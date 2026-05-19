@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/serverAuth";
 import { kvGet, kvSet } from "@/lib/redis";
 
-const ALLOWED_TYPES = ["themes", "contentTypes"];
+const ALLOWED_TYPES = ["themes", "contentTypes", "platforms", "pillars"];
 
 export async function GET(req) {
   const user = await getSession(req);
