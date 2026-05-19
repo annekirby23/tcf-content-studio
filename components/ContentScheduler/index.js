@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { C } from "./constants";
 import ContentForm from "./ContentForm";
 import Dashboard from "./Dashboard";
@@ -27,7 +27,7 @@ function CampaignModal({ onSave, onClose }) {
 
   const inputStyle = {
     width: "100%",
-    background: "rgba(255,255,255,0.06)",
+    background: C.inputBg,
     border: `1px solid ${C.border}`,
     borderRadius: "8px",
     padding: "10px 12px",
@@ -38,7 +38,7 @@ function CampaignModal({ onSave, onClose }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", backdropFilter: "blur(4px)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", width: "100%", maxWidth: "440px", padding: "24px" }}>
         <h2 style={{ margin: "0 0 20px", fontSize: "18px", fontWeight: "700", color: C.text }}>New Campaign</h2>
         <div style={{ marginBottom: "14px" }}>
@@ -48,11 +48,11 @@ function CampaignModal({ onSave, onClose }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
           <div>
             <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px" }}>Start Date</label>
-            <input type="date" style={{ ...inputStyle, colorScheme: "dark" }} value={start} onChange={(e) => setStart(e.target.value)} />
+            <input type="date" style={{ ...inputStyle, colorScheme: "light" }} value={start} onChange={(e) => setStart(e.target.value)} />
           </div>
           <div>
             <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px" }}>End Date</label>
-            <input type="date" style={{ ...inputStyle, colorScheme: "dark" }} value={end} onChange={(e) => setEnd(e.target.value)} />
+            <input type="date" style={{ ...inputStyle, colorScheme: "light" }} value={end} onChange={(e) => setEnd(e.target.value)} />
           </div>
         </div>
         <div style={{ marginBottom: "20px" }}>
@@ -112,6 +112,10 @@ export default function ContentScheduler() {
   const [teamModalOpen, setTeamModalOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [goals, setGoals] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [listFilters, setListFilters] = useState({});
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -181,19 +185,35 @@ export default function ContentScheduler() {
     if (!authToken) return;
     setLoading(true);
     try {
-      const [postsRes, campaignsRes, teamRes] = await Promise.all([
+      const [postsRes, campaignsRes, teamRes, goalsRes] = await Promise.all([
         authFetch("/api/scheduler"),
         authFetch("/api/scheduler?type=campaigns"),
         authFetch("/api/team"),
+        authFetch("/api/goals"),
       ]);
       if (postsRes.ok) setPosts(await postsRes.json());
       if (campaignsRes.ok) setCampaigns(await campaignsRes.json());
       if (teamRes.ok) setTeamMembers(await teamRes.json());
+      if (goalsRes.ok) setGoals(await goalsRes.json());
     } catch (e) {
       showToast("Failed to load content", "error");
     } finally {
       setLoading(false);
     }
+  }, [authToken, authFetch]);
+
+  // Poll notifications every 30s
+  useEffect(() => {
+    if (!authToken) return;
+    const fetchNotifs = async () => {
+      try {
+        const res = await authFetch("/api/notifications");
+        if (res.ok) setNotifications(await res.json());
+      } catch {}
+    };
+    fetchNotifs();
+    const interval = setInterval(fetchNotifs, 30000);
+    return () => clearInterval(interval);
   }, [authToken, authFetch]);
 
   useEffect(() => { if (authToken) fetchAll(); }, [authToken, fetchAll]);
@@ -260,6 +280,21 @@ export default function ContentScheduler() {
     } catch {
       showToast("Failed to delete", "error");
     }
+  };
+
+  const handleNavigate = (targetView, filters = {}) => {
+    setView(targetView);
+    setListFilters(filters);
+  };
+
+  const handleGoalsUpdate = (updated) => setGoals(updated);
+
+  const handleMarkAllRead = async () => {
+    try {
+      const token = authToken;
+      await fetch("/api/notifications", { method: "POST", headers: { "x-session": token, "Content-Type": "application/json" }, body: JSON.stringify({ ids: [] }) });
+      setNotifications((n) => n.map((x) => ({ ...x, read: true })));
+    } catch {}
   };
 
   const handleCampaignSave = async (data) => {
@@ -359,7 +394,7 @@ export default function ContentScheduler() {
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                 }}
-                onMouseEnter={(e) => !active && (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                onMouseEnter={(e) => !active && (e.currentTarget.style.background = C.hover)}
                 onMouseLeave={(e) => !active && (e.currentTarget.style.background = "transparent")}
               >
                 <span style={{ fontSize: "16px", flexShrink: 0 }}>{v.icon}</span>
@@ -389,7 +424,7 @@ export default function ContentScheduler() {
                 whiteSpace: "nowrap",
                 overflow: "hidden",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+              onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >
               <span style={{ fontSize: "16px", flexShrink: 0 }}>🎯</span>
@@ -403,14 +438,14 @@ export default function ContentScheduler() {
               onClick={() => setTeamModalOpen(true)}
               title={!sidebarOpen ? "Manage Team" : undefined}
               style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "9px 10px", borderRadius: "8px", border: "none", background: "transparent", color: C.muted, fontSize: "13px", cursor: "pointer", transition: "all 0.15s", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+              onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >
               <span style={{ fontSize: "16px", flexShrink: 0 }}>👥</span>
               {sidebarOpen && (
                 <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   Team
-                  {teamMembers.length > 0 && <span style={{ fontSize: "10px", background: "rgba(255,255,255,0.1)", padding: "1px 6px", borderRadius: "10px" }}>{teamMembers.length}</span>}
+                  {teamMembers.length > 0 && <span style={{ fontSize: "10px", background: "rgba(0,0,0,0.08)", padding: "1px 6px", borderRadius: "10px" }}>{teamMembers.length}</span>}
                 </span>
               )}
             </button>
@@ -449,7 +484,7 @@ export default function ContentScheduler() {
           <button
             onClick={() => setSidebarOpen((o) => !o)}
             style={{ width: "100%", padding: "8px 10px", borderRadius: "8px", border: "none", background: "transparent", color: C.muted, fontSize: "13px", cursor: "pointer", textAlign: "center" }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+            onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
             onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
             {sidebarOpen ? "◀" : "▶"}
@@ -472,6 +507,60 @@ export default function ContentScheduler() {
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <div style={{ fontSize: "12px", color: C.muted }}>
               {posts.length} total posts
+            </div>
+            {/* Notification bell */}
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setNotifOpen((o) => !o)}
+                style={{ position: "relative", padding: "8px", borderRadius: "8px", border: `1px solid ${notifOpen ? C.accent : C.border}`, background: notifOpen ? C.accentLight : C.inputBg, color: notifOpen ? C.accentBright : C.muted, fontSize: "16px", cursor: "pointer", lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}
+                title="Notifications"
+              >
+                🔔
+                {notifications.filter((n) => !n.read).length > 0 && (
+                  <span style={{ position: "absolute", top: "2px", right: "2px", width: "16px", height: "16px", borderRadius: "50%", background: "#EF4444", color: "#fff", fontSize: "9px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
+                    {notifications.filter((n) => !n.read).length > 9 ? "9+" : notifications.filter((n) => !n.read).length}
+                  </span>
+                )}
+              </button>
+              {/* Notification panel */}
+              {notifOpen && (
+                <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, width: "340px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px", boxShadow: C.shadowMd, zIndex: 1000, overflow: "hidden" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: `1px solid ${C.border}` }}>
+                    <span style={{ fontSize: "13px", fontWeight: "700", color: C.text }}>Notifications</span>
+                    {notifications.some((n) => !n.read) && (
+                      <button onClick={handleMarkAllRead} style={{ fontSize: "11px", color: C.accentBright, background: "none", border: "none", cursor: "pointer", fontWeight: "600" }}>
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ maxHeight: "380px", overflowY: "auto" }}>
+                    {notifications.length === 0 ? (
+                      <div style={{ padding: "32px 16px", textAlign: "center", color: C.muted, fontSize: "13px" }}>No notifications yet</div>
+                    ) : (
+                      notifications.slice(0, 20).map((n) => (
+                        <div
+                          key={n.id}
+                          onClick={() => { setNotifOpen(false); const post = posts.find((p) => p.id === n.postId); if (post) openEdit(post); }}
+                          style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}`, background: n.read ? "transparent" : C.accentLight, cursor: "pointer", transition: "background 0.1s" }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = n.read ? "transparent" : C.accentLight)}
+                        >
+                          {!n.read && <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.accent, display: "inline-block", marginRight: "6px", verticalAlign: "middle" }} />}
+                          <span style={{ fontSize: "12px", color: C.text }}>
+                            <strong>{n.mentionedBy}</strong> mentioned you in <strong>{n.postTitle}</strong>
+                          </span>
+                          <div style={{ fontSize: "11px", color: C.muted, marginTop: "3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            "{n.noteText}"
+                          </div>
+                          <div style={{ fontSize: "10px", color: C.muted, marginTop: "2px" }}>
+                            {new Date(n.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             <button
               onClick={() => openNew()}
@@ -500,10 +589,10 @@ export default function ContentScheduler() {
             </div>
           ) : (
             <>
-              {view === "dashboard" && <Dashboard posts={posts} onEdit={openEdit} onNewPost={() => openNew()} />}
+              {view === "dashboard" && <Dashboard posts={posts} campaigns={campaigns} goals={goals} currentUser={currentUser} onEdit={openEdit} onNewPost={() => openNew()} onNavigate={handleNavigate} onGoalsUpdate={handleGoalsUpdate} />}
               {view === "calendar" && <CalendarView posts={posts} onEdit={openEdit} onNewPost={(date) => openNew(date)} />}
               {view === "pipeline" && <Pipeline posts={posts} onEdit={openEdit} onNewPost={(date, status) => openNew(date, status || "draft")} onStatusChange={handleStatusChange} currentUser={currentUser} />}
-              {view === "list" && <ListView posts={posts} campaigns={campaigns} onEdit={openEdit} onNewPost={() => openNew()} />}
+              {view === "list" && <ListView key={JSON.stringify(listFilters)} posts={posts} campaigns={campaigns} onEdit={openEdit} onNewPost={() => openNew()} initialFilters={listFilters} />}
             </>
           )}
         </div>
@@ -516,6 +605,7 @@ export default function ContentScheduler() {
           campaigns={campaigns}
           teamMembers={teamMembers}
           currentUser={currentUser}
+          token={authToken}
           onSave={handleSave}
           onDelete={handleDelete}
           onClose={() => { setFormOpen(false); setEditingPost(null); }}

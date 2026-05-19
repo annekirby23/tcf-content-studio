@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { STATUSES, STATUS_MAP, PLATFORM_MAP, PRIORITIES, C } from "./constants";
+import { STATUSES, STATUS_MAP, PLATFORM_MAP, PRIORITIES, AUDIENCE_MAP, C } from "./constants";
 
 function PriorityDot({ priority }) {
   const colors = { urgent: "#DC2626", high: "#EF4444", medium: "#F59E0B", low: "#6B7280" };
@@ -26,7 +26,7 @@ function PipelineCard({ post, onEdit, onDragStart, isDragging }) {
       onDragStart={(e) => onDragStart(e, post.id)}
       onClick={() => onEdit(post)}
       style={{
-        background: isDragging ? "rgba(99,102,241,0.12)" : "rgba(255,255,255,0.04)",
+        background: isDragging ? "rgba(99,102,241,0.12)" : C.card,
         border: `1px solid ${isDragging ? C.accent : isOverdue ? "rgba(239,68,68,0.3)" : C.border}`,
         borderRadius: "10px",
         padding: "12px",
@@ -36,8 +36,8 @@ function PipelineCard({ post, onEdit, onDragStart, isDragging }) {
         opacity: isDragging ? 0.5 : 1,
         userSelect: "none",
       }}
-      onMouseEnter={(e) => { if (!isDragging) e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
-      onMouseLeave={(e) => { if (!isDragging) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+      onMouseEnter={(e) => { if (!isDragging) e.currentTarget.style.background = C.cardBg; }}
+      onMouseLeave={(e) => { if (!isDragging) e.currentTarget.style.background = C.card; }}
     >
       {/* Drag handle hint + platforms row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
@@ -61,6 +61,14 @@ function PipelineCard({ post, onEdit, onDragStart, isDragging }) {
       {post.caption && (
         <div style={{ fontSize: "11px", color: C.muted, lineHeight: "1.4", marginBottom: "8px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
           {post.caption}
+        </div>
+      )}
+
+      {post.audience && AUDIENCE_MAP[post.audience] && (
+        <div style={{ marginBottom: "6px" }}>
+          <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "8px", background: AUDIENCE_MAP[post.audience].bg, color: AUDIENCE_MAP[post.audience].color, fontWeight: "600" }}>
+            {post.audience === "internal" ? "🏛" : "🌐"} {AUDIENCE_MAP[post.audience].label}
+          </span>
         </div>
       )}
 
@@ -190,7 +198,7 @@ export default function Pipeline({ posts, onEdit, onNewPost, onStatusChange, cur
                   <span style={{ fontSize: "12px", fontWeight: "700", color: C.text }}>{status.label}</span>
                   {isLocked && <span title="Admin only" style={{ fontSize: "10px" }}>🔒</span>}
                 </div>
-                <span style={{ fontSize: "11px", color: C.muted, fontFamily: "monospace", background: "rgba(255,255,255,0.06)", padding: "1px 7px", borderRadius: "10px" }}>
+                <span style={{ fontSize: "11px", color: C.muted, fontFamily: "monospace", background: "rgba(0,0,0,0.06)", padding: "1px 7px", borderRadius: "10px" }}>
                   {col.length}
                 </span>
               </div>
@@ -201,7 +209,7 @@ export default function Pipeline({ posts, onEdit, onNewPost, onStatusChange, cur
                   minHeight: "300px",
                   padding: "8px",
                   borderRadius: "12px",
-                  background: isDropTarget ? `${status.color}0D` : "rgba(255,255,255,0.02)",
+                  background: isDropTarget ? `${status.color}1A` : C.cardBg,
                   border: `${isDropTarget ? "2px" : "1px"} ${isDropTarget ? "dashed" : "solid"} ${isDropTarget ? status.color : C.border}`,
                   transition: "all 0.15s",
                 }}

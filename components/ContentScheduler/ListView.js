@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PLATFORMS, STATUSES, STATUS_MAP, PLATFORM_MAP, CONTENT_TYPES, PILLARS, PRIORITIES, C } from "./constants";
+import { PLATFORMS, STATUSES, STATUS_MAP, PLATFORM_MAP, CONTENT_TYPES, PILLARS, PRIORITIES, AUDIENCES, AUDIENCE_MAP, C } from "./constants";
 
 const SORT_OPTS = [
   { id: "date-asc", label: "Date (Earliest)" },
@@ -34,11 +34,12 @@ function FilterPill({ label, active, onClick, color }) {
   );
 }
 
-export default function ListView({ posts, campaigns, onEdit, onNewPost }) {
+export default function ListView({ posts, campaigns, onEdit, onNewPost, initialFilters }) {
   const [search, setSearch] = useState("");
-  const [filterPlatform, setFilterPlatform] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
-  const [filterCampaign, setFilterCampaign] = useState("");
+  const [filterPlatform, setFilterPlatform] = useState(initialFilters?.platform || "");
+  const [filterStatus, setFilterStatus] = useState(initialFilters?.status || "");
+  const [filterCampaign, setFilterCampaign] = useState(initialFilters?.campaign || "");
+  const [filterAudience, setFilterAudience] = useState(initialFilters?.audience || "");
   const [filterPillar, setFilterPillar] = useState("");
   const [sort, setSort] = useState("date-asc");
   const [showFilters, setShowFilters] = useState(false);
@@ -53,6 +54,7 @@ export default function ListView({ posts, campaigns, onEdit, onNewPost }) {
       if (filterStatus && p.status !== filterStatus) return false;
       if (filterCampaign && p.campaign !== filterCampaign) return false;
       if (filterPillar && p.pillar !== filterPillar) return false;
+      if (filterAudience && p.audience !== filterAudience) return false;
       return true;
     })
     .sort((a, b) => {
@@ -81,7 +83,7 @@ export default function ListView({ posts, campaigns, onEdit, onNewPost }) {
   };
 
   const inputStyle = {
-    background: "rgba(255,255,255,0.06)",
+    background: C.inputBg,
     border: `1px solid ${C.border}`,
     borderRadius: "8px",
     padding: "8px 12px",
@@ -111,7 +113,7 @@ export default function ListView({ posts, campaigns, onEdit, onNewPost }) {
         />
         <button
           onClick={() => setShowFilters((f) => !f)}
-          style={{ ...inputStyle, cursor: "pointer", color: showFilters ? C.accentBright : C.muted, border: `1px solid ${showFilters ? C.accent : C.border}`, background: showFilters ? C.accentLight : "rgba(255,255,255,0.06)" }}
+          style={{ ...inputStyle, cursor: "pointer", color: showFilters ? C.accentBright : C.muted, border: `1px solid ${showFilters ? C.accent : C.border}`, background: showFilters ? C.accentLight : C.inputBg }}
         >
           Filters {showFilters ? "▲" : "▼"}
         </button>
@@ -132,7 +134,7 @@ export default function ListView({ posts, campaigns, onEdit, onNewPost }) {
 
       {/* Filter pills */}
       {showFilters && (
-        <div style={{ marginBottom: "14px", padding: "14px 16px", background: "rgba(255,255,255,0.02)", borderRadius: "10px", border: `1px solid ${C.border}` }}>
+        <div style={{ marginBottom: "14px", padding: "14px 16px", background: C.cardBg, borderRadius: "10px", border: `1px solid ${C.border}` }}>
           <div style={{ marginBottom: "10px" }}>
             <div style={{ fontSize: "10px", color: C.muted, fontWeight: "600", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "7px" }}>Platform</div>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
@@ -162,6 +164,15 @@ export default function ListView({ posts, campaigns, onEdit, onNewPost }) {
               </div>
             </div>
           )}
+          <div>
+            <div style={{ fontSize: "10px", color: C.muted, fontWeight: "600", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "7px" }}>Audience</div>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              <FilterPill label="All" active={!filterAudience} onClick={() => setFilterAudience("")} />
+              {AUDIENCES.map((a) => (
+                <FilterPill key={a.id} label={`${a.id === "internal" ? "🏛" : "🌐"} ${a.label}`} active={filterAudience === a.id} onClick={() => setFilterAudience(filterAudience === a.id ? "" : a.id)} color={a.color} />
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -174,7 +185,7 @@ export default function ListView({ posts, campaigns, onEdit, onNewPost }) {
       {/* Table */}
       <div style={{ borderRadius: "12px", border: `1px solid ${C.border}`, overflow: "hidden" }}>
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", padding: "10px 16px", background: "rgba(255,255,255,0.04)", borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ display: "flex", alignItems: "center", padding: "10px 16px", background: C.cardBg, borderBottom: `1px solid ${C.border}` }}>
           <div style={{ width: "20px", marginRight: "12px", flexShrink: 0 }}>
             <input
               type="checkbox"
@@ -222,7 +233,7 @@ export default function ListView({ posts, campaigns, onEdit, onNewPost }) {
                   transition: "background 0.1s",
                   cursor: "pointer",
                 }}
-                onMouseEnter={(e) => !isSelected && (e.currentTarget.style.background = "rgba(255,255,255,0.03)")}
+                onMouseEnter={(e) => !isSelected && (e.currentTarget.style.background = C.hover)}
                 onMouseLeave={(e) => !isSelected && (e.currentTarget.style.background = "transparent")}
               >
                 <div style={{ width: "20px", marginRight: "12px", flexShrink: 0 }} onClick={(e) => { e.stopPropagation(); toggleSelect(p.id); }}>
@@ -235,7 +246,14 @@ export default function ListView({ posts, campaigns, onEdit, onNewPost }) {
                 </div>
 
                 <div style={{ ...colStyle(3) }} onClick={() => onEdit(p)}>
-                  <div style={{ fontSize: "13px", fontWeight: "600", color: C.text }}>{p.title}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                    <div style={{ fontSize: "13px", fontWeight: "600", color: C.text }}>{p.title}</div>
+                    {p.audience && AUDIENCE_MAP[p.audience] && (
+                      <span style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "8px", background: AUDIENCE_MAP[p.audience].bg, color: AUDIENCE_MAP[p.audience].color, fontWeight: "600", flexShrink: 0 }}>
+                        {p.audience === "internal" ? "🏛" : "🌐"} {AUDIENCE_MAP[p.audience].label}
+                      </span>
+                    )}
+                  </div>
                   {p.caption && <div style={{ fontSize: "11px", color: C.muted, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis" }}>{p.caption.slice(0, 60)}{p.caption.length > 60 ? "…" : ""}</div>}
                 </div>
 
