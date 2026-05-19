@@ -317,6 +317,14 @@ export default function ContentScheduler() {
     }
   };
 
+  const handleNoteAdded = (postId, note) => {
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId ? { ...p, notes: [...(p.notes || []), note] } : p
+      )
+    );
+  };
+
   const handleMakePost = (idea) => {
     setEditingPost({ title: idea.title || "", caption: idea.description || "", status: "draft" });
     setFormOpen(true);
@@ -664,6 +672,7 @@ export default function ContentScheduler() {
           token={authToken}
           onSave={handleSave}
           onDelete={handleDelete}
+          onNoteAdded={handleNoteAdded}
           onClose={() => { setFormOpen(false); setEditingPost(null); }}
         />
       )}

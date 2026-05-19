@@ -81,6 +81,7 @@ export default function ContentForm({
   onSave,
   onDelete,
   onClose,
+  onNoteAdded,
   token,
 }) {
   const isAdmin = currentUser?.role === "admin";
@@ -282,8 +283,8 @@ export default function ContentForm({
         });
         if (res.ok) {
           const saved = await res.json();
-          // Replace the optimistic note with the real saved one
           setThreadNotes((prev) => prev.map((n) => n.id === optimistic.id ? saved : n));
+          onNoteAdded?.(post.id, saved);
         }
       }
     } catch {
