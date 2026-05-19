@@ -159,6 +159,27 @@ export default function ContentScheduler() {
     }
   };
 
+  const handleStatusChange = async (postId, newStatus) => {
+    const post = posts.find((p) => p.id === postId);
+    if (!post) return;
+    // Optimistic update — feels instant
+    setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, status: newStatus } : p));
+    try {
+      const res = await fetch(`/api/scheduler/${postId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...post, status: newStatus }),
+      });
+      if (!res.ok) throw new Error();
+      const statusLabel = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
+      showToast(`Moved to ${statusLabel}`);
+    } catch {
+      // Revert on failure
+      setPosts((prev) => prev.map((p) => p.id === postId ? post : p));
+      showToast("Failed to update status", "error");
+    }
+  };
+
   const handleDelete = async (id) => {
     try {
       const res = await fetch(`/api/scheduler/${id}`, { method: "DELETE" });
@@ -358,7 +379,7 @@ export default function ContentScheduler() {
             <>
               {view === "dashboard" && <Dashboard posts={posts} onEdit={openEdit} onNewPost={() => openNew()} />}
               {view === "calendar" && <CalendarView posts={posts} onEdit={openEdit} onNewPost={(date) => openNew(date)} />}
-              {view === "pipeline" && <Pipeline posts={posts} onEdit={openEdit} onNewPost={(date, status) => openNew(date, status || "draft")} />}
+              {view === "pipeline" && <Pipeline posts={posts} onEdit={openEdit} onNewPost={(date, status) => openNew(date, status || "draft")} onStatusChange={handleStatusChange} />}
               {view === "list" && <ListView posts={posts} campaigns={campaigns} onEdit={openEdit} onNewPost={() => openNew()} />}
             </>
           )}

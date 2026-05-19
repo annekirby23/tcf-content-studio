@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { STATUSES, STATUS_MAP, PLATFORM_MAP, PRIORITIES, C } from "./constants";
 
 function PriorityDot({ priority }) {
@@ -7,8 +8,7 @@ function PriorityDot({ priority }) {
   return <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: colors[priority] || colors.low, flexShrink: 0 }} title={priority} />;
 }
 
-function PipelineCard({ post, onEdit }) {
-  const statusCfg = STATUS_MAP[post.status] || {};
+function PipelineCard({ post, onEdit, onDragStart, isDragging }) {
   const today = new Date().toISOString().split("T")[0];
   const isOverdue = post.scheduledDate && post.scheduledDate < today && post.status !== "published";
   const dayLabel = (() => {
@@ -22,27 +22,30 @@ function PipelineCard({ post, onEdit }) {
 
   return (
     <div
+      draggable
+      onDragStart={(e) => onDragStart(e, post.id)}
       onClick={() => onEdit(post)}
       style={{
-        background: "rgba(255,255,255,0.04)",
-        border: `1px solid ${isOverdue ? "rgba(239,68,68,0.3)" : C.border}`,
+        background: isDragging ? "rgba(99,102,241,0.12)" : "rgba(255,255,255,0.04)",
+        border: `1px solid ${isDragging ? C.accent : isOverdue ? "rgba(239,68,68,0.3)" : C.border}`,
         borderRadius: "10px",
         padding: "12px",
-        cursor: "pointer",
+        cursor: "grab",
         transition: "all 0.15s",
         marginBottom: "8px",
+        opacity: isDragging ? 0.5 : 1,
+        userSelect: "none",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
-      onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+      onMouseEnter={(e) => { if (!isDragging) e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+      onMouseLeave={(e) => { if (!isDragging) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
     >
-      {/* Platform icons */}
+      {/* Drag handle hint + platforms row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-        <div style={{ display: "flex", gap: "4px" }}>
+        <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+          <span style={{ fontSize: "11px", color: C.muted, marginRight: "4px", cursor: "grab" }}>⠿</span>
           {(post.platforms || []).slice(0, 4).map((pid) => {
             const cfg = PLATFORM_MAP[pid];
-            return cfg ? (
-              <span key={pid} style={{ fontSize: "13px" }} title={cfg.label}>{cfg.icon}</span>
-            ) : null;
+            return cfg ? <span key={pid} style={{ fontSize: "13px" }} title={cfg.label}>{cfg.icon}</span> : null;
           })}
           {(!post.platforms || post.platforms.length === 0) && (
             <span style={{ fontSize: "11px", color: C.muted }}>No platform</span>
@@ -79,12 +82,15 @@ function PipelineCard({ post, onEdit }) {
   );
 }
 
-export default function Pipeline({ posts, onEdit, onNewPost }) {
+export default function Pipeline({ posts, onEdit, onNewPost, onStatusChange }) {
+  const [draggingId, setDraggingId] = useState(null);
+  const [dragOverStatus, setDragOverStatus] = useState(null);
+
   const grouped = {};
   STATUSES.forEach((s) => { grouped[s.id] = []; });
   posts.forEach((p) => {
     if (grouped[p.status]) grouped[p.status].push(p);
-    else grouped["draft"] = [...(grouped["draft"] || []), p];
+    else grouped["draft"].push(p);
   });
 
   Object.keys(grouped).forEach((key) => {
@@ -96,10 +102,45 @@ export default function Pipeline({ posts, onEdit, onNewPost }) {
     });
   });
 
+  const handleDragStart = (e, postId) => {
+    setDraggingId(postId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("postId", postId);
+  };
+
+  const handleDragOver = (e, statusId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverStatus(statusId);
+  };
+
+  const handleDragLeave = (e) => {
+    // Only clear if leaving the column entirely (not entering a child)
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setDragOverStatus(null);
+    }
+  };
+
+  const handleDrop = (e, statusId) => {
+    e.preventDefault();
+    const postId = e.dataTransfer.getData("postId");
+    setDraggingId(null);
+    setDragOverStatus(null);
+    const post = posts.find((p) => p.id === postId);
+    if (post && post.status !== statusId) {
+      onStatusChange(postId, statusId);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggingId(null);
+    setDragOverStatus(null);
+  };
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "center" }}>
           {[
             { color: "#DC2626", label: "Urgent" },
             { color: "#EF4444", label: "High" },
@@ -111,6 +152,9 @@ export default function Pipeline({ posts, onEdit, onNewPost }) {
               {label}
             </div>
           ))}
+          <span style={{ fontSize: "11px", color: C.muted, borderLeft: `1px solid ${C.border}`, paddingLeft: "16px" }}>
+            Drag cards between columns to update status
+          </span>
         </div>
         <button
           onClick={() => onNewPost()}
@@ -120,11 +164,21 @@ export default function Pipeline({ posts, onEdit, onNewPost }) {
         </button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(180px, 1fr))", gap: "12px", overflowX: "auto", paddingBottom: "8px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(190px, 1fr))", gap: "12px", overflowX: "auto", paddingBottom: "8px" }}>
         {STATUSES.map((status) => {
           const col = grouped[status.id] || [];
+          const isDropTarget = dragOverStatus === status.id;
+          const isDraggingFromThis = draggingId && col.some((p) => p.id === draggingId);
+
           return (
-            <div key={status.id} style={{ minWidth: "180px" }}>
+            <div
+              key={status.id}
+              style={{ minWidth: "190px" }}
+              onDragOver={(e) => handleDragOver(e, status.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, status.id)}
+            >
+              {/* Column header */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", padding: "0 2px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
                   <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: status.color }} />
@@ -135,16 +189,34 @@ export default function Pipeline({ posts, onEdit, onNewPost }) {
                 </span>
               </div>
 
+              {/* Drop zone */}
               <div
                 style={{
                   minHeight: "300px",
                   padding: "8px",
                   borderRadius: "12px",
-                  background: "rgba(255,255,255,0.02)",
-                  border: `1px solid ${C.border}`,
+                  background: isDropTarget ? `${status.color}0D` : "rgba(255,255,255,0.02)",
+                  border: `${isDropTarget ? "2px" : "1px"} ${isDropTarget ? "dashed" : "solid"} ${isDropTarget ? status.color : C.border}`,
+                  transition: "all 0.15s",
                 }}
               >
-                {col.map((p) => <PipelineCard key={p.id} post={p} onEdit={onEdit} />)}
+                {isDropTarget && col.length === 0 && (
+                  <div style={{ textAlign: "center", padding: "24px 8px", fontSize: "12px", color: status.color, opacity: 0.7 }}>
+                    Drop here
+                  </div>
+                )}
+
+                {col.map((p) => (
+                  <PipelineCard
+                    key={p.id}
+                    post={p}
+                    onEdit={onEdit}
+                    onDragStart={handleDragStart}
+                    isDragging={draggingId === p.id}
+                    onDragEnd={handleDragEnd}
+                  />
+                ))}
+
                 <button
                   onClick={() => onNewPost(null, status.id)}
                   style={{
