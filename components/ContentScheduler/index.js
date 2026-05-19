@@ -13,6 +13,7 @@ import IdeaBoard from "./IdeaBoard";
 import SettingsModal from "./SettingsModal";
 import SlackPlanner from "./SlackPlanner";
 import QuickLinks from "./QuickLinks";
+import AssetTracker from "./AssetTracker";
 
 const TOKEN_KEY = "tcf_session";
 
@@ -23,6 +24,7 @@ const VIEWS = [
   { id: "list", label: "List", icon: "☰" },
   { id: "slack", label: "Slack", icon: "💬" },
   { id: "links", label: "Quick Links", icon: "🔗" },
+  { id: "assets", label: "Assets", icon: "📦" },
 ];
 
 function CampaignModal({ onSave, onClose }) {
@@ -646,6 +648,7 @@ export default function ContentScheduler() {
               {view === "list" && <ListView key={JSON.stringify(listFilters)} posts={posts} campaigns={campaigns} onEdit={openEdit} onNewPost={() => openNew()} initialFilters={listFilters} />}
               {view === "slack" && <SlackPlanner currentUser={currentUser} token={authToken} onMakePost={handleMakePost} />}
               {view === "links" && <QuickLinks currentUser={currentUser} token={authToken} />}
+              {view === "assets" && <AssetTracker currentUser={currentUser} token={authToken} teamMembers={teamMembers} />}
             </>
           )}
         </div>
