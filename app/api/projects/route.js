@@ -22,12 +22,13 @@ export async function POST(req) {
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
-    const { name, description, color, status, members } = body;
+    const { name, description, details, color, status, members } = body;
 
     const project = {
       id: crypto.randomBytes(8).toString("hex"),
       name,
       description: description || "",
+      details: details || "",
       color: color || null,
       status: status || "planning",
       tasks: [],

@@ -542,7 +542,7 @@ function MembershipsTab({ token }) {
                     <span style={{ fontSize:"15px", fontWeight:"700", color:C.text }}>{m.name}</span>
                     {m.cost && <span style={{ padding:"2px 8px", borderRadius:"20px", background:`${C.accent}18`, color:C.accent, fontSize:"11px", fontWeight:"700" }}>${m.cost}/{m.billingCycle}</span>}
                   </div>
-                  {m.details && <div style={{ fontSize:"13px", color:C.muted, lineHeight:"1.5", marginBottom:"6px" }}>{m.details}</div>}
+                  {m.details && <div style={{ fontSize:"13px", color:C.muted, lineHeight:"1.5", marginBottom:"6px", whiteSpace:"pre-wrap", wordBreak:"break-word" }}>{m.details}</div>}
                   {m.link && <a href={m.link} target="_blank" rel="noopener noreferrer" style={{ fontSize:"12px", color:C.accent, textDecoration:"none" }}>🔗 Visit</a>}
                 </div>
                 {hoverIds.has(m.id) && (
@@ -560,61 +560,286 @@ function MembershipsTab({ token }) {
   );
 }
 
-function InternalView({ token }) {
-  const [data, setData] = useState({ hrInfo: "" });
+function HRInfoTab({ token }) {
+  const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("hrInfo");
+  const [showAdd, setShowAdd] = useState(false);
+  const [addForm, setAddForm] = useState({ title: "", content: "" });
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [expandedIds, setExpandedIds] = useState(new Set());
 
   useEffect(() => {
     fetch("/api/internal", { headers: { "x-session": token } })
       .then((r) => r.json())
-      .then((d) => setData(d || { hrInfo: "" }))
+      .then((d) => {
+        if (Array.isArray(d?.hrSections) && d.hrSections.length > 0) {
+          setSections(d.hrSections);
+          setExpandedIds(new Set([d.hrSections[0]?.id]));
+        } else if (d?.hrInfo) {
+          const migrated = [{ id: "legacy", title: "General HR Info", content: d.hrInfo }];
+          setSections(migrated);
+          setExpandedIds(new Set(["legacy"]));
+        } else {
+          setSections([]);
+        }
+      })
+      .catch(() => setSections([]))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  const saveSections = async (updated) => {
+    await fetch("/api/internal", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "x-session": token },
+      body: JSON.stringify({ hrSections: updated }),
+    });
+  };
+
+  const addSection = async () => {
+    if (!addForm.title.trim()) return;
+    const section = { id: genHex(), ...addForm };
+    const updated = [...sections, section];
+    setSections(updated);
+    setAddForm({ title: "", content: "" });
+    setShowAdd(false);
+    setExpandedIds((prev) => { const n = new Set(prev); n.add(section.id); return n; });
+    await saveSections(updated);
+  };
+
+  const updateSection = async (id) => {
+    const updated = sections.map((s) => s.id === id ? { ...s, ...editForm } : s);
+    setSections(updated);
+    setEditingId(null);
+    await saveSections(updated);
+  };
+
+  const deleteSection = async (id) => {
+    if (!window.confirm("Delete this section?")) return;
+    const updated = sections.filter((s) => s.id !== id);
+    setSections(updated);
+    await saveSections(updated);
+  };
+
+  const toggleExpand = (id) => {
+    setExpandedIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const inputS = { padding:"8px 10px", border:`1px solid ${C.border}`, borderRadius:"8px", background:C.inputBg, color:C.text, fontSize:"13px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", width:"100%" };
+
+  if (loading) return <div style={{ textAlign:"center", padding:"48px", color:C.muted }}>Loading HR info…</div>;
+
+  return (
+    <div>
+      <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:"16px" }}>
+        <button
+          onClick={() => setShowAdd((v) => !v)}
+          style={{ padding:"8px 16px", borderRadius:"8px", border:"none", background:C.accent, color:"#fff", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}
+        >
+          {showAdd ? "Cancel" : "+ Add Section"}
+        </button>
+      </div>
+
+      {showAdd && (
+        <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:"12px", padding:"16px", marginBottom:"16px", display:"flex", flexDirection:"column", gap:"10px" }}>
+          <div>
+            <label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px" }}>Section Title *</label>
+            <input value={addForm.title} onChange={(e) => setAddForm((f) => ({ ...f, title: e.target.value }))} style={inputS} placeholder="e.g. Benefits, PTO Policy, Onboarding, Payroll…" autoFocus />
+          </div>
+          <div>
+            <label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px" }}>Content</label>
+            <textarea value={addForm.content} onChange={(e) => setAddForm((f) => ({ ...f, content: e.target.value }))} rows={5} style={{ ...inputS, resize:"vertical" }} placeholder="Add details, policies, links, contacts, instructions…" />
+          </div>
+          <div style={{ display:"flex", gap:"8px" }}>
+            <button onClick={addSection} style={{ padding:"8px 18px", borderRadius:"8px", border:"none", background:C.accent, color:"#fff", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>Add Section</button>
+            <button onClick={() => { setShowAdd(false); setAddForm({ title:"", content:"" }); }} style={{ padding:"8px 14px", borderRadius:"8px", border:`1px solid ${C.border}`, background:"none", color:C.muted, fontSize:"13px", cursor:"pointer" }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+        {sections.length === 0 && (
+          <div style={{ textAlign:"center", padding:"60px 20px", color:C.muted, fontSize:"14px", background:C.card, border:`1px dashed ${C.border}`, borderRadius:"12px" }}>
+            <div style={{ fontSize:"32px", marginBottom:"8px" }}>🏢</div>
+            No HR sections yet. Add the first one above!
+          </div>
+        )}
+        {sections.map((section) => (
+          <div key={section.id} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:"12px", overflow:"hidden" }}>
+            {editingId === section.id ? (
+              <div style={{ padding:"16px", display:"flex", flexDirection:"column", gap:"10px" }}>
+                <div>
+                  <label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px" }}>Title</label>
+                  <input value={editForm.title||""} onChange={(e) => setEditForm((f) => ({ ...f, title:e.target.value }))} style={inputS} autoFocus />
+                </div>
+                <div>
+                  <label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px" }}>Content</label>
+                  <textarea value={editForm.content||""} onChange={(e) => setEditForm((f) => ({ ...f, content:e.target.value }))} rows={7} style={{ ...inputS, resize:"vertical" }} />
+                </div>
+                <div style={{ display:"flex", gap:"8px" }}>
+                  <button onClick={() => updateSection(section.id)} style={{ padding:"7px 16px", borderRadius:"8px", border:"none", background:C.accent, color:"#fff", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>Save</button>
+                  <button onClick={() => setEditingId(null)} style={{ padding:"7px 12px", borderRadius:"8px", border:`1px solid ${C.border}`, background:"none", color:C.muted, fontSize:"13px", cursor:"pointer" }}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={() => toggleExpand(section.id)}
+                  style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 16px", background:"none", border:"none", cursor:"pointer", textAlign:"left" }}
+                >
+                  <span style={{ fontSize:"14px", fontWeight:"700", color:C.text }}>{section.title}</span>
+                  <span style={{ fontSize:"10px", color:C.muted, transform:expandedIds.has(section.id) ? "rotate(90deg)" : "rotate(0deg)", display:"inline-block", transition:"transform 0.12s" }}>▶</span>
+                </button>
+                {expandedIds.has(section.id) && (
+                  <div style={{ padding:"0 16px 16px", borderTop:`1px solid ${C.border}` }}>
+                    {section.content ? (
+                      <div style={{ fontSize:"13px", color:C.text, lineHeight:"1.6", whiteSpace:"pre-wrap", wordBreak:"break-word", paddingTop:"12px" }}>
+                        {section.content}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize:"13px", color:C.muted, fontStyle:"italic", paddingTop:"12px" }}>No content yet. Click Edit to add details.</div>
+                    )}
+                    <div style={{ display:"flex", gap:"8px", marginTop:"14px" }}>
+                      <button
+                        onClick={() => { setEditingId(section.id); setEditForm({ ...section }); }}
+                        style={{ padding:"5px 12px", borderRadius:"6px", border:`1px solid ${C.border}`, background:C.cardBg, color:C.muted, fontSize:"12px", cursor:"pointer" }}
+                      >
+                        ✏ Edit
+                      </button>
+                      <button
+                        onClick={() => deleteSection(section.id)}
+                        style={{ padding:"5px 12px", borderRadius:"6px", border:"1px solid #FECACA", background:"rgba(239,68,68,0.06)", color:"#EF4444", fontSize:"12px", cursor:"pointer" }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PTOEmbedTab({ token }) {
+  const [savedUrl, setSavedUrl] = useState("");
+  const [inputVal, setInputVal] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/internal", { headers: { "x-session": token } })
+      .then((r) => r.json())
+      .then((d) => { setSavedUrl(d?.ptoEmbedUrl || ""); setInputVal(d?.ptoEmbedUrl || ""); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [token]);
 
-  const saveHrInfo = async (value) => {
+  const save = async () => {
     setSaving(true);
     try {
       const res = await fetch("/api/internal", {
         method: "PUT",
         headers: { "Content-Type": "application/json", "x-session": token },
-        body: JSON.stringify({ hrInfo: value }),
+        body: JSON.stringify({ ptoEmbedUrl: inputVal }),
       });
       if (res.ok) {
-        const saved = await res.json();
-        setData(saved);
+        const d = await res.json();
+        setSavedUrl(d.ptoEmbedUrl || "");
+        setEditing(false);
       }
     } finally {
       setSaving(false);
     }
   };
 
+  if (loading) return <div style={{ textAlign:"center", padding:"48px", color:C.muted }}>Loading…</div>;
+
+  return (
+    <div>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"20px" }}>
+        <div>
+          <h2 style={{ margin:"0 0 4px", fontSize:"15px", fontWeight:"700", color:C.text }}>PTO / Vacation Form</h2>
+          <p style={{ margin:0, fontSize:"13px", color:C.muted }}>Embed a Google Form or any URL for PTO requests.</p>
+        </div>
+        <button
+          onClick={() => setEditing((v) => !v)}
+          style={{ padding:"7px 14px", borderRadius:"8px", border:`1px solid ${C.border}`, background:C.cardBg, color:C.muted, fontSize:"12px", fontWeight:"600", cursor:"pointer" }}
+        >
+          ⚙ {savedUrl ? "Change URL" : "Set URL"}
+        </button>
+      </div>
+
+      {editing && (
+        <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:"12px", padding:"16px", marginBottom:"20px" }}>
+          <label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"6px" }}>Embed URL</label>
+          <input
+            value={inputVal}
+            onChange={(e) => setInputVal(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && save()}
+            placeholder="https://docs.google.com/forms/d/e/…/viewform?embedded=true"
+            autoFocus
+            style={{ width:"100%", padding:"8px 10px", border:`1px solid ${C.border}`, borderRadius:"8px", background:C.inputBg, color:C.text, fontSize:"13px", outline:"none", boxSizing:"border-box", marginBottom:"10px", fontFamily:"inherit" }}
+          />
+          <div style={{ display:"flex", gap:"8px" }}>
+            <button onClick={save} disabled={saving} style={{ padding:"8px 18px", borderRadius:"8px", border:"none", background:C.accent, color:"#fff", fontSize:"13px", fontWeight:"600", cursor:saving?"not-allowed":"pointer" }}>
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button onClick={() => { setEditing(false); setInputVal(savedUrl); }} style={{ padding:"8px 14px", borderRadius:"8px", border:`1px solid ${C.border}`, background:"none", color:C.muted, fontSize:"13px", cursor:"pointer" }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {savedUrl ? (
+        <div style={{ borderRadius:"12px", overflow:"hidden", border:`1px solid ${C.border}` }}>
+          <iframe
+            src={savedUrl}
+            style={{ width:"100%", height:"720px", border:"none", display:"block" }}
+            title="PTO / Vacation Form"
+            allow="fullscreen"
+          />
+        </div>
+      ) : (
+        <div style={{ textAlign:"center", padding:"60px 20px", background:C.card, borderRadius:"12px", border:`1px dashed ${C.border}`, color:C.muted }}>
+          <div style={{ fontSize:"40px", marginBottom:"12px" }}>📅</div>
+          <div style={{ fontSize:"15px", fontWeight:"600", marginBottom:"6px", color:C.text }}>No form embedded yet</div>
+          <div style={{ fontSize:"13px" }}>Click "Set URL" above to embed a Google Form or other URL for PTO / vacation requests.</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InternalView({ token }) {
+  const [activeTab, setActiveTab] = useState("hrInfo");
+
   const tabs = [
     { id: "hrInfo", label: "HR Info", icon: "🏢" },
     { id: "contacts", label: "Important Contacts", icon: "📞" },
     { id: "membership", label: "Membership Details", icon: "🏛" },
     { id: "inventory", label: "Inventory 📦", icon: "" },
+    { id: "pto", label: "PTO / Vacation 🗓", icon: "" },
   ];
-
-  if (loading) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "200px" }}>
-        <div style={{ width: "28px", height: "28px", border: `3px solid ${C.border}`, borderTopColor: C.accent, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-      </div>
-    );
-  }
 
   return (
     <div>
       <div style={{ marginBottom: "20px" }}>
         <h1 style={{ margin: "0 0 4px", fontSize: "24px", fontWeight: "800", color: C.text }}>Internal</h1>
-        <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>Internal resources — HR info, contacts, membership details, and inventory</p>
+        <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>Internal resources — HR info, contacts, membership details, inventory, and PTO</p>
       </div>
 
       {/* Tab bar */}
-      <div style={{ display:"flex", gap:"4px", marginBottom:"24px", borderBottom:`1px solid ${C.border}`, paddingBottom:"0" }}>
+      <div style={{ display:"flex", gap:"4px", marginBottom:"24px", borderBottom:`1px solid ${C.border}`, paddingBottom:"0", overflowX:"auto" }}>
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -628,31 +853,16 @@ function InternalView({ token }) {
               whiteSpace:"nowrap",
             }}
           >
-            {t.icon && t.id !== "inventory" ? `${t.icon} ` : ""}{t.label}
+            {t.icon ? `${t.icon} ` : ""}{t.label}
           </button>
         ))}
       </div>
 
-      {activeTab === "hrInfo" && (
-        <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:"16px", padding:"20px", boxShadow:C.shadow }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"14px" }}>
-            <h2 style={{ margin:0, fontSize:"15px", fontWeight:"700", color:C.text }}>HR Info</h2>
-            {saving && <span style={{ fontSize:"11px", color:C.muted }}>Saving…</span>}
-          </div>
-          <textarea
-            value={data.hrInfo || ""}
-            onChange={(e) => setData((d) => ({ ...d, hrInfo: e.target.value }))}
-            onBlur={(e) => saveHrInfo(e.target.value)}
-            rows={16}
-            placeholder="HR policies, benefits, contacts, onboarding info…"
-            style={{ width:"100%", padding:"10px 12px", border:`1px solid ${C.border}`, borderRadius:"8px", background:C.inputBg, color:C.text, fontSize:"13px", outline:"none", resize:"vertical", fontFamily:"inherit", lineHeight:"1.6", boxSizing:"border-box" }}
-          />
-        </div>
-      )}
-
+      {activeTab === "hrInfo" && <HRInfoTab token={token} />}
       {activeTab === "contacts" && <ContactsTab token={token} />}
       {activeTab === "membership" && <MembershipsTab token={token} />}
       {activeTab === "inventory" && <InventoryTab token={token} />}
+      {activeTab === "pto" && <PTOEmbedTab token={token} />}
     </div>
   );
 }
@@ -814,7 +1024,7 @@ function DraggableNavItem({ v, idx, active, sidebarOpen, dragIndexRef, orderedCo
 // ─── Main export ─────────────────────────────────────────────────────────────
 
 export default function ContentScheduler() {
-  const [view, setView] = useState("dashboard");
+  const [view, setView] = useState("mydash");
   const [viewingUserId, setViewingUserId] = useState(null); // null = current user
   const [posts, setPosts] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
@@ -1232,9 +1442,21 @@ export default function ContentScheduler() {
             />
           ))}
 
+          {/* New Campaign button — above campaign tags */}
+          <button
+            onClick={() => setCampaignModalOpen(true)}
+            title={!sidebarOpen ? "New Campaign" : undefined}
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "9px 10px", borderRadius: "8px", border: "none", background: "transparent", color: C.muted, fontSize: "13px", cursor: "pointer", transition: "all 0.15s", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          >
+            <span style={{ fontSize: "16px", flexShrink: 0 }}>🎯</span>
+            {sidebarOpen && "New Campaign"}
+          </button>
+
           {/* Campaigns list */}
           {sidebarOpen && campaigns.length > 0 && (
-            <div style={{ padding: "0 4px", marginTop: "4px" }}>
+            <div style={{ padding: "0 4px", marginTop: "2px" }}>
               <div style={{ fontSize: "10px", color: C.muted, fontWeight: "600", letterSpacing: "0.08em", textTransform: "uppercase", padding: "4px 6px", marginBottom: "4px" }}>Campaigns</div>
               {campaigns.slice(0, 8).map((c) => (
                 <button
@@ -1263,17 +1485,6 @@ export default function ContentScheduler() {
 
           {/* ── Admin tools ── */}
           <div style={{ borderTop: `1px solid ${C.border}`, margin: "10px 0", padding: "10px 0 0" }}>
-            <button
-              onClick={() => setCampaignModalOpen(true)}
-              title={!sidebarOpen ? "New Campaign" : undefined}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "9px 10px", borderRadius: "8px", border: "none", background: "transparent", color: C.muted, fontSize: "13px", cursor: "pointer", transition: "all 0.15s", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            >
-              <span style={{ fontSize: "16px", flexShrink: 0 }}>🎯</span>
-              {sidebarOpen && "New Campaign"}
-            </button>
-
             {currentUser.role === "admin" && (
               <button
                 onClick={() => setSettingsOpen(true)}
@@ -1434,6 +1645,7 @@ export default function ContentScheduler() {
                   assignedSlackChannels={slackChannels.filter((c) => c.assignedTo === effectiveViewingUserId)}
                   onOpenPost={(post) => { openEdit(post); }}
                   onOpenAsset={(asset) => { setView("assets"); }}
+                  onOpenSlack={() => { setView("slack"); }}
                 />
               )}
               {view === "profile" && (

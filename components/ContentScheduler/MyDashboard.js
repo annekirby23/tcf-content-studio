@@ -917,6 +917,7 @@ function ProjectProgressBar({ tasks = [] }) {
 function NewProjectModal({ onSave, onClose, teamMembers = [] }) {
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
+  const [details, setDetails] = useState("");
   const [color, setColor] = useState(PROJECT_COLORS[0]);
   const [status, setStatus] = useState("planning");
   const [selectedMembers, setSelectedMembers] = useState([]);
@@ -929,7 +930,7 @@ function NewProjectModal({ onSave, onClose, teamMembers = [] }) {
 
   const submit = () => {
     if (!name.trim()) return;
-    onSave({ name: name.trim(), description: desc, color, status, members: selectedMembers });
+    onSave({ name: name.trim(), description: desc, details, color, status, members: selectedMembers });
   };
 
   return (
@@ -951,6 +952,10 @@ function NewProjectModal({ onSave, onClose, teamMembers = [] }) {
         <div style={{ marginBottom: "14px" }}>
           <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Description</label>
           <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit" }) }} placeholder="What's this project about?" />
+        </div>
+        <div style={{ marginBottom: "14px" }}>
+          <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>What We're Working On</label>
+          <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={3} style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit" }) }} placeholder="Current focus, goals, what the team is actively doing…" />
         </div>
         <div style={{ marginBottom: "14px" }}>
           <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>Color</label>
@@ -1015,9 +1020,13 @@ function MemberInitials({ name, size = 24 }) {
   );
 }
 
-function ProjectCard({ project, onToggleTask, onAddTask, onDelete, onAddStatusUpdate, teamMembers = [] }) {
+function ProjectCard({ project, onToggleTask, onAddTask, onDelete, onAddStatusUpdate, onSaveDetails, teamMembers = [] }) {
   const [taskInput, setTaskInput] = useState("");
+  const [selectedAssignee, setSelectedAssignee] = useState(null);
   const [expanded, setExpanded] = useState(false);
+  const [details, setDetails] = useState(project.details || "");
+  const [showDetails, setShowDetails] = useState(!!(project.details));
+  const [editingDetails, setEditingDetails] = useState(false);
   const [commentInput, setCommentInput] = useState("");
   const [mentionSuggestions, setMentionSuggestions] = useState([]);
   const [showComments, setShowComments] = useState(false);
@@ -1025,10 +1034,18 @@ function ProjectCard({ project, onToggleTask, onAddTask, onDelete, onAddStatusUp
   const members = project.members || [];
   const statusUpdates = project.statusUpdates || [];
 
+  useEffect(() => { setDetails(project.details || ""); }, [project.details]);
+
   const submitTask = () => {
     if (!taskInput.trim()) return;
-    onAddTask(project.id, taskInput.trim());
+    onAddTask(project.id, taskInput.trim(), selectedAssignee);
     setTaskInput("");
+    setSelectedAssignee(null);
+  };
+
+  const saveDetails = () => {
+    setEditingDetails(false);
+    onSaveDetails?.(project.id, details);
   };
 
   const handleCommentChange = (val) => {
@@ -1102,6 +1119,46 @@ function ProjectCard({ project, onToggleTask, onAddTask, onDelete, onAddStatusUp
         <div style={{ fontSize: "12px", color: C.muted, marginBottom: "10px", lineHeight: "1.4" }}>{project.description}</div>
       )}
 
+      {/* What we're working on — collapsible details */}
+      <div style={{ marginBottom: "10px" }}>
+        <button
+          onClick={() => setShowDetails((v) => !v)}
+          style={{ fontSize: "11px", color: showDetails ? C.accent : C.muted, background: "none", border: "none", cursor: "pointer", padding: "0", fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}
+        >
+          <span style={{ fontSize: "9px", transform: showDetails ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block", transition: "transform 0.12s" }}>▶</span>
+          What we're working on
+        </button>
+        {showDetails && (
+          <div style={{ marginTop: "8px" }}>
+            {editingDetails ? (
+              <div>
+                <textarea
+                  value={details}
+                  onChange={(e) => setDetails(e.target.value)}
+                  rows={4}
+                  autoFocus
+                  onBlur={saveDetails}
+                  style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.5", fontSize: "12px" }) }}
+                  placeholder="Current focus, who is working on what, goals, blockers…"
+                />
+                <div style={{ display: "flex", gap: "6px", marginTop: "6px" }}>
+                  <button onClick={saveDetails} style={{ padding: "4px 10px", borderRadius: "6px", border: "none", background: project.color || C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>Save</button>
+                  <button onClick={() => { setEditingDetails(false); setDetails(project.details || ""); }} style={{ padding: "4px 8px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", cursor: "pointer" }}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div
+                onClick={() => setEditingDetails(true)}
+                style={{ fontSize: "12px", color: details ? C.text : C.muted, lineHeight: "1.6", padding: "8px 10px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}`, cursor: "pointer", minHeight: "40px", whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+                title="Click to edit"
+              >
+                {details || <em>Click to describe what the team is currently working on…</em>}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {statusUpdates.length > 0 && (
         <div style={{ marginBottom: "10px" }}>
           <button
@@ -1164,9 +1221,10 @@ function ProjectCard({ project, onToggleTask, onAddTask, onDelete, onAddStatusUp
                 {task.text}
               </span>
               {task.assignedTo && (
-                <span title={task.assignedTo.name || task.assignedTo}>
-                  <MemberInitials name={task.assignedTo.name || task.assignedTo} size={20} />
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }} title={task.assignedTo.name || task.assignedTo}>
+                  <MemberInitials name={task.assignedTo.name || task.assignedTo} size={18} />
+                  <span style={{ fontSize: "10px", color: C.muted, whiteSpace: "nowrap" }}>{task.assignedTo.name || task.assignedTo}</span>
+                </div>
               )}
             </div>
           ))}
@@ -1215,18 +1273,40 @@ function ProjectCard({ project, onToggleTask, onAddTask, onDelete, onAddStatusUp
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: "6px", marginTop: "10px" }}>
-        <input
-          value={taskInput}
-          onChange={(e) => setTaskInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && submitTask()}
-          placeholder="+ Add task…"
-          style={{ ...textInput({ flex: 1, fontSize: "12px", padding: "6px 8px" }) }}
-        />
-        {taskInput.trim() && (
-          <button onClick={submitTask} style={{ padding: "6px 10px", borderRadius: "6px", border: "none", background: project.color || C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer", flexShrink: 0 }}>
-            Add
-          </button>
+      <div style={{ marginTop: "10px" }}>
+        <div style={{ display: "flex", gap: "6px" }}>
+          <input
+            value={taskInput}
+            onChange={(e) => setTaskInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submitTask()}
+            placeholder="+ Add task…"
+            style={{ ...textInput({ flex: 1, fontSize: "12px", padding: "6px 8px" }) }}
+          />
+          {teamMembers.length > 0 && (
+            <select
+              value={selectedAssignee?.id || ""}
+              onChange={(e) => {
+                const m = teamMembers.find((m) => m.id === e.target.value);
+                setSelectedAssignee(m || null);
+              }}
+              style={{ ...textInput({ maxWidth: "110px", fontSize: "11px", padding: "5px 6px", color: selectedAssignee ? C.text : C.muted }) }}
+            >
+              <option value="">Assign…</option>
+              {teamMembers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          )}
+          {taskInput.trim() && (
+            <button onClick={submitTask} style={{ padding: "6px 10px", borderRadius: "6px", border: "none", background: project.color || C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer", flexShrink: 0 }}>
+              Add
+            </button>
+          )}
+        </div>
+        {selectedAssignee && (
+          <div style={{ fontSize: "10px", color: C.accent, marginTop: "4px", display: "flex", alignItems: "center", gap: "4px" }}>
+            <MemberInitials name={selectedAssignee.name} size={14} />
+            Assigning to {selectedAssignee.name}
+            <button onClick={() => setSelectedAssignee(null)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "10px", padding: "0 2px" }}>✕</button>
+          </div>
         )}
       </div>
     </div>
@@ -1271,15 +1351,22 @@ function ProjectsSection({ token, sectionTitle, onSaveTitle, teamMembers = [] })
     }
   };
 
-  const handleAddTask = async (projectId, text) => {
-    const newTask = { id: genId(), text, done: false };
+  const handleAddTask = async (projectId, text, assignedTo = null) => {
+    const newTask = { id: genId(), text, done: false, assignedTo };
     setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, tasks: [...(p.tasks || []), newTask] } : p));
     try {
       const project = projects.find((p) => p.id === projectId);
-      const tasks = [...(project?.tasks || []), { text, done: false }];
+      const tasks = [...(project?.tasks || []), { text, done: false, assignedTo }];
       const res = await apiFetch(`/api/projects/${projectId}`, { method: "PUT", body: JSON.stringify({ tasks }) }, token);
       const saved = await res.json();
       setProjects((prev) => prev.map((p) => p.id === projectId ? saved : p));
+    } catch {}
+  };
+
+  const handleSaveDetails = async (projectId, details) => {
+    setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, details } : p));
+    try {
+      await apiFetch(`/api/projects/${projectId}`, { method: "PUT", body: JSON.stringify({ details }) }, token);
     } catch {}
   };
 
@@ -1327,6 +1414,7 @@ function ProjectsSection({ token, sectionTitle, onSaveTitle, teamMembers = [] })
               onAddTask={handleAddTask}
               onDelete={handleDelete}
               onAddStatusUpdate={handleAddStatusUpdate}
+              onSaveDetails={handleSaveDetails}
               teamMembers={teamMembers}
             />
           ))}
@@ -1675,7 +1763,7 @@ const STATUS_COLORS = {
   paused: { color: "#EF4444", bg: "rgba(239,68,68,0.15)" },
 };
 
-function AssignedContentSection({ assignedPosts = [], assignedAssets = [], assignedSlackChannels = [], sectionTitle, onOpenPost, onOpenAsset }) {
+function AssignedContentSection({ assignedPosts = [], assignedAssets = [], assignedSlackChannels = [], sectionTitle, onOpenPost, onOpenAsset, onOpenSlack }) {
   const [activeSubTab, setActiveSubTab] = useState("posts");
 
   const hasAny = assignedPosts.length > 0 || assignedAssets.length > 0 || assignedSlackChannels.length > 0;
@@ -1789,13 +1877,23 @@ function AssignedContentSection({ assignedPosts = [], assignedAssets = [], assig
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {assignedSlackChannels.map((ch) => (
-              <div key={ch.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", boxShadow: C.shadow }}>
+              <div
+                key={ch.id}
+                onClick={() => onOpenSlack?.(ch)}
+                style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", boxShadow: C.shadow, cursor: onOpenSlack ? "pointer" : "default", transition: "border-color 0.12s" }}
+                onMouseEnter={(e) => { if (onOpenSlack) e.currentTarget.style.borderColor = C.accent; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; }}
+              >
                 <span style={{ fontSize: "16px", flexShrink: 0 }}>{ch.emoji || "💬"}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: "13px", fontWeight: "600", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     #{ch.name}
                   </div>
+                  {ch.description && (
+                    <div style={{ fontSize: "11px", color: C.muted, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ch.description}</div>
+                  )}
                 </div>
+                {onOpenSlack && <span style={{ fontSize: "10px", color: C.accent, fontWeight: "600", flexShrink: 0 }}>Open →</span>}
               </div>
             ))}
           </div>
@@ -1817,7 +1915,7 @@ const DEFAULT_SECTION_TITLES = {
   assignedContent: "Assigned to Me",
 };
 
-export default function MyDashboard({ currentUser, token, viewingUserId, teamMembers = [], assignedPosts = [], assignedAssets = [], assignedSlackChannels = [], onOpenPost, onOpenAsset }) {
+export default function MyDashboard({ currentUser, token, viewingUserId, teamMembers = [], assignedPosts = [], assignedAssets = [], assignedSlackChannels = [], onOpenPost, onOpenAsset, onOpenSlack }) {
   const currentUserId = currentUser?.id;
   const effectiveViewingUserId = viewingUserId || currentUserId;
   const readOnly = effectiveViewingUserId !== currentUserId;
@@ -2024,24 +2122,25 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
         />
       </div>
 
+      {/* My Tasks — full width below Daily Routines */}
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px 24px", boxShadow: C.shadow, marginBottom: "20px" }}>
+        <TasksColumn
+          token={token}
+          viewingUserId={effectiveViewingUserId}
+          currentUserId={currentUserId}
+          sectionTitle={sectionTitles.tasks}
+          onSaveTitle={(v) => saveSectionTitle("tasks", v)}
+        />
+      </div>
+
       {/* 2-column layout */}
       <div style={{ display: "flex", gap: "20px", alignItems: "flex-start" }}>
 
-        {/* LEFT column */}
+        {/* LEFT column — Assigned to Me */}
         <div style={{
-          width: "380px", flexShrink: 0,
+          width: "340px", flexShrink: 0,
           display: "flex", flexDirection: "column", gap: "16px",
         }}>
-          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", boxShadow: C.shadow }}>
-            <TasksColumn
-              token={token}
-              viewingUserId={effectiveViewingUserId}
-              currentUserId={currentUserId}
-              sectionTitle={sectionTitles.tasks}
-              onSaveTitle={(v) => saveSectionTitle("tasks", v)}
-            />
-          </div>
-
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", boxShadow: C.shadow }}>
             <AssignedContentSection
               assignedPosts={assignedPosts}
@@ -2050,6 +2149,7 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
               sectionTitle={sectionTitles.assignedContent}
               onOpenPost={onOpenPost}
               onOpenAsset={onOpenAsset}
+              onOpenSlack={onOpenSlack}
             />
           </div>
         </div>

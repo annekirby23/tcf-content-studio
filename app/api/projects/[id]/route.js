@@ -44,6 +44,7 @@ export async function PUT(req, { params }) {
       if (body.status !== undefined) project.status = body.status;
       if (body.tasks !== undefined) project.tasks = body.tasks;
       if (body.members !== undefined) project.members = body.members;
+      if (body.details !== undefined) project.details = body.details;
       if (body.statusUpdates !== undefined) project.statusUpdates = body.statusUpdates;
       if (body.addStatusUpdate !== undefined) {
         const update = {
