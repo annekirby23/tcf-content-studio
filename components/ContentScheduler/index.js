@@ -7,6 +7,10 @@ import Dashboard from "./Dashboard";
 import CalendarView from "./CalendarView";
 import Pipeline from "./Pipeline";
 import ListView from "./ListView";
+import AuthScreen from "./AuthScreen";
+import TeamManager from "./TeamManager";
+
+const TOKEN_KEY = "tcf_session";
 
 const VIEWS = [
   { id: "dashboard", label: "Dashboard", icon: "◉" },
@@ -96,10 +100,16 @@ export default function ContentScheduler() {
   const [view, setView] = useState("dashboard");
   const [posts, setPosts] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authToken, setAuthToken] = useState(null);
+  const [needsSetup, setNeedsSetup] = useState(false);
   const [editingPost, setEditingPost] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
   const [campaignModalOpen, setCampaignModalOpen] = useState(false);
+  const [teamModalOpen, setTeamModalOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -108,23 +118,85 @@ export default function ContentScheduler() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const authFetch = useCallback((url, opts = {}) => {
+    const token = authToken || (typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null);
+    return fetch(url, {
+      ...opts,
+      headers: { ...(opts.headers || {}), "x-session": token || "", "Content-Type": "application/json" },
+    });
+  }, [authToken]);
+
+  // Check session on mount
+  useEffect(() => {
+    const init = async () => {
+      const stored = localStorage.getItem(TOKEN_KEY);
+      if (!stored) {
+        // Check if first-time setup needed
+        const res = await fetch("/api/auth/setup");
+        const data = await res.json();
+        setNeedsSetup(data.needsSetup);
+        setAuthLoading(false);
+        return;
+      }
+      try {
+        const res = await fetch("/api/auth/me", { headers: { "x-session": stored } });
+        if (res.ok) {
+          const user = await res.json();
+          setCurrentUser(user);
+          setAuthToken(stored);
+        } else {
+          localStorage.removeItem(TOKEN_KEY);
+          const setupRes = await fetch("/api/auth/setup");
+          const data = await setupRes.json();
+          setNeedsSetup(data.needsSetup);
+        }
+      } catch {
+        localStorage.removeItem(TOKEN_KEY);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+    init();
+  }, []);
+
+  const handleAuth = useCallback((token, user) => {
+    localStorage.setItem(TOKEN_KEY, token);
+    setAuthToken(token);
+    setCurrentUser(user);
+    setNeedsSetup(false);
+  }, []);
+
+  const handleLogout = async () => {
+    const token = authToken;
+    setCurrentUser(null);
+    setAuthToken(null);
+    setPosts([]);
+    setCampaigns([]);
+    setTeamMembers([]);
+    localStorage.removeItem(TOKEN_KEY);
+    await fetch("/api/auth/logout", { method: "POST", headers: { "x-session": token } });
+  };
+
   const fetchAll = useCallback(async () => {
+    if (!authToken) return;
     setLoading(true);
     try {
-      const [postsRes, campaignsRes] = await Promise.all([
-        fetch("/api/scheduler"),
-        fetch("/api/scheduler?type=campaigns"),
+      const [postsRes, campaignsRes, teamRes] = await Promise.all([
+        authFetch("/api/scheduler"),
+        authFetch("/api/scheduler?type=campaigns"),
+        authFetch("/api/team"),
       ]);
       if (postsRes.ok) setPosts(await postsRes.json());
       if (campaignsRes.ok) setCampaigns(await campaignsRes.json());
+      if (teamRes.ok) setTeamMembers(await teamRes.json());
     } catch (e) {
       showToast("Failed to load content", "error");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authToken, authFetch]);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => { if (authToken) fetchAll(); }, [authToken, fetchAll]);
 
   const openNew = (scheduledDate = null, status = "draft") => {
     setEditingPost({ scheduledDate: scheduledDate || "", status });
@@ -139,9 +211,8 @@ export default function ContentScheduler() {
   const handleSave = async (form) => {
     try {
       const isNew = !form.id;
-      const res = await fetch(isNew ? "/api/scheduler" : `/api/scheduler/${form.id}`, {
+      const res = await authFetch(isNew ? "/api/scheduler" : `/api/scheduler/${form.id}`, {
         method: isNew ? "POST" : "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
       if (!res.ok) throw new Error("Save failed");
@@ -162,12 +233,10 @@ export default function ContentScheduler() {
   const handleStatusChange = async (postId, newStatus) => {
     const post = posts.find((p) => p.id === postId);
     if (!post) return;
-    // Optimistic update — feels instant
     setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, status: newStatus } : p));
     try {
-      const res = await fetch(`/api/scheduler/${postId}`, {
+      const res = await authFetch(`/api/scheduler/${postId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...post, status: newStatus }),
       });
       if (!res.ok) throw new Error();
@@ -182,7 +251,7 @@ export default function ContentScheduler() {
 
   const handleDelete = async (id) => {
     try {
-      const res = await fetch(`/api/scheduler/${id}`, { method: "DELETE" });
+      const res = await authFetch(`/api/scheduler/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed");
       setPosts((p) => p.filter((x) => x.id !== id));
       setFormOpen(false);
@@ -195,9 +264,8 @@ export default function ContentScheduler() {
 
   const handleCampaignSave = async (data) => {
     try {
-      const res = await fetch("/api/scheduler", {
+      const res = await authFetch("/api/scheduler", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "campaign", ...data }),
       });
       if (!res.ok) throw new Error();
@@ -212,6 +280,27 @@ export default function ContentScheduler() {
 
   const today = new Date().toISOString().split("T")[0];
   const scheduledToday = posts.filter((p) => p.scheduledDate === today && p.status === "scheduled").length;
+
+  // Auth guard
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: "32px", height: "32px", border: `3px solid ${C.border}`, borderTopColor: C.accent, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+        <style>{"@keyframes spin { to { transform: rotate(360deg); } }"}</style>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <AuthScreen needsSetup={needsSetup} onAuth={handleAuth} />;
+  }
+
+  // Avatar helper
+  const userInitials = currentUser.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+  const avatarColors = ["#6366F1","#8B5CF6","#EC4899","#EF4444","#F59E0B","#10B981","#3B82F6","#06B6D4"];
+  let hash = 0;
+  for (let i = 0; i < currentUser.name.length; i++) hash = currentUser.name.charCodeAt(i) + ((hash << 5) - hash);
+  const userColor = avatarColors[Math.abs(hash) % avatarColors.length];
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
@@ -308,9 +397,28 @@ export default function ContentScheduler() {
             </button>
           </div>
 
+          {/* Team button — admin only */}
+          {currentUser.role === "admin" && (
+            <button
+              onClick={() => setTeamModalOpen(true)}
+              title={!sidebarOpen ? "Manage Team" : undefined}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "9px 10px", borderRadius: "8px", border: "none", background: "transparent", color: C.muted, fontSize: "13px", cursor: "pointer", transition: "all 0.15s", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            >
+              <span style={{ fontSize: "16px", flexShrink: 0 }}>👥</span>
+              {sidebarOpen && (
+                <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  Team
+                  {teamMembers.length > 0 && <span style={{ fontSize: "10px", background: "rgba(255,255,255,0.1)", padding: "1px 6px", borderRadius: "10px" }}>{teamMembers.length}</span>}
+                </span>
+              )}
+            </button>
+          )}
+
           {/* Campaigns list */}
           {sidebarOpen && campaigns.length > 0 && (
-            <div style={{ padding: "0 4px" }}>
+            <div style={{ padding: "0 4px", marginTop: "8px" }}>
               <div style={{ fontSize: "10px", color: C.muted, fontWeight: "600", letterSpacing: "0.08em", textTransform: "uppercase", padding: "4px 6px", marginBottom: "4px" }}>Campaigns</div>
               {campaigns.slice(0, 8).map((c) => (
                 <div key={c.id} style={{ fontSize: "12px", color: C.muted, padding: "5px 8px", borderRadius: "6px", cursor: "default", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -321,8 +429,23 @@ export default function ContentScheduler() {
           )}
         </nav>
 
-        {/* Collapse toggle */}
+        {/* User + collapse */}
         <div style={{ padding: "12px 8px", borderTop: `1px solid ${C.border}` }}>
+          {/* Current user */}
+          {sidebarOpen ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 10px", marginBottom: "4px" }}>
+              <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: userColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "700", color: "#fff", flexShrink: 0 }}>{userInitials}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "12px", fontWeight: "600", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentUser.name}</div>
+                <div style={{ fontSize: "10px", color: C.muted, textTransform: "capitalize" }}>{currentUser.role}</div>
+              </div>
+              <button onClick={handleLogout} title="Sign out" style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: "13px", padding: "2px 4px" }}>↩</button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px" }}>
+              <div title={`${currentUser.name} · ${currentUser.role}`} style={{ width: "28px", height: "28px", borderRadius: "50%", background: userColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "700", color: "#fff", cursor: "default" }}>{userInitials}</div>
+            </div>
+          )}
           <button
             onClick={() => setSidebarOpen((o) => !o)}
             style={{ width: "100%", padding: "8px 10px", borderRadius: "8px", border: "none", background: "transparent", color: C.muted, fontSize: "13px", cursor: "pointer", textAlign: "center" }}
@@ -379,7 +502,7 @@ export default function ContentScheduler() {
             <>
               {view === "dashboard" && <Dashboard posts={posts} onEdit={openEdit} onNewPost={() => openNew()} />}
               {view === "calendar" && <CalendarView posts={posts} onEdit={openEdit} onNewPost={(date) => openNew(date)} />}
-              {view === "pipeline" && <Pipeline posts={posts} onEdit={openEdit} onNewPost={(date, status) => openNew(date, status || "draft")} onStatusChange={handleStatusChange} />}
+              {view === "pipeline" && <Pipeline posts={posts} onEdit={openEdit} onNewPost={(date, status) => openNew(date, status || "draft")} onStatusChange={handleStatusChange} currentUser={currentUser} />}
               {view === "list" && <ListView posts={posts} campaigns={campaigns} onEdit={openEdit} onNewPost={() => openNew()} />}
             </>
           )}
@@ -391,6 +514,8 @@ export default function ContentScheduler() {
         <ContentForm
           post={editingPost}
           campaigns={campaigns}
+          teamMembers={teamMembers}
+          currentUser={currentUser}
           onSave={handleSave}
           onDelete={handleDelete}
           onClose={() => { setFormOpen(false); setEditingPost(null); }}
@@ -402,6 +527,17 @@ export default function ContentScheduler() {
         <CampaignModal
           onSave={handleCampaignSave}
           onClose={() => setCampaignModalOpen(false)}
+        />
+      )}
+
+      {/* Team manager modal */}
+      {teamModalOpen && (
+        <TeamManager
+          teamMembers={teamMembers}
+          currentUser={currentUser}
+          token={authToken}
+          onClose={() => setTeamModalOpen(false)}
+          onTeamUpdate={setTeamMembers}
         />
       )}
 

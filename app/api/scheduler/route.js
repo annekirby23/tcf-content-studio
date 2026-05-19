@@ -1,22 +1,8 @@
-import Redis from "ioredis";
+import { getSession } from "@/lib/serverAuth";
+import { kvGet, kvSet } from "@/lib/redis";
 
 const POSTS_KEY = "tcf:scheduler:posts";
 const CAMPAIGNS_KEY = "tcf:scheduler:campaigns";
-
-let redis;
-function getRedis() {
-  if (!redis) redis = new Redis(process.env.REDIS_URL);
-  return redis;
-}
-
-async function get(key) {
-  const val = await getRedis().get(key);
-  return val ? JSON.parse(val) : null;
-}
-
-async function set(key, value) {
-  await getRedis().set(key, JSON.stringify(value));
-}
 
 function genId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -24,15 +10,17 @@ function genId() {
 
 export async function GET(req) {
   try {
+    const user = await getSession(req);
+    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
     const url = new URL(req.url);
     const type = url.searchParams.get("type");
 
     if (type === "campaigns") {
-      const campaigns = (await get(CAMPAIGNS_KEY)) || [];
-      return Response.json(campaigns);
+      return Response.json((await kvGet(CAMPAIGNS_KEY)) || []);
     }
 
-    const posts = (await get(POSTS_KEY)) || [];
+    const posts = (await kvGet(POSTS_KEY)) || [];
     const platform = url.searchParams.get("platform");
     const status = url.searchParams.get("status");
     const campaign = url.searchParams.get("campaign");
@@ -58,23 +46,30 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
+    const user = await getSession(req);
+    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
     const body = await req.json();
     const { type, ...data } = body;
+    const now = new Date().toISOString();
 
     if (type === "campaign") {
-      const campaigns = (await get(CAMPAIGNS_KEY)) || [];
-      const now = new Date().toISOString();
+      const campaigns = (await kvGet(CAMPAIGNS_KEY)) || [];
       const campaign = { ...data, id: genId(), createdAt: now, updatedAt: now };
       campaigns.push(campaign);
-      await set(CAMPAIGNS_KEY, campaigns);
+      await kvSet(CAMPAIGNS_KEY, campaigns);
       return Response.json(campaign, { status: 201 });
     }
 
-    const posts = (await get(POSTS_KEY)) || [];
-    const now = new Date().toISOString();
-    const post = { ...data, id: genId(), createdAt: now, updatedAt: now };
+    // Members can only create draft or review posts
+    if (user.role !== "admin" && !["draft", "review"].includes(data.status)) {
+      data.status = "draft";
+    }
+
+    const posts = (await kvGet(POSTS_KEY)) || [];
+    const post = { ...data, id: genId(), createdBy: user.id, createdAt: now, updatedAt: now };
     posts.push(post);
-    await set(POSTS_KEY, posts);
+    await kvSet(POSTS_KEY, posts);
     return Response.json(post, { status: 201 });
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });

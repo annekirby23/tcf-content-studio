@@ -31,7 +31,11 @@ const EMPTY = {
   notes: "",
 };
 
-export default function ContentForm({ post, campaigns, onSave, onDelete, onClose }) {
+const MEMBER_STATUSES = ["draft", "review"];
+
+export default function ContentForm({ post, campaigns, teamMembers = [], currentUser, onSave, onDelete, onClose }) {
+  const isAdmin = currentUser?.role === "admin";
+  const allowedStatuses = isAdmin ? STATUSES : STATUSES.filter((s) => MEMBER_STATUSES.includes(s.id));
   const [form, setForm] = useState(post ? { ...EMPTY, ...post } : { ...EMPTY });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -223,8 +227,9 @@ export default function ContentForm({ post, campaigns, onSave, onDelete, onClose
                 <div>
                   <label style={labelStyle}>Status</label>
                   <select style={{ ...inputStyle, appearance: "none" }} value={form.status} onChange={(e) => set("status", e.target.value)}>
-                    {STATUSES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                    {allowedStatuses.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
                   </select>
+                  {!isAdmin && <div style={{ fontSize: "10px", color: C.muted, marginTop: "4px" }}>Admin approval required for Approved / Published</div>}
                 </div>
               </div>
 
@@ -358,12 +363,14 @@ export default function ContentForm({ post, campaigns, onSave, onDelete, onClose
                 </div>
                 <div>
                   <label style={labelStyle}>Assignee</label>
-                  <input
-                    style={inputStyle}
-                    value={form.assignee}
-                    onChange={(e) => set("assignee", e.target.value)}
-                    placeholder="Team member"
-                  />
+                  {teamMembers.length > 0 ? (
+                    <select style={{ ...inputStyle, appearance: "none" }} value={form.assignee} onChange={(e) => set("assignee", e.target.value)}>
+                      <option value="">— Unassigned —</option>
+                      {teamMembers.map((m) => <option key={m.id} value={m.name}>{m.name} ({m.role})</option>)}
+                    </select>
+                  ) : (
+                    <input style={inputStyle} value={form.assignee} onChange={(e) => set("assignee", e.target.value)} placeholder="Team member name" />
+                  )}
                 </div>
               </div>
 

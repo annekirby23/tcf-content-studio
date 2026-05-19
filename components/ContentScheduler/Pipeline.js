@@ -82,7 +82,10 @@ function PipelineCard({ post, onEdit, onDragStart, isDragging }) {
   );
 }
 
-export default function Pipeline({ posts, onEdit, onNewPost, onStatusChange }) {
+const ADMIN_ONLY_STATUSES = ["approved", "scheduled", "published"];
+
+export default function Pipeline({ posts, onEdit, onNewPost, onStatusChange, currentUser }) {
+  const isAdmin = currentUser?.role === "admin";
   const [draggingId, setDraggingId] = useState(null);
   const [dragOverStatus, setDragOverStatus] = useState(null);
 
@@ -126,6 +129,7 @@ export default function Pipeline({ posts, onEdit, onNewPost, onStatusChange }) {
     const postId = e.dataTransfer.getData("postId");
     setDraggingId(null);
     setDragOverStatus(null);
+    if (!isAdmin && ADMIN_ONLY_STATUSES.includes(statusId)) return;
     const post = posts.find((p) => p.id === postId);
     if (post && post.status !== statusId) {
       onStatusChange(postId, statusId);
@@ -167,7 +171,8 @@ export default function Pipeline({ posts, onEdit, onNewPost, onStatusChange }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(190px, 1fr))", gap: "12px", overflowX: "auto", paddingBottom: "8px" }}>
         {STATUSES.map((status) => {
           const col = grouped[status.id] || [];
-          const isDropTarget = dragOverStatus === status.id;
+          const isLocked = !isAdmin && ADMIN_ONLY_STATUSES.includes(status.id);
+          const isDropTarget = dragOverStatus === status.id && !isLocked;
           const isDraggingFromThis = draggingId && col.some((p) => p.id === draggingId);
 
           return (
@@ -183,6 +188,7 @@ export default function Pipeline({ posts, onEdit, onNewPost, onStatusChange }) {
                 <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
                   <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: status.color }} />
                   <span style={{ fontSize: "12px", fontWeight: "700", color: C.text }}>{status.label}</span>
+                  {isLocked && <span title="Admin only" style={{ fontSize: "10px" }}>🔒</span>}
                 </div>
                 <span style={{ fontSize: "11px", color: C.muted, fontFamily: "monospace", background: "rgba(255,255,255,0.06)", padding: "1px 7px", borderRadius: "10px" }}>
                   {col.length}
