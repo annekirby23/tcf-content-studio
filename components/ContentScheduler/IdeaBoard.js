@@ -4,18 +4,18 @@ import { useState, useEffect, useCallback } from "react";
 import { C, THEMES, THEME_MAP } from "./constants";
 
 const INSPIRATION_PILLS = [
-  "Behind the scenes of our process",
-  "Member spotlight: share a win",
-  "Answer the #1 question we get asked",
-  "This week's team highlight",
-  "What we learned this month",
-  "Community poll: vote on our next topic",
-  "5 tips our members love",
-  "Throwback: how we started",
-  "Quick win you can apply today",
-  "Introducing a new team member",
-  "Event recap + key takeaways",
-  "Our most popular post this month",
+  { title: "Behind the scenes of our process", caption: "Ever wonder what really happens behind the scenes at [Organization]? Here's an honest look at how we do things — the messy, real parts included. 👇 Drop your questions below!" },
+  { title: "Member spotlight: share a win", caption: "🎉 Community win alert! We're shining a spotlight on [Member Name] this week. [Describe their achievement or contribution]. This is exactly why we do what we do. Comment with YOUR latest win — we want to celebrate you too!" },
+  { title: "Answer the #1 question we get asked", caption: "We get this question ALL the time: \"[Question]\" So let's settle it once and for all. Here's our honest answer 👇\n\n[Your answer here]\n\nHave a question you want us to tackle? Drop it in the comments." },
+  { title: "This week's team highlight", caption: "Shoutout to [Team Member] for [accomplishment/contribution] this week! 🙌 Great teams are built one great person at a time. Who on YOUR team deserves a shoutout today?" },
+  { title: "What we learned this month", caption: "Month in review 📋 Here's what we learned in [Month]:\n\n✅ [Lesson 1]\n✅ [Lesson 2]\n✅ [Lesson 3]\n\nGrowth isn't always pretty, but it's always worth it. What did YOU learn this month?" },
+  { title: "Community poll: vote on our next topic", caption: "We want YOUR input! 🗳️ What should we cover next?\n\n🅰️ [Option A]\n🅱️ [Option B]\n\nVote in the comments — most votes wins and we'll create the content just for you!" },
+  { title: "5 tips our members love", caption: "5 things our members say changed the game for them 🎯\n\n1️⃣ [Tip 1]\n2️⃣ [Tip 2]\n3️⃣ [Tip 3]\n4️⃣ [Tip 4]\n5️⃣ [Tip 5]\n\nSave this for later. Which one resonates most with you?" },
+  { title: "Throwback: how we started", caption: "Throwback to where it all began ✨ [Share your origin story — what problem you were solving, what the early days looked like, what almost made you quit]. We've come a long way. Grateful for every single one of you who's been part of this journey. 🙏" },
+  { title: "Quick win you can apply today", caption: "Here's a quick win you can apply TODAY 💡\n\n[Describe the quick win or tip in 2-3 sentences]\n\nNo fluff, no gatekeeping — just something that actually works. Try it and let me know how it goes in the comments 👇" },
+  { title: "Introducing a new team member", caption: "🎊 Please give a warm welcome to [Name], our newest [Role]! \n\nA few fun facts about [Name]:\n🏠 From: [Location]\n🎯 Specialty: [Skill/Focus]\n🌟 Fun fact: [Something personal]\n\nWe're so excited to have [him/her/them] on the team. Say hello in the comments!" },
+  { title: "Event recap + key takeaways", caption: "We just wrapped [Event Name] and WOW 🤩 Here are the top takeaways:\n\n🔑 [Key takeaway 1]\n🔑 [Key takeaway 2]\n🔑 [Key takeaway 3]\n\nMissed it? We've got you — [link to recording/recap/resources]. See you at the next one!" },
+  { title: "Our most popular post this month", caption: "Our most popular post this month blew us away 📈 In case you missed it:\n\n[Summarize or re-share the content]\n\nThank you for the incredible response. This kind of engagement is what keeps us going. Which post should we expand on next?" },
 ];
 
 function formatRelativeTime(isoString) {
@@ -531,8 +531,8 @@ export default function IdeaBoard({ currentUser, token, onMakePost }) {
           </p>
           {INSPIRATION_PILLS.map((pill) => (
             <button
-              key={pill}
-              onClick={() => onMakePost?.({ title: pill, description: "" })}
+              key={pill.title}
+              onClick={() => onMakePost?.({ title: pill.title, description: pill.caption })}
               style={{
                 background: C.cardBg,
                 border: `1px solid ${C.border}`,
@@ -554,7 +554,7 @@ export default function IdeaBoard({ currentUser, token, onMakePost }) {
                 e.currentTarget.style.borderColor = C.border;
               }}
             >
-              {pill}
+              {pill.title}
             </button>
           ))}
         </div>
