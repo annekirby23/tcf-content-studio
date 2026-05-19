@@ -97,7 +97,7 @@ export default function ContentForm({
   const [aiSuggestion, setAiSuggestion] = useState(null);
 
   // Thread / notes state
-  const [threadNotes, setThreadNotes] = useState(post?.threadNotes || []);
+  const [threadNotes, setThreadNotes] = useState(post?.notes || []);
   const [noteInput, setNoteInput] = useState("");
   const [sendingNote, setSendingNote] = useState(false);
   const [mentionQuery, setMentionQuery] = useState(null); // null or string
@@ -111,7 +111,7 @@ export default function ContentForm({
     setTab("content");
     setConfirmDelete(false);
     setAiSuggestion(null);
-    setThreadNotes(post?.threadNotes || []);
+    setThreadNotes(post?.notes || []);
     setNoteInput("");
     setMentionQuery(null);
   }, [post]);
@@ -264,7 +264,7 @@ export default function ContentForm({
     const optimistic = {
       id: `temp-${Date.now()}`,
       text,
-      author: currentUser?.name || "You",
+      authorName: currentUser?.name || "You",
       createdAt: new Date().toISOString(),
     };
     setThreadNotes((prev) => [...prev, optimistic]);
@@ -272,7 +272,7 @@ export default function ContentForm({
     setMentionQuery(null);
     try {
       if (post?.id) {
-        await fetch("/api/notes", {
+        const res = await fetch("/api/notes", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -280,9 +280,14 @@ export default function ContentForm({
           },
           body: JSON.stringify({ postId: post.id, text }),
         });
+        if (res.ok) {
+          const saved = await res.json();
+          // Replace the optimistic note with the real saved one
+          setThreadNotes((prev) => prev.map((n) => n.id === optimistic.id ? saved : n));
+        }
       }
     } catch {
-      // optimistic note stays; API error is silent
+      // optimistic note stays visible; silent fail
     } finally {
       setSendingNote(false);
     }
@@ -960,7 +965,7 @@ export default function ContentForm({
                           width: "32px",
                           height: "32px",
                           borderRadius: "50%",
-                          background: avatarColor(note.author || ""),
+                          background: avatarColor(note.authorName || note.author || ""),
                           color: "#fff",
                           display: "flex",
                           alignItems: "center",
@@ -970,7 +975,7 @@ export default function ContentForm({
                           flexShrink: 0,
                         }}
                       >
-                        {getInitials(note.author || "?")}
+                        {getInitials(note.authorName || note.author || "?")}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div
@@ -988,7 +993,7 @@ export default function ContentForm({
                               color: C.text,
                             }}
                           >
-                            {note.author || "Unknown"}
+                            {note.authorName || note.author || "Unknown"}
                           </span>
                           <span style={{ fontSize: "11px", color: C.muted }}>
                             {formatTimestamp(note.createdAt)}
