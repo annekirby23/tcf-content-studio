@@ -9,13 +9,14 @@ function genId() {
 }
 
 function parseMentions(text, users) {
+  const lower = text.toLowerCase();
+  const seen = new Set();
   const mentions = [];
-  const regex = /@([\w\s]+?)(?=\s|$|@)/g;
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    const name = match[1].trim();
-    const user = users.find((u) => u.name.toLowerCase() === name.toLowerCase());
-    if (user) mentions.push({ id: user.id, name: user.name });
+  for (const u of users) {
+    if (!seen.has(u.id) && lower.includes(`@${u.name.toLowerCase()}`)) {
+      seen.add(u.id);
+      mentions.push({ id: u.id, name: u.name });
+    }
   }
   return mentions;
 }
