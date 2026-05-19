@@ -44,17 +44,6 @@ function formatDate(dateStr) {
 
 // ─── Small reusable pieces ────────────────────────────────────────────────────
 
-function SectionHeader({ title, action }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-      <h2 style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: C.text, letterSpacing: "0.02em" }}>
-        {title}
-      </h2>
-      {action}
-    </div>
-  );
-}
-
 function AddBtn({ onClick, label = "+ Add" }) {
   const [hov, setHov] = useState(false);
   return (
@@ -128,9 +117,169 @@ function PriorityPill({ priority }) {
   );
 }
 
+// ─── Editable section title ───────────────────────────────────────────────────
+
+function EditableSectionTitle({ title, onSave, readOnly }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(title);
+  const [hov, setHov] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => { setVal(title); }, [title]);
+
+  const save = () => {
+    setEditing(false);
+    if (val.trim() && val.trim() !== title) onSave(val.trim());
+    else setVal(title);
+  };
+
+  if (readOnly) {
+    return (
+      <h2 style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: C.text, letterSpacing: "0.02em" }}>
+        {title}
+      </h2>
+    );
+  }
+
+  return (
+    <div
+      style={{ display: "flex", alignItems: "center", gap: "6px" }}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+    >
+      {editing ? (
+        <input
+          ref={inputRef}
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") { setVal(title); setEditing(false); } }}
+          style={{
+            fontSize: "14px", fontWeight: "700", color: C.text,
+            background: "transparent", border: "none", borderBottom: `2px solid ${C.accent}`,
+            outline: "none", padding: "0 2px", width: `${Math.max(val.length, 10)}ch`,
+          }}
+          autoFocus
+        />
+      ) : (
+        <>
+          <h2
+            onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.focus(), 10); }}
+            style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: C.text, letterSpacing: "0.02em", cursor: "pointer" }}
+          >
+            {title}
+          </h2>
+          {hov && (
+            <span
+              onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.focus(), 10); }}
+              style={{ fontSize: "11px", color: C.muted, cursor: "pointer", opacity: 0.6 }}
+              title="Edit title"
+            >
+              ✏
+            </span>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── TASK DETAIL MODAL ────────────────────────────────────────────────────────
+
+function TaskDetailModal({ task, token, onClose, onUpdate, onDelete }) {
+  const [title, setTitle] = useState(task.text || "");
+  const [description, setDescription] = useState(task.description || "");
+  const [priority, setPriority] = useState(task.priority || "medium");
+  const [dueDate, setDueDate] = useState(task.dueDate || "");
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const res = await apiFetch(`/api/tasks/${task.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ text: title, description, priority, dueDate: dueDate || null }),
+      }, token);
+      if (res.ok) {
+        const saved = await res.json();
+        onUpdate(saved);
+        onClose();
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const del = async () => {
+    if (!window.confirm("Delete this task?")) return;
+    await apiFetch(`/api/tasks/${task.id}`, { method: "DELETE" }, token);
+    onDelete(task.id);
+    onClose();
+  };
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", backdropFilter: "blur(3px)", zIndex: 2000 }} />
+      <div style={{
+        position: "fixed", top: "50%", left: "50%",
+        transform: "translate(-50%, -50%)",
+        background: C.card, border: `1px solid ${C.border}`,
+        borderRadius: "16px", padding: "24px", width: "460px", maxWidth: "92vw",
+        zIndex: 2001, boxShadow: C.shadowMd,
+      }}>
+        <h3 style={{ margin: "0 0 16px", fontSize: "15px", fontWeight: "700", color: C.text }}>Task Details</h3>
+
+        <div style={{ marginBottom: "12px" }}>
+          <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "5px" }}>Title</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ ...textInput({ width: "100%" }) }} placeholder="Task title" />
+        </div>
+
+        <div style={{ marginBottom: "12px" }}>
+          <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "5px" }}>Description</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={4}
+            style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.5" }) }}
+            placeholder="Add more detail…"
+          />
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+          <div>
+            <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "5px" }}>Priority</label>
+            <select value={priority} onChange={(e) => setPriority(e.target.value)} style={{ ...textInput({ width: "100%" }), color: C.text }}>
+              {Object.entries(PRIORITY_MAP).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "5px" }}>Due Date</label>
+            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={{ ...textInput({ width: "100%", colorScheme: "light" }) }} />
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: "10px", justifyContent: "space-between" }}>
+          <button
+            onClick={del}
+            style={{ padding: "9px 18px", borderRadius: "8px", border: "1px solid #FECACA", background: "rgba(239,68,68,0.06)", color: "#EF4444", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}
+          >
+            Delete
+          </button>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button onClick={onClose} style={{ padding: "9px 18px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
+            <button onClick={save} disabled={saving} style={{ padding: "9px 20px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "600", cursor: saving ? "not-allowed" : "pointer" }}>
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ─── TASKS ────────────────────────────────────────────────────────────────────
 
-function TaskItem({ task, onToggle, onDelete }) {
+function TaskItem({ task, onToggle, onDelete, onOpen, readOnly }) {
   const [hov, setHov] = useState(false);
   return (
     <div
@@ -145,12 +294,13 @@ function TaskItem({ task, onToggle, onDelete }) {
     >
       {/* Checkbox */}
       <button
-        onClick={() => onToggle(task)}
+        onClick={() => !readOnly && onToggle(task)}
         style={{
           width: "18px", height: "18px", borderRadius: "5px", flexShrink: 0,
           border: `2px solid ${task.done ? C.accent : C.border}`,
           background: task.done ? C.accent : "transparent",
-          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: readOnly ? "default" : "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
           padding: 0, transition: "all 0.12s", marginTop: "1px",
         }}
       >
@@ -158,7 +308,10 @@ function TaskItem({ task, onToggle, onDelete }) {
       </button>
 
       {/* Text + meta */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div
+        style={{ flex: 1, minWidth: 0, cursor: readOnly ? "default" : "pointer" }}
+        onClick={() => !readOnly && onOpen && onOpen(task)}
+      >
         <div style={{
           fontSize: "13px", fontWeight: "500",
           color: task.done ? C.muted : C.text,
@@ -167,6 +320,11 @@ function TaskItem({ task, onToggle, onDelete }) {
         }}>
           {task.text}
         </div>
+        {task.description && (
+          <div style={{ fontSize: "11px", color: C.muted, marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {task.description}
+          </div>
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px", flexWrap: "wrap" }}>
           {task.priority && <PriorityPill priority={task.priority} />}
           {task.dueDate && (
@@ -182,7 +340,7 @@ function TaskItem({ task, onToggle, onDelete }) {
       </div>
 
       {/* Delete */}
-      {hov && (
+      {hov && !readOnly && (
         <button
           onClick={() => onDelete(task.id)}
           style={{
@@ -233,12 +391,14 @@ function AddTaskForm({ onAdd }) {
   const [text, setText] = useState("");
   const [priority, setPriority] = useState("medium");
   const [dueDate, setDueDate] = useState("");
+  const [description, setDescription] = useState("");
+  const [showDetails, setShowDetails] = useState(false);
   const [focused, setFocused] = useState(false);
 
   const submit = () => {
     if (!text.trim()) return;
-    onAdd({ text: text.trim(), priority, dueDate: dueDate || null });
-    setText(""); setDueDate("");
+    onAdd({ text: text.trim(), priority, dueDate: dueDate || null, description: description || "" });
+    setText(""); setDueDate(""); setDescription(""); setShowDetails(false);
   };
 
   return (
@@ -257,7 +417,7 @@ function AddTaskForm({ onAdd }) {
         placeholder="New task…"
         style={{ ...textInput({ width: "100%", background: "transparent", border: "none", padding: "4px 0", marginBottom: "8px", fontSize: "14px" }) }}
       />
-      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+      <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: showDetails ? "8px" : 0 }}>
         <select
           value={priority}
           onChange={(e) => setPriority(e.target.value)}
@@ -274,6 +434,12 @@ function AddTaskForm({ onAdd }) {
           style={{ ...textInput({ flex: 1, colorScheme: "light" }) }}
         />
         <button
+          onClick={() => setShowDetails((v) => !v)}
+          style={{ padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "11px", cursor: "pointer", whiteSpace: "nowrap" }}
+        >
+          {showDetails ? "▲ Less" : "▼ Details"}
+        </button>
+        <button
           onClick={submit}
           disabled={!text.trim()}
           style={{
@@ -287,32 +453,43 @@ function AddTaskForm({ onAdd }) {
           Add
         </button>
       </div>
+      {showDetails && (
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={2}
+          placeholder="Add description (optional)…"
+          style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.5" }) }}
+        />
+      )}
     </div>
   );
 }
 
-function TasksColumn({ token }) {
+function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSaveTitle }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [openTask, setOpenTask] = useState(null);
+  const readOnly = viewingUserId !== currentUserId;
+
+  const url = readOnly ? `/api/tasks?userId=${viewingUserId}` : "/api/tasks";
 
   useEffect(() => {
-    apiFetch("/api/tasks", {}, token)
+    setLoading(true);
+    apiFetch(url, {}, token)
       .then((r) => r.json())
       .then((data) => setTasks(Array.isArray(data) ? data : []))
       .catch(() => setTasks([]))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, url]);
 
   const handleAdd = async (taskData) => {
     const tempId = genId();
     const optimistic = { id: tempId, ...taskData, done: false };
     setTasks((prev) => [...prev, optimistic]);
     try {
-      const res = await apiFetch("/api/tasks", {
-        method: "POST",
-        body: JSON.stringify(taskData),
-      }, token);
+      const res = await apiFetch("/api/tasks", { method: "POST", body: JSON.stringify(taskData) }, token);
       const saved = await res.json();
       setTasks((prev) => prev.map((t) => t.id === tempId ? saved : t));
     } catch {
@@ -324,10 +501,7 @@ function TasksColumn({ token }) {
     const updated = { ...task, done: !task.done };
     setTasks((prev) => prev.map((t) => t.id === task.id ? updated : t));
     try {
-      await apiFetch(`/api/tasks/${task.id}`, {
-        method: "PUT",
-        body: JSON.stringify({ done: updated.done }),
-      }, token);
+      await apiFetch(`/api/tasks/${task.id}`, { method: "PUT", body: JSON.stringify({ done: updated.done }) }, token);
     } catch {
       setTasks((prev) => prev.map((t) => t.id === task.id ? task : t));
     }
@@ -343,64 +517,198 @@ function TasksColumn({ token }) {
     }
   };
 
+  const handleUpdate = (updated) => {
+    setTasks((prev) => prev.map((t) => t.id === updated.id ? updated : t));
+  };
+
   const active = tasks.filter((t) => !t.done);
   const done = tasks.filter((t) => t.done);
   const todayOverdue = active.filter((t) => t.dueDate && (isToday(t.dueDate) || isOverdue(t.dueDate)));
-  const upcoming = active.filter((t) => !t.dueDate || isUpcoming(t.dueDate));
-  // tasks with no due date that are not overdue
+  const upcoming = active.filter((t) => t.dueDate && isUpcoming(t.dueDate));
   const noDue = active.filter((t) => !t.dueDate);
 
   return (
-    <div style={{
-      width: "340px", flexShrink: 0,
-      background: C.card, border: `1px solid ${C.border}`,
-      borderRadius: "16px", padding: "20px",
-      boxShadow: C.shadow,
-      display: "flex", flexDirection: "column",
-      maxHeight: "calc(100vh - 100px)", overflowY: "auto",
-    }}>
-      <SectionHeader
-        title="My Tasks"
-        action={<AddBtn onClick={() => setShowForm((v) => !v)} label={showForm ? "✕ Cancel" : "+ Add Task"} />}
-      />
+    <div style={{ marginBottom: "16px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+        <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={readOnly} />
+        {!readOnly && <AddBtn onClick={() => setShowForm((v) => !v)} label={showForm ? "✕ Cancel" : "+ Add Task"} />}
+      </div>
 
-      {showForm && <AddTaskForm onAdd={handleAdd} />}
+      {showForm && !readOnly && <AddTaskForm onAdd={handleAdd} />}
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: "32px", color: C.muted, fontSize: "13px" }}>
-          Loading tasks…
-        </div>
+        <div style={{ textAlign: "center", padding: "32px", color: C.muted, fontSize: "13px" }}>Loading tasks…</div>
       ) : tasks.length === 0 ? (
-        <EmptyState icon="✅" message="No tasks yet. Add your first task above." />
+        <EmptyState icon="✅" message={readOnly ? "No tasks yet." : "No tasks yet. Add your first task above."} />
       ) : (
-        <div style={{ flex: 1 }}>
+        <div>
           {todayOverdue.length > 0 && (
             <CollapsibleSection title="Today & Overdue" count={todayOverdue.length}>
               {todayOverdue.map((t) => (
-                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} />
+                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={setOpenTask} readOnly={readOnly} />
               ))}
             </CollapsibleSection>
           )}
-          {upcoming.length > 0 && (
+          {(upcoming.length > 0 || noDue.length > 0) && (
             <CollapsibleSection title="Upcoming" count={upcoming.length + noDue.length}>
               {[...upcoming, ...noDue].map((t) => (
-                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} />
-              ))}
-            </CollapsibleSection>
-          )}
-          {noDue.length > 0 && upcoming.length === 0 && todayOverdue.length === 0 && (
-            <CollapsibleSection title="Tasks" count={noDue.length}>
-              {noDue.map((t) => (
-                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} />
+                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={setOpenTask} readOnly={readOnly} />
               ))}
             </CollapsibleSection>
           )}
           {done.length > 0 && (
             <CollapsibleSection title="Done" count={done.length} defaultOpen={false}>
               {done.map((t) => (
-                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} />
+                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={setOpenTask} readOnly={readOnly} />
               ))}
             </CollapsibleSection>
+          )}
+        </div>
+      )}
+
+      {openTask && !readOnly && (
+        <TaskDetailModal
+          task={openTask}
+          token={token}
+          onClose={() => setOpenTask(null)}
+          onUpdate={handleUpdate}
+          onDelete={handleDelete}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── DAILY ROUTINES ───────────────────────────────────────────────────────────
+
+function DailyTaskItem({ task, onToggle, onDelete, readOnly }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        display: "flex", alignItems: "center", gap: "10px",
+        padding: "8px 10px", borderRadius: "8px",
+        background: hov ? C.hover : "transparent",
+        transition: "background 0.12s",
+      }}
+    >
+      <button
+        onClick={() => !readOnly && onToggle(task)}
+        style={{
+          width: "16px", height: "16px", borderRadius: "4px", flexShrink: 0,
+          border: `2px solid ${task.done ? "#10B981" : C.border}`,
+          background: task.done ? "#10B981" : "transparent",
+          cursor: readOnly ? "default" : "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 0,
+        }}
+      >
+        {task.done && <span style={{ color: "#fff", fontSize: "10px" }}>✓</span>}
+      </button>
+      <span style={{
+        flex: 1, fontSize: "13px", fontWeight: "500",
+        color: task.done ? C.muted : C.text,
+        textDecoration: task.done ? "line-through" : "none",
+      }}>
+        {task.text}
+      </span>
+      {hov && !readOnly && (
+        <button onClick={() => onDelete(task.id)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "13px", padding: "1px 4px", opacity: 0.6 }}>
+          ✕
+        </button>
+      )}
+    </div>
+  );
+}
+
+function DailyRoutinesSection({ token, viewingUserId, currentUserId, sectionTitle, onSaveTitle }) {
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [newText, setNewText] = useState("");
+  const readOnly = viewingUserId !== currentUserId;
+
+  const url = readOnly ? `/api/dailytasks?userId=${viewingUserId}` : "/api/dailytasks";
+
+  useEffect(() => {
+    setLoading(true);
+    apiFetch(url, {}, token)
+      .then((r) => r.json())
+      .then((data) => setTasks(Array.isArray(data) ? data : []))
+      .catch(() => setTasks([]))
+      .finally(() => setLoading(false));
+  }, [token, url]);
+
+  const handleAdd = async () => {
+    if (!newText.trim()) return;
+    const text = newText.trim();
+    setNewText("");
+    const tempId = genId();
+    setTasks((prev) => [...prev, { id: tempId, text, done: false }]);
+    try {
+      const res = await apiFetch("/api/dailytasks", { method: "POST", body: JSON.stringify({ text }) }, token);
+      const saved = await res.json();
+      setTasks((prev) => prev.map((t) => t.id === tempId ? saved : t));
+    } catch {
+      setTasks((prev) => prev.filter((t) => t.id !== tempId));
+    }
+  };
+
+  const handleToggle = async (task) => {
+    const updated = { ...task, done: !task.done };
+    setTasks((prev) => prev.map((t) => t.id === task.id ? updated : t));
+    try {
+      await apiFetch(`/api/dailytasks/${task.id}`, { method: "PUT", body: JSON.stringify({ done: updated.done }) }, token);
+    } catch {
+      setTasks((prev) => prev.map((t) => t.id === task.id ? task : t));
+    }
+  };
+
+  const handleDelete = async (id) => {
+    const prev = tasks.find((t) => t.id === id);
+    setTasks((ts) => ts.filter((t) => t.id !== id));
+    try {
+      await apiFetch(`/api/dailytasks/${id}`, { method: "DELETE" }, token);
+    } catch {
+      if (prev) setTasks((ts) => [...ts, prev]);
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: "16px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+        <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={readOnly} />
+      </div>
+
+      {loading ? (
+        <div style={{ color: C.muted, fontSize: "13px", padding: "8px 0" }}>Loading…</div>
+      ) : tasks.length === 0 && readOnly ? (
+        <EmptyState icon="🔄" message="No daily routines set up." />
+      ) : (
+        <div>
+          {tasks.map((t) => (
+            <DailyTaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} readOnly={readOnly} />
+          ))}
+        </div>
+      )}
+
+      {!readOnly && (
+        <div style={{ display: "flex", gap: "6px", marginTop: "10px" }}>
+          <input
+            value={newText}
+            onChange={(e) => setNewText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+            placeholder="Add routine…"
+            style={{ ...textInput({ flex: 1, fontSize: "12px", padding: "6px 8px" }) }}
+          />
+          {newText.trim() && (
+            <button
+              onClick={handleAdd}
+              style={{ padding: "6px 12px", borderRadius: "6px", border: "none", background: C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
+            >
+              Add
+            </button>
           )}
         </div>
       )}
@@ -412,10 +720,10 @@ function TasksColumn({ token }) {
 
 const PROJECT_COLORS = ["#6366F1", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#3B82F6"];
 const PROJECT_STATUSES = [
-  { id: "active",    label: "Active",    color: "#10B981", bg: "rgba(16,185,129,0.10)" },
-  { id: "paused",    label: "Paused",    color: "#F59E0B", bg: "rgba(245,158,11,0.10)" },
-  { id: "done",      label: "Done",      color: "#6366F1", bg: "rgba(99,102,241,0.10)" },
-  { id: "planning",  label: "Planning",  color: "#94A3B8", bg: "rgba(148,163,184,0.10)" },
+  { id: "planning", label: "Planning",         color: "#94A3B8", bg: "rgba(148,163,184,0.10)" },
+  { id: "draft",    label: "Draft",            color: "#F59E0B", bg: "rgba(245,158,11,0.10)" },
+  { id: "review",   label: "Ready for Review", color: "#3B82F6", bg: "rgba(59,130,246,0.10)" },
+  { id: "live",     label: "Live",             color: "#10B981", bg: "rgba(16,185,129,0.10)" },
 ];
 
 function StatusPill({ status }) {
@@ -459,7 +767,7 @@ function NewProjectModal({ onSave, onClose }) {
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [color, setColor] = useState(PROJECT_COLORS[0]);
-  const [status, setStatus] = useState("active");
+  const [status, setStatus] = useState("planning");
 
   const submit = () => {
     if (!name.trim()) return;
@@ -468,10 +776,7 @@ function NewProjectModal({ onSave, onClose }) {
 
   return (
     <>
-      <div
-        onClick={onClose}
-        style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", backdropFilter: "blur(3px)", zIndex: 2000 }}
-      />
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", backdropFilter: "blur(3px)", zIndex: 2000 }} />
       <div style={{
         position: "fixed", top: "50%", left: "50%",
         transform: "translate(-50%, -50%)",
@@ -479,82 +784,32 @@ function NewProjectModal({ onSave, onClose }) {
         borderRadius: "16px", padding: "24px", width: "400px", maxWidth: "90vw",
         zIndex: 2001, boxShadow: C.shadowMd,
       }}>
-        <h3 style={{ margin: "0 0 20px", fontSize: "16px", fontWeight: "700", color: C.text }}>New Project</h3>
+        <h3 style={{ margin: "0 0 20px", fontSize: "16px", fontWeight: "700", color: C.text }}>New TCF Community Project</h3>
         <div style={{ marginBottom: "14px" }}>
-          <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>
-            Name *
-          </label>
-          <input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && submit()}
-            style={{ ...textInput({ width: "100%" }) }}
-            placeholder="Project name"
-          />
+          <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Name *</label>
+          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} style={{ ...textInput({ width: "100%" }) }} placeholder="Project name" />
         </div>
         <div style={{ marginBottom: "14px" }}>
-          <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>
-            Description
-          </label>
-          <textarea
-            value={desc}
-            onChange={(e) => setDesc(e.target.value)}
-            rows={2}
-            style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit" }) }}
-            placeholder="What's this project about?"
-          />
+          <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Description</label>
+          <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit" }) }} placeholder="What's this project about?" />
         </div>
         <div style={{ marginBottom: "14px" }}>
-          <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>
-            Color
-          </label>
+          <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>Color</label>
           <div style={{ display: "flex", gap: "8px" }}>
             {PROJECT_COLORS.map((c) => (
-              <button
-                key={c}
-                onClick={() => setColor(c)}
-                style={{
-                  width: "28px", height: "28px", borderRadius: "50%",
-                  background: c, border: color === c ? `3px solid ${C.text}` : `3px solid transparent`,
-                  cursor: "pointer", padding: 0,
-                  transition: "border-color 0.12s",
-                }}
-              />
+              <button key={c} onClick={() => setColor(c)} style={{ width: "28px", height: "28px", borderRadius: "50%", background: c, border: color === c ? `3px solid ${C.text}` : `3px solid transparent`, cursor: "pointer", padding: 0, transition: "border-color 0.12s" }} />
             ))}
           </div>
         </div>
         <div style={{ marginBottom: "20px" }}>
-          <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>
-            Status
-          </label>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            style={{ ...textInput({ width: "100%" }), color: C.text }}
-          >
-            {PROJECT_STATUSES.map((s) => (
-              <option key={s.id} value={s.id}>{s.label}</option>
-            ))}
+          <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Status</label>
+          <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ ...textInput({ width: "100%" }), color: C.text }}>
+            {PROJECT_STATUSES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </select>
         </div>
         <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-          <button
-            onClick={onClose}
-            style={{ padding: "9px 18px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={submit}
-            disabled={!name.trim()}
-            style={{
-              padding: "9px 20px", borderRadius: "8px", border: "none",
-              background: name.trim() ? C.accent : C.border, color: "#fff",
-              fontSize: "13px", fontWeight: "600",
-              cursor: name.trim() ? "pointer" : "not-allowed",
-            }}
-          >
+          <button onClick={onClose} style={{ padding: "9px 18px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
+          <button onClick={submit} disabled={!name.trim()} style={{ padding: "9px 20px", borderRadius: "8px", border: "none", background: name.trim() ? C.accent : C.border, color: "#fff", fontSize: "13px", fontWeight: "600", cursor: name.trim() ? "pointer" : "not-allowed" }}>
             Create Project
           </button>
         </div>
@@ -563,10 +818,9 @@ function NewProjectModal({ onSave, onClose }) {
   );
 }
 
-function ProjectCard({ project, onToggleTask, onAddTask, onDelete }) {
+function ProjectCard({ project, onToggleTask, onAddTask, onDelete, readOnly }) {
   const [taskInput, setTaskInput] = useState("");
   const [expanded, setExpanded] = useState(false);
-
   const tasks = project.tasks || [];
 
   const submitTask = () => {
@@ -584,45 +838,28 @@ function ProjectCard({ project, onToggleTask, onAddTask, onDelete }) {
       padding: "16px",
       boxShadow: C.shadow,
     }}>
-      {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "8px", gap: "8px" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "4px" }}>
-            {project.name}
-          </div>
+          <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "4px" }}>{project.name}</div>
           <StatusPill status={project.status} />
         </div>
-        <button
-          onClick={() => onDelete(project.id)}
-          style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "14px", padding: "2px 4px", opacity: 0.5, flexShrink: 0 }}
-        >
-          ✕
-        </button>
+        {!readOnly && (
+          <button onClick={() => onDelete(project.id)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "14px", padding: "2px 4px", opacity: 0.5, flexShrink: 0 }}>✕</button>
+        )}
       </div>
 
       {project.description && (
-        <div style={{ fontSize: "12px", color: C.muted, marginBottom: "10px", lineHeight: "1.4" }}>
-          {project.description}
-        </div>
+        <div style={{ fontSize: "12px", color: C.muted, marginBottom: "10px", lineHeight: "1.4" }}>{project.description}</div>
       )}
 
-      {/* Progress bar */}
       {tasks.length > 0 && (
         <div style={{ marginBottom: "12px" }}>
           <ProjectProgressBar tasks={tasks} />
         </div>
       )}
 
-      {/* Task list toggle */}
       {tasks.length > 0 && (
-        <button
-          onClick={() => setExpanded((e) => !e)}
-          style={{
-            background: "none", border: "none", cursor: "pointer",
-            fontSize: "12px", color: C.muted, fontWeight: "600",
-            padding: "0 0 8px", display: "flex", alignItems: "center", gap: "4px",
-          }}
-        >
+        <button onClick={() => setExpanded((e) => !e)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "12px", color: C.muted, fontWeight: "600", padding: "0 0 8px", display: "flex", alignItems: "center", gap: "4px" }}>
           <span style={{ fontSize: "9px", transform: expanded ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block", transition: "transform 0.12s" }}>▶</span>
           {expanded ? "Hide" : "Show"} tasks ({tasks.length})
         </button>
@@ -631,28 +868,20 @@ function ProjectCard({ project, onToggleTask, onAddTask, onDelete }) {
       {expanded && tasks.length > 0 && (
         <div style={{ marginBottom: "10px" }}>
           {tasks.map((task) => (
-            <div
-              key={task.id}
-              style={{ display: "flex", alignItems: "center", gap: "8px", padding: "5px 0" }}
-            >
+            <div key={task.id} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "5px 0" }}>
               <button
-                onClick={() => onToggleTask(project.id, task)}
+                onClick={() => !readOnly && onToggleTask(project.id, task)}
                 style={{
                   width: "16px", height: "16px", borderRadius: "4px", flexShrink: 0,
                   border: `2px solid ${task.done ? project.color || C.accent : C.border}`,
                   background: task.done ? (project.color || C.accent) : "transparent",
-                  cursor: "pointer", padding: 0,
+                  cursor: readOnly ? "default" : "pointer", padding: 0,
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}
               >
                 {task.done && <span style={{ color: "#fff", fontSize: "10px" }}>✓</span>}
               </button>
-              <span style={{
-                fontSize: "13px",
-                color: task.done ? C.muted : C.text,
-                textDecoration: task.done ? "line-through" : "none",
-                flex: 1,
-              }}>
+              <span style={{ fontSize: "13px", color: task.done ? C.muted : C.text, textDecoration: task.done ? "line-through" : "none", flex: 1 }}>
                 {task.text}
               </span>
             </div>
@@ -660,44 +889,42 @@ function ProjectCard({ project, onToggleTask, onAddTask, onDelete }) {
         </div>
       )}
 
-      {/* Add task inline */}
-      <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
-        <input
-          value={taskInput}
-          onChange={(e) => setTaskInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && submitTask()}
-          placeholder="+ Add task…"
-          style={{ ...textInput({ flex: 1, fontSize: "12px", padding: "6px 8px" }) }}
-        />
-        {taskInput.trim() && (
-          <button
-            onClick={submitTask}
-            style={{
-              padding: "6px 10px", borderRadius: "6px", border: "none",
-              background: project.color || C.accent, color: "#fff",
-              fontSize: "12px", fontWeight: "600", cursor: "pointer", flexShrink: 0,
-            }}
-          >
-            Add
-          </button>
-        )}
-      </div>
+      {!readOnly && (
+        <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
+          <input
+            value={taskInput}
+            onChange={(e) => setTaskInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submitTask()}
+            placeholder="+ Add task…"
+            style={{ ...textInput({ flex: 1, fontSize: "12px", padding: "6px 8px" }) }}
+          />
+          {taskInput.trim() && (
+            <button onClick={submitTask} style={{ padding: "6px 10px", borderRadius: "6px", border: "none", background: project.color || C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer", flexShrink: 0 }}>
+              Add
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function ProjectsSection({ token }) {
+function ProjectsSection({ token, viewingUserId, currentUserId, sectionTitle, onSaveTitle }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const readOnly = viewingUserId !== currentUserId;
+
+  const url = readOnly ? `/api/projects?userId=${viewingUserId}` : "/api/projects";
 
   useEffect(() => {
-    apiFetch("/api/projects", {}, token)
+    setLoading(true);
+    apiFetch(url, {}, token)
       .then((r) => r.json())
       .then((data) => setProjects(Array.isArray(data) ? data : []))
       .catch(() => setProjects([]))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, url]);
 
   const handleCreate = async (data) => {
     const tempId = genId();
@@ -725,16 +952,11 @@ function ProjectsSection({ token }) {
 
   const handleAddTask = async (projectId, text) => {
     const newTask = { id: genId(), text, done: false };
-    setProjects((prev) =>
-      prev.map((p) => p.id === projectId ? { ...p, tasks: [...(p.tasks || []), newTask] } : p)
-    );
+    setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, tasks: [...(p.tasks || []), newTask] } : p));
     try {
       const project = projects.find((p) => p.id === projectId);
       const tasks = [...(project?.tasks || []), { text, done: false }];
-      const res = await apiFetch(`/api/projects/${projectId}`, {
-        method: "PUT",
-        body: JSON.stringify({ tasks }),
-      }, token);
+      const res = await apiFetch(`/api/projects/${projectId}`, { method: "PUT", body: JSON.stringify({ tasks }) }, token);
       const saved = await res.json();
       setProjects((prev) => prev.map((p) => p.id === projectId ? saved : p));
     } catch {}
@@ -750,48 +972,31 @@ function ProjectsSection({ token }) {
     );
     try {
       const project = projects.find((p) => p.id === projectId);
-      const tasks = (project?.tasks || []).map((t) =>
-        t.id === task.id ? { ...t, done: !t.done } : t
-      );
-      await apiFetch(`/api/projects/${projectId}`, {
-        method: "PUT",
-        body: JSON.stringify({ tasks }),
-      }, token);
+      const tasks = (project?.tasks || []).map((t) => t.id === task.id ? { ...t, done: !t.done } : t);
+      await apiFetch(`/api/projects/${projectId}`, { method: "PUT", body: JSON.stringify({ tasks }) }, token);
     } catch {}
   };
 
   return (
     <div style={{ marginBottom: "24px" }}>
-      <SectionHeader
-        title="My Projects"
-        action={<AddBtn onClick={() => setShowModal(true)} label="+ New Project" />}
-      />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+        <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={readOnly} />
+        {!readOnly && <AddBtn onClick={() => setShowModal(true)} label="+ New Project" />}
+      </div>
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: "24px", color: C.muted, fontSize: "13px" }}>
-          Loading projects…
-        </div>
+        <div style={{ textAlign: "center", padding: "24px", color: C.muted, fontSize: "13px" }}>Loading projects…</div>
       ) : projects.length === 0 ? (
-        <EmptyState icon="📁" message="No projects yet. Create one to get started." />
+        <EmptyState icon="📁" message={readOnly ? "No projects yet." : "No projects yet. Create one to get started."} />
       ) : (
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-          gap: "14px",
-        }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "14px" }}>
           {projects.map((p) => (
-            <ProjectCard
-              key={p.id}
-              project={p}
-              onToggleTask={handleToggleTask}
-              onAddTask={handleAddTask}
-              onDelete={handleDelete}
-            />
+            <ProjectCard key={p.id} project={p} onToggleTask={handleToggleTask} onAddTask={handleAddTask} onDelete={handleDelete} readOnly={readOnly} />
           ))}
         </div>
       )}
 
-      {showModal && (
+      {showModal && !readOnly && (
         <NewProjectModal onSave={handleCreate} onClose={() => setShowModal(false)} />
       )}
     </div>
@@ -800,7 +1005,7 @@ function ProjectsSection({ token }) {
 
 // ─── NOTES ────────────────────────────────────────────────────────────────────
 
-function NoteCard({ note, onSave, onDelete }) {
+function NoteCard({ note, onSave, onDelete, readOnly }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(note.title || "");
@@ -816,9 +1021,7 @@ function NoteCard({ note, onSave, onDelete }) {
   };
 
   const handleBlur = () => {
-    if (title !== note.title || content !== note.content) {
-      handleSave();
-    }
+    if (title !== note.title || content !== note.content) handleSave();
   };
 
   return (
@@ -832,111 +1035,66 @@ function NoteCard({ note, onSave, onDelete }) {
         transition: "border-color 0.15s, box-shadow 0.15s",
       }}
     >
-      {editing ? (
+      {editing && !readOnly ? (
         <div>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onBlur={handleBlur}
-            style={{ ...textInput({ width: "100%", marginBottom: "8px", fontWeight: "600" }) }}
-            placeholder="Note title…"
-          />
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            onBlur={handleBlur}
-            rows={5}
-            style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.5" }) }}
-            placeholder="Write your note…"
-          />
+          <input value={title} onChange={(e) => setTitle(e.target.value)} onBlur={handleBlur} style={{ ...textInput({ width: "100%", marginBottom: "8px", fontWeight: "600" }) }} placeholder="Note title…" />
+          <textarea value={content} onChange={(e) => setContent(e.target.value)} onBlur={handleBlur} rows={5} style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.5" }) }} placeholder="Write your note…" />
           <div style={{ display: "flex", gap: "8px", marginTop: "10px", justifyContent: "flex-end" }}>
-            <button
-              onClick={() => { setTitle(note.title || ""); setContent(note.content || ""); setEditing(false); }}
-              style={{ padding: "6px 14px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              style={{ padding: "6px 14px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
+            <button onClick={() => { setTitle(note.title || ""); setContent(note.content || ""); setEditing(false); }} style={{ padding: "6px 14px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: "6px 14px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>{saving ? "Saving…" : "Save"}</button>
           </div>
         </div>
       ) : (
         <div>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
-            <div
-              onClick={() => setEditing(true)}
-              style={{ flex: 1, cursor: "pointer" }}
-            >
-              {note.title && (
-                <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "4px" }}>
-                  {note.title}
-                </div>
-              )}
-              <div style={{
-                fontSize: "13px", color: C.muted, lineHeight: "1.5",
-                overflow: "hidden",
-                display: "-webkit-box",
-                WebkitLineClamp: expanded ? "unset" : 2,
-                WebkitBoxOrient: "vertical",
-              }}>
+            <div onClick={() => !readOnly && setEditing(true)} style={{ flex: 1, cursor: readOnly ? "default" : "pointer" }}>
+              {note.title && <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "4px" }}>{note.title}</div>}
+              <div style={{ fontSize: "13px", color: C.muted, lineHeight: "1.5", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: expanded ? "unset" : 2, WebkitBoxOrient: "vertical" }}>
                 {note.content || <em style={{ opacity: 0.5 }}>Empty note</em>}
               </div>
             </div>
-            <button
-              onClick={() => onDelete(note.id)}
-              style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "14px", opacity: hov ? 0.7 : 0, transition: "opacity 0.12s", flexShrink: 0 }}
-            >
-              ✕
-            </button>
+            {!readOnly && (
+              <button onClick={() => onDelete(note.id)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "14px", opacity: hov ? 0.7 : 0, transition: "opacity 0.12s", flexShrink: 0 }}>✕</button>
+            )}
           </div>
           {note.content && note.content.length > 100 && (
-            <button
-              onClick={() => setExpanded((e) => !e)}
-              style={{ background: "none", border: "none", cursor: "pointer", color: C.accent, fontSize: "12px", fontWeight: "600", padding: "4px 0 0" }}
-            >
+            <button onClick={() => setExpanded((e) => !e)} style={{ background: "none", border: "none", cursor: "pointer", color: C.accent, fontSize: "12px", fontWeight: "600", padding: "4px 0 0" }}>
               {expanded ? "Show less" : "Read more"}
             </button>
           )}
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button
-              onClick={() => setEditing(true)}
-              style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "12px", opacity: hov ? 1 : 0, transition: "opacity 0.12s" }}
-            >
-              ✏️ Edit
-            </button>
-          </div>
+          {!readOnly && (
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button onClick={() => setEditing(true)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "12px", opacity: hov ? 1 : 0, transition: "opacity 0.12s" }}>✏️ Edit</button>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function NotesSection({ token }) {
+function NotesSection({ token, viewingUserId, currentUserId, sectionTitle, onSaveTitle }) {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const readOnly = viewingUserId !== currentUserId;
+
+  const url = readOnly ? `/api/personalnotes?userId=${viewingUserId}` : "/api/personalnotes";
 
   useEffect(() => {
-    apiFetch("/api/personalnotes", {}, token)
+    setLoading(true);
+    apiFetch(url, {}, token)
       .then((r) => r.json())
       .then((data) => setNotes(Array.isArray(data) ? data : []))
       .catch(() => setNotes([]))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, url]);
 
   const handleNew = async () => {
     const tempId = genId();
     const optimistic = { id: tempId, title: "", content: "" };
     setNotes((prev) => [optimistic, ...prev]);
     try {
-      const res = await apiFetch("/api/personalnotes", {
-        method: "POST",
-        body: JSON.stringify({ title: "", content: "" }),
-      }, token);
+      const res = await apiFetch("/api/personalnotes", { method: "POST", body: JSON.stringify({ title: "", content: "" }) }, token);
       const saved = await res.json();
       setNotes((prev) => prev.map((n) => n.id === tempId ? saved : n));
     } catch {
@@ -947,10 +1105,7 @@ function NotesSection({ token }) {
   const handleSave = async (id, data) => {
     setNotes((prev) => prev.map((n) => n.id === id ? { ...n, ...data } : n));
     try {
-      await apiFetch(`/api/personalnotes/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      }, token);
+      await apiFetch(`/api/personalnotes/${id}`, { method: "PUT", body: JSON.stringify(data) }, token);
     } catch {}
   };
 
@@ -966,20 +1121,18 @@ function NotesSection({ token }) {
 
   return (
     <div style={{ marginBottom: "24px" }}>
-      <SectionHeader
-        title="Notes"
-        action={<AddBtn onClick={handleNew} label="+ New Note" />}
-      />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+        <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={readOnly} />
+        {!readOnly && <AddBtn onClick={handleNew} label="+ New Note" />}
+      </div>
       {loading ? (
-        <div style={{ textAlign: "center", padding: "20px", color: C.muted, fontSize: "13px" }}>
-          Loading notes…
-        </div>
+        <div style={{ textAlign: "center", padding: "20px", color: C.muted, fontSize: "13px" }}>Loading notes…</div>
       ) : notes.length === 0 ? (
-        <EmptyState icon="📝" message="No notes yet. Create one to get started." />
+        <EmptyState icon="📝" message={readOnly ? "No notes yet." : "No notes yet. Create one to get started."} />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
           {notes.map((note) => (
-            <NoteCard key={note.id} note={note} onSave={handleSave} onDelete={handleDelete} />
+            <NoteCard key={note.id} note={note} onSave={handleSave} onDelete={handleDelete} readOnly={readOnly} />
           ))}
         </div>
       )}
@@ -993,7 +1146,6 @@ function AddLinkModal({ onSave, onClose }) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [emoji, setEmoji] = useState("🔗");
-
   const QUICK_EMOJIS = ["🔗", "📄", "🎨", "📊", "🗂", "📬", "🌐", "💬", "⚡", "🏷"];
 
   const submit = () => {
@@ -1005,144 +1157,65 @@ function AddLinkModal({ onSave, onClose }) {
 
   return (
     <>
-      <div
-        onClick={onClose}
-        style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", backdropFilter: "blur(3px)", zIndex: 2000 }}
-      />
-      <div style={{
-        position: "fixed", top: "50%", left: "50%",
-        transform: "translate(-50%, -50%)",
-        background: C.card, border: `1px solid ${C.border}`,
-        borderRadius: "16px", padding: "24px", width: "360px", maxWidth: "90vw",
-        zIndex: 2001, boxShadow: C.shadowMd,
-      }}>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", backdropFilter: "blur(3px)", zIndex: 2000 }} />
+      <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "24px", width: "360px", maxWidth: "90vw", zIndex: 2001, boxShadow: C.shadowMd }}>
         <h3 style={{ margin: "0 0 16px", fontSize: "15px", fontWeight: "700", color: C.text }}>Add Link</h3>
-
         <div style={{ marginBottom: "12px" }}>
           <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Emoji</label>
           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
             {QUICK_EMOJIS.map((e) => (
-              <button
-                key={e}
-                onClick={() => setEmoji(e)}
-                style={{
-                  width: "32px", height: "32px", borderRadius: "8px",
-                  border: `2px solid ${emoji === e ? C.accent : C.border}`,
-                  background: emoji === e ? C.accentLight : C.cardBg,
-                  cursor: "pointer", fontSize: "16px", padding: 0,
-                }}
-              >
-                {e}
-              </button>
+              <button key={e} onClick={() => setEmoji(e)} style={{ width: "32px", height: "32px", borderRadius: "8px", border: `2px solid ${emoji === e ? C.accent : C.border}`, background: emoji === e ? C.accentLight : C.cardBg, cursor: "pointer", fontSize: "16px", padding: 0 }}>{e}</button>
             ))}
           </div>
         </div>
-
         <div style={{ marginBottom: "12px" }}>
           <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Name *</label>
-          <input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            style={{ ...textInput({ width: "100%" }) }}
-            placeholder="e.g. Brand Guide"
-          />
+          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} style={{ ...textInput({ width: "100%" }) }} placeholder="e.g. Brand Guide" />
         </div>
-
         <div style={{ marginBottom: "20px" }}>
           <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>URL *</label>
-          <input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && submit()}
-            style={{ ...textInput({ width: "100%" }) }}
-            placeholder="https://…"
-          />
+          <input value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} style={{ ...textInput({ width: "100%" }) }} placeholder="https://…" />
         </div>
-
         <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-          <button
-            onClick={onClose}
-            style={{ padding: "8px 16px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={submit}
-            disabled={!name.trim() || !url.trim()}
-            style={{
-              padding: "8px 18px", borderRadius: "8px", border: "none",
-              background: name.trim() && url.trim() ? C.accent : C.border,
-              color: "#fff", fontSize: "13px", fontWeight: "600",
-              cursor: name.trim() && url.trim() ? "pointer" : "not-allowed",
-            }}
-          >
-            Add Link
-          </button>
+          <button onClick={onClose} style={{ padding: "8px 16px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
+          <button onClick={submit} disabled={!name.trim() || !url.trim()} style={{ padding: "8px 18px", borderRadius: "8px", border: "none", background: name.trim() && url.trim() ? C.accent : C.border, color: "#fff", fontSize: "13px", fontWeight: "600", cursor: name.trim() && url.trim() ? "pointer" : "not-allowed" }}>Add Link</button>
         </div>
       </div>
     </>
   );
 }
 
-function LinkPill({ link, onDelete }) {
+function LinkPill({ link, onDelete, readOnly }) {
   const [hov, setHov] = useState(false);
   return (
-    <div
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
-    >
-      <a
-        href={link.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          display: "inline-flex", alignItems: "center", gap: "6px",
-          padding: "7px 12px", borderRadius: "20px",
-          border: `1px solid ${hov ? C.accent : C.border}`,
-          background: hov ? C.accentLight : C.cardBg,
-          color: hov ? C.accent : C.text,
-          fontSize: "13px", fontWeight: "500",
-          textDecoration: "none",
-          transition: "all 0.15s",
-          cursor: "pointer",
-        }}
-      >
+    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)} style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+      <a href={link.url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "7px 12px", borderRadius: "20px", border: `1px solid ${hov ? C.accent : C.border}`, background: hov ? C.accentLight : C.cardBg, color: hov ? C.accent : C.text, fontSize: "13px", fontWeight: "500", textDecoration: "none", transition: "all 0.15s", cursor: "pointer" }}>
         <span>{link.emoji || "🔗"}</span>
         {link.name}
       </a>
-      {hov && (
-        <button
-          onClick={(e) => { e.preventDefault(); onDelete(link.id); }}
-          style={{
-            position: "absolute", top: "-6px", right: "-6px",
-            width: "18px", height: "18px", borderRadius: "50%",
-            background: "#EF4444", border: "2px solid #fff",
-            color: "#fff", fontSize: "10px", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: 0, lineHeight: 1,
-          }}
-        >
-          ✕
-        </button>
+      {hov && !readOnly && (
+        <button onClick={(e) => { e.preventDefault(); onDelete(link.id); }} style={{ position: "absolute", top: "-6px", right: "-6px", width: "18px", height: "18px", borderRadius: "50%", background: "#EF4444", border: "2px solid #fff", color: "#fff", fontSize: "10px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, lineHeight: 1 }}>✕</button>
       )}
     </div>
   );
 }
 
-function LinksSection({ token }) {
+function LinksSection({ token, viewingUserId, currentUserId, sectionTitle, onSaveTitle }) {
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const readOnly = viewingUserId !== currentUserId;
+
+  const url = readOnly ? `/api/personallinks?userId=${viewingUserId}` : "/api/personallinks";
 
   useEffect(() => {
-    apiFetch("/api/personallinks", {}, token)
+    setLoading(true);
+    apiFetch(url, {}, token)
       .then((r) => r.json())
       .then((data) => setLinks(Array.isArray(data) ? data : []))
       .catch(() => setLinks([]))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, url]);
 
   const handleAdd = async (data) => {
     const tempId = genId();
@@ -1170,79 +1243,347 @@ function LinksSection({ token }) {
 
   return (
     <div>
-      <SectionHeader
-        title="Quick Links"
-        action={<AddBtn onClick={() => setShowModal(true)} label="+ Add Link" />}
-      />
-
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+        <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={readOnly} />
+        {!readOnly && <AddBtn onClick={() => setShowModal(true)} label="+ Add Link" />}
+      </div>
       {loading ? (
         <div style={{ fontSize: "13px", color: C.muted }}>Loading links…</div>
       ) : links.length === 0 ? (
-        <EmptyState icon="🔗" message="No links saved yet. Add frequently used links." />
+        <EmptyState icon="🔗" message={readOnly ? "No links saved yet." : "No links saved yet. Add frequently used links."} />
       ) : (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-          {links.map((link) => (
-            <LinkPill key={link.id} link={link} onDelete={handleDelete} />
-          ))}
+          {links.map((link) => <LinkPill key={link.id} link={link} onDelete={handleDelete} readOnly={readOnly} />)}
         </div>
       )}
+      {showModal && !readOnly && <AddLinkModal onSave={handleAdd} onClose={() => setShowModal(false)} />}
+    </div>
+  );
+}
 
-      {showModal && (
-        <AddLinkModal onSave={handleAdd} onClose={() => setShowModal(false)} />
+// ─── PROCESS/ROLE SECTION ─────────────────────────────────────────────────────
+
+function ProcessRoleSection({ token, viewingUserId, currentUserId, sectionTitle, onSaveTitle, processRole, onProcessRoleSaved }) {
+  const [text, setText] = useState(processRole || "");
+  const [saving, setSaving] = useState(false);
+  const readOnly = viewingUserId !== currentUserId;
+
+  useEffect(() => { setText(processRole || ""); }, [processRole]);
+
+  const save = async () => {
+    if (text === (processRole || "")) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-session": token },
+        body: JSON.stringify({ processRole: text }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        onProcessRoleSaved(data.processRole || "");
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: "24px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+        <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={readOnly} />
+        {saving && <span style={{ fontSize: "11px", color: C.muted }}>Saving…</span>}
+      </div>
+      {readOnly ? (
+        text ? (
+          <div style={{ fontSize: "13px", color: C.text, lineHeight: "1.6", padding: "12px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}` }}>
+            {text}
+          </div>
+        ) : (
+          <EmptyState icon="📋" message="No process/role info yet." />
+        )
+      ) : (
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={save}
+          rows={5}
+          placeholder="Describe your process, role, and responsibilities…"
+          style={{
+            width: "100%", padding: "10px 12px",
+            border: `1px solid ${C.border}`, borderRadius: "8px",
+            background: C.inputBg, color: C.text,
+            fontSize: "13px", outline: "none", resize: "vertical",
+            fontFamily: "inherit", lineHeight: "1.6", boxSizing: "border-box",
+          }}
+        />
       )}
+    </div>
+  );
+}
+
+// ─── ASSIGNED CONTENT SECTION ─────────────────────────────────────────────────
+
+const PLATFORM_ICONS = {
+  instagram: "📸", tiktok: "🎵", linkedin: "💼", x: "✖", facebook: "👥",
+  youtube: "▶", pinterest: "📌", email: "📧", blog: "✍", podcast: "🎙",
+};
+
+const STATUS_COLORS = {
+  draft: { color: "#94A3B8", bg: "rgba(148,163,184,0.15)" },
+  review: { color: "#F59E0B", bg: "rgba(245,158,11,0.15)" },
+  approved: { color: "#3B82F6", bg: "rgba(59,130,246,0.15)" },
+  scheduled: { color: "#8B5CF6", bg: "rgba(139,92,246,0.15)" },
+  published: { color: "#10B981", bg: "rgba(16,185,129,0.15)" },
+  paused: { color: "#EF4444", bg: "rgba(239,68,68,0.15)" },
+};
+
+function AssignedContentSection({ assignedPosts, sectionTitle }) {
+  if (!assignedPosts || assignedPosts.length === 0) {
+    return (
+      <div style={{ marginBottom: "16px" }}>
+        <h2 style={{ margin: "0 0 12px", fontSize: "14px", fontWeight: "700", color: C.text }}>{sectionTitle}</h2>
+        <EmptyState icon="📋" message="No content assigned to you yet." />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginBottom: "16px" }}>
+      <h2 style={{ margin: "0 0 12px", fontSize: "14px", fontWeight: "700", color: C.text }}>{sectionTitle}</h2>
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        {assignedPosts.map((post) => {
+          const statusCfg = STATUS_COLORS[post.status] || STATUS_COLORS.draft;
+          return (
+            <div key={post.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", boxShadow: C.shadow }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "13px", fontWeight: "600", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {post.title || "Untitled"}
+                </div>
+                {post.scheduledDate && (
+                  <div style={{ fontSize: "11px", color: C.muted, marginTop: "2px" }}>
+                    {formatDate(post.scheduledDate)}
+                  </div>
+                )}
+              </div>
+              {post.platforms && post.platforms.length > 0 && (
+                <div style={{ display: "flex", gap: "3px" }}>
+                  {post.platforms.slice(0, 3).map((p) => (
+                    <span key={p} title={p} style={{ fontSize: "14px" }}>{PLATFORM_ICONS[p] || "📄"}</span>
+                  ))}
+                </div>
+              )}
+              <span style={{ padding: "2px 8px", borderRadius: "20px", background: statusCfg.bg, color: statusCfg.color, fontSize: "11px", fontWeight: "700", flexShrink: 0 }}>
+                {post.status ? post.status.charAt(0).toUpperCase() + post.status.slice(1) : "Draft"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
 
-export default function MyDashboard({ currentUser, token }) {
+const DEFAULT_SECTION_TITLES = {
+  dailyRoutines: "Daily Routines",
+  tasks: "My Tasks",
+  projects: "TCF Community Projects",
+  notes: "My Notes",
+  links: "My Links",
+  processRole: "My Process & Role",
+  assignedContent: "Assigned to Me",
+};
+
+export default function MyDashboard({ currentUser, token, viewingUserId, teamMembers = [], assignedPosts = [] }) {
+  const currentUserId = currentUser?.id;
+  const effectiveViewingUserId = viewingUserId || currentUserId;
+  const readOnly = effectiveViewingUserId !== currentUserId;
+
+  // Profile data (header image, processRole, sectionTitles)
+  const [profile, setProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const fileInputRef = useRef(null);
+
+  const ownerName = readOnly
+    ? (teamMembers.find((m) => m.id === effectiveViewingUserId)?.name || "Member")
+    : currentUser?.name || "My";
+
+  const workspaceName = ownerName.endsWith("s") ? `${ownerName}' Workspace` : `${ownerName}'s Workspace`;
+
+  useEffect(() => {
+    setProfileLoading(true);
+    const profileUrl = readOnly ? `/api/profile?userId=${effectiveViewingUserId}` : "/api/profile";
+    fetch(profileUrl, { headers: { "x-session": token } })
+      .then((r) => r.json())
+      .then((data) => setProfile(data || {}))
+      .catch(() => setProfile({}))
+      .finally(() => setProfileLoading(false));
+  }, [token, effectiveViewingUserId, readOnly]);
+
+  const sectionTitles = { ...DEFAULT_SECTION_TITLES, ...(profile?.sectionTitles || {}) };
+
+  const saveSectionTitle = async (key, value) => {
+    const updated = { ...sectionTitles, [key]: value };
+    setProfile((p) => ({ ...p, sectionTitles: updated }));
+    try {
+      await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-session": token },
+        body: JSON.stringify({ sectionTitles: updated }),
+      });
+    } catch {}
+  };
+
+  const handleHeaderImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target.result;
+      setProfile((p) => ({ ...p, headerImage: dataUrl }));
+      try {
+        await fetch("/api/profile", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", "x-session": token },
+          body: JSON.stringify({ headerImage: dataUrl }),
+        });
+      } catch {}
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const processRole = profile?.processRole || "";
+  const headerImage = profile?.headerImage || null;
+
   return (
-    <div style={{ padding: "24px", minHeight: "100vh", background: C.bg }}>
-      {/* Page header */}
-      <div style={{ marginBottom: "24px" }}>
-        <h1 style={{ margin: "0 0 4px", fontSize: "24px", fontWeight: "800", color: C.text }}>
-          My Dashboard
-        </h1>
-        <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>
-          Your personal workspace — tasks, projects, notes, and links
-        </p>
+    <div style={{ padding: "0", minHeight: "100vh", background: C.bg }}>
+      {/* Header banner */}
+      <div style={{ position: "relative", marginBottom: "24px" }}>
+        <div style={{
+          width: "100%", height: "140px",
+          background: headerImage
+            ? `url(${headerImage}) center/cover no-repeat`
+            : `linear-gradient(135deg, ${C.accent}22, #8B5CF622)`,
+          borderRadius: "12px",
+          overflow: "hidden",
+          border: `1px solid ${C.border}`,
+          display: "flex",
+          alignItems: "flex-end",
+          padding: "16px 20px",
+        }}>
+          {!headerImage && !readOnly && (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              style={{ padding: "6px 14px", borderRadius: "20px", border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.85)", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
+            >
+              + Upload Header Image
+            </button>
+          )}
+          {headerImage && !readOnly && (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              style={{ padding: "5px 12px", borderRadius: "20px", border: `1px solid rgba(255,255,255,0.4)`, background: "rgba(0,0,0,0.35)", color: "#fff", fontSize: "11px", fontWeight: "600", cursor: "pointer" }}
+            >
+              ✏ Change
+            </button>
+          )}
+        </div>
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleHeaderImageUpload} style={{ display: "none" }} />
+
+        <div style={{ padding: "16px 4px 0" }}>
+          <h1 style={{ margin: "0 0 4px", fontSize: "26px", fontWeight: "800", color: C.text }}>{workspaceName}</h1>
+          {readOnly && (
+            <p style={{ margin: 0, fontSize: "13px", color: C.muted }}>Read-only view</p>
+          )}
+        </div>
       </div>
 
       {/* 2-column layout */}
       <div style={{ display: "flex", gap: "20px", alignItems: "flex-start" }}>
 
-        {/* LEFT: Tasks */}
-        <TasksColumn token={token} />
+        {/* LEFT column */}
+        <div style={{
+          width: "340px", flexShrink: 0,
+          background: C.card, border: `1px solid ${C.border}`,
+          borderRadius: "16px", padding: "20px",
+          boxShadow: C.shadow,
+          maxHeight: "calc(100vh - 180px)", overflowY: "auto",
+        }}>
+          <DailyRoutinesSection
+            token={token}
+            viewingUserId={effectiveViewingUserId}
+            currentUserId={currentUserId}
+            sectionTitle={sectionTitles.dailyRoutines}
+            onSaveTitle={(v) => saveSectionTitle("dailyRoutines", v)}
+          />
 
-        {/* RIGHT: Projects + Notes + Links */}
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "0" }}>
+          <div style={{ borderTop: `1px solid ${C.border}`, margin: "16px 0" }} />
+
+          <TasksColumn
+            token={token}
+            viewingUserId={effectiveViewingUserId}
+            currentUserId={currentUserId}
+            sectionTitle={sectionTitles.tasks}
+            onSaveTitle={(v) => saveSectionTitle("tasks", v)}
+          />
+
+          <div style={{ borderTop: `1px solid ${C.border}`, margin: "16px 0" }} />
+
+          <AssignedContentSection
+            assignedPosts={assignedPosts}
+            sectionTitle={sectionTitles.assignedContent}
+          />
+        </div>
+
+        {/* RIGHT column */}
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "16px" }}>
 
           {/* Projects */}
-          <div style={{
-            background: C.card, border: `1px solid ${C.border}`,
-            borderRadius: "16px", padding: "20px",
-            boxShadow: C.shadow, marginBottom: "16px",
-          }}>
-            <ProjectsSection token={token} />
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", boxShadow: C.shadow }}>
+            <ProjectsSection
+              token={token}
+              viewingUserId={effectiveViewingUserId}
+              currentUserId={currentUserId}
+              sectionTitle={sectionTitles.projects}
+              onSaveTitle={(v) => saveSectionTitle("projects", v)}
+            />
           </div>
 
           {/* Notes */}
-          <div style={{
-            background: C.card, border: `1px solid ${C.border}`,
-            borderRadius: "16px", padding: "20px",
-            boxShadow: C.shadow, marginBottom: "16px",
-          }}>
-            <NotesSection token={token} />
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", boxShadow: C.shadow }}>
+            <NotesSection
+              token={token}
+              viewingUserId={effectiveViewingUserId}
+              currentUserId={currentUserId}
+              sectionTitle={sectionTitles.notes}
+              onSaveTitle={(v) => saveSectionTitle("notes", v)}
+            />
           </div>
 
           {/* Links */}
-          <div style={{
-            background: C.card, border: `1px solid ${C.border}`,
-            borderRadius: "16px", padding: "20px",
-            boxShadow: C.shadow,
-          }}>
-            <LinksSection token={token} />
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", boxShadow: C.shadow }}>
+            <LinksSection
+              token={token}
+              viewingUserId={effectiveViewingUserId}
+              currentUserId={currentUserId}
+              sectionTitle={sectionTitles.links}
+              onSaveTitle={(v) => saveSectionTitle("links", v)}
+            />
+          </div>
+
+          {/* Process/Role */}
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", boxShadow: C.shadow }}>
+            <ProcessRoleSection
+              token={token}
+              viewingUserId={effectiveViewingUserId}
+              currentUserId={currentUserId}
+              sectionTitle={sectionTitles.processRole}
+              onSaveTitle={(v) => saveSectionTitle("processRole", v)}
+              processRole={processRole}
+              onProcessRoleSaved={(v) => setProfile((p) => ({ ...p, processRole: v }))}
+            />
           </div>
         </div>
       </div>

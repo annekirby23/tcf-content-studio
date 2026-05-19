@@ -23,18 +23,22 @@ export async function PUT(req) {
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
-    const { image, title, email, phone, bio, orgLevel, funFacts } = body;
+    const { image, title, jobTitle, email, phone, bio, orgLevel, funFacts, headerImage, processRole, sectionTitles } = body;
 
     const existing = (await kvGet(`tcf:profile:${user.id}`)) || {};
     const updated = {
       ...existing,
       ...(image !== undefined && { image }),
       ...(title !== undefined && { title }),
+      ...(jobTitle !== undefined && { jobTitle }),
       ...(email !== undefined && { email }),
       ...(phone !== undefined && { phone }),
       ...(bio !== undefined && { bio }),
       ...(orgLevel !== undefined && { orgLevel }),
       ...(funFacts !== undefined && { funFacts }),
+      ...(headerImage !== undefined && { headerImage }),
+      ...(processRole !== undefined && { processRole }),
+      ...(sectionTitles !== undefined && { sectionTitles }),
       updatedAt: new Date().toISOString(),
     };
 

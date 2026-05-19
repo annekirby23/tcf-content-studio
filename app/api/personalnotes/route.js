@@ -7,7 +7,10 @@ export async function GET(req) {
     const user = await getSession(req);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-    const notes = (await kvGet(`tcf:personalnotes:${user.id}`)) || [];
+    const { searchParams } = new URL(req.url);
+    const targetId = searchParams.get("userId") || user.id;
+
+    const notes = (await kvGet(`tcf:personalnotes:${targetId}`)) || [];
     return Response.json(notes);
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });

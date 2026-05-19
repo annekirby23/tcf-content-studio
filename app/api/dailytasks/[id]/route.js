@@ -9,19 +9,16 @@ export async function PUT(req, { params }) {
     const { id } = await params;
     const body = await req.json();
 
-    const tasks = (await kvGet(`tcf:tasks:${user.id}`)) || [];
+    const tasks = (await kvGet(`tcf:dailytasks:${user.id}`)) || [];
     const index = tasks.findIndex((t) => t.id === id);
     if (index === -1) return Response.json({ error: "Task not found" }, { status: 404 });
 
     const task = { ...tasks[index] };
     if (body.text !== undefined) task.text = body.text;
     if (body.done !== undefined) task.done = body.done;
-    if (body.priority !== undefined) task.priority = body.priority;
-    if (body.dueDate !== undefined) task.dueDate = body.dueDate;
-    if (body.description !== undefined) task.description = body.description;
 
     tasks[index] = task;
-    await kvSet(`tcf:tasks:${user.id}`, tasks);
+    await kvSet(`tcf:dailytasks:${user.id}`, tasks);
 
     return Response.json(task);
   } catch (e) {
@@ -36,12 +33,12 @@ export async function DELETE(req, { params }) {
 
     const { id } = await params;
 
-    const tasks = (await kvGet(`tcf:tasks:${user.id}`)) || [];
+    const tasks = (await kvGet(`tcf:dailytasks:${user.id}`)) || [];
     const exists = tasks.some((t) => t.id === id);
     if (!exists) return Response.json({ error: "Task not found" }, { status: 404 });
 
     const updated = tasks.filter((t) => t.id !== id);
-    await kvSet(`tcf:tasks:${user.id}`, updated);
+    await kvSet(`tcf:dailytasks:${user.id}`, updated);
 
     return Response.json({ ok: true });
   } catch (e) {

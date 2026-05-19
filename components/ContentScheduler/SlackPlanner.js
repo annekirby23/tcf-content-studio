@@ -130,9 +130,10 @@ function ChannelForm({ initial, onSave, onCancel }) {
 
 // ─── Add Idea Form ───────────────────────────────────────────────────────────
 
-function AddIdeaForm({ onSave, onCancel }) {
+function AddIdeaForm({ onSave, onCancel, teamMembers = [] }) {
   const [title, setTitle] = useState("");
   const [copy, setCopy] = useState("");
+  const [assignedTo, setAssignedTo] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -142,7 +143,7 @@ function AddIdeaForm({ onSave, onCancel }) {
     setSaving(true);
     setError("");
     try {
-      await onSave({ title: title.trim(), copy: copy.trim() });
+      await onSave({ title: title.trim(), copy: copy.trim(), assignedTo: assignedTo || null });
     } catch (e) {
       setError(e.message || "Failed to save.");
       setSaving(false);
@@ -188,6 +189,18 @@ function AddIdeaForm({ onSave, onCancel }) {
         rows={4}
         style={{ ...inputStyle, resize: "vertical", marginBottom: 8 }}
       />
+      {teamMembers.length > 0 && (
+        <select
+          value={assignedTo}
+          onChange={(e) => setAssignedTo(e.target.value)}
+          style={{ ...inputStyle, marginBottom: 8, color: C.text }}
+        >
+          <option value="">Unassigned</option>
+          {teamMembers.map((m) => (
+            <option key={m.id} value={m.id}>{m.name}</option>
+          ))}
+        </select>
+      )}
       {error && <div style={{ fontSize: 12, color: "#EF4444", marginBottom: 8 }}>{error}</div>}
       <div style={{ display: "flex", gap: 8 }}>
         <button
@@ -228,7 +241,7 @@ function AddIdeaForm({ onSave, onCancel }) {
 
 // ─── Idea Card ───────────────────────────────────────────────────────────────
 
-function IdeaCard({ idea, currentUser, token, onDelete, onMakePost }) {
+function IdeaCard({ idea, currentUser, token, onDelete, onMakePost, teamMembers = [] }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -351,8 +364,16 @@ function IdeaCard({ idea, currentUser, token, onDelete, onMakePost }) {
         )}
       </div>
 
-      <div style={{ marginTop: 10, fontSize: 11, color: C.muted }}>
-        {idea.submittedBy} · {relativeTime(idea.createdAt)}
+      <div style={{ marginTop: 10, fontSize: 11, color: C.muted, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span>{idea.submittedBy} · {relativeTime(idea.createdAt)}</span>
+        {idea.assignedTo && (() => {
+          const member = teamMembers.find((m) => m.id === idea.assignedTo);
+          return member ? (
+            <span style={{ padding: "2px 8px", borderRadius: "20px", background: "rgba(99,102,241,0.12)", color: "#6366F1", fontWeight: 600, fontSize: 11 }}>
+              → {member.name}
+            </span>
+          ) : null;
+        })()}
       </div>
     </div>
   );
@@ -360,7 +381,7 @@ function IdeaCard({ idea, currentUser, token, onDelete, onMakePost }) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export default function SlackPlanner({ currentUser, token, onMakePost }) {
+export default function SlackPlanner({ currentUser, token, onMakePost, teamMembers = [] }) {
   const isAdmin = currentUser?.role === "admin";
 
   // Channels state
@@ -477,11 +498,11 @@ export default function SlackPlanner({ currentUser, token, onMakePost }) {
 
   // ── Idea actions ─────────────────────────────────────────────────────────
 
-  async function handleAddIdea({ title, copy }) {
+  async function handleAddIdea({ title, copy, assignedTo }) {
     const res = await fetch("/api/slack/ideas", {
       method: "POST",
       headers: { "x-session": token, "Content-Type": "application/json" },
-      body: JSON.stringify({ channelId: selectedChannelId, title, copy }),
+      body: JSON.stringify({ channelId: selectedChannelId, title, copy, assignedTo: assignedTo || null }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -750,6 +771,7 @@ export default function SlackPlanner({ currentUser, token, onMakePost }) {
                 <AddIdeaForm
                   onSave={handleAddIdea}
                   onCancel={() => setShowAddIdea(false)}
+                  teamMembers={teamMembers}
                 />
               )}
 
@@ -778,6 +800,7 @@ export default function SlackPlanner({ currentUser, token, onMakePost }) {
                     token={token}
                     onDelete={handleIdeaDeleted}
                     onMakePost={onMakePost}
+                    teamMembers={teamMembers}
                   />
                 ))
               )}

@@ -10,8 +10,8 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const targetId = searchParams.get("userId") || user.id;
 
-    const links = (await kvGet(`tcf:personallinks:${targetId}`)) || [];
-    return Response.json(links);
+    const tasks = (await kvGet(`tcf:dailytasks:${targetId}`)) || [];
+    return Response.json(tasks);
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });
   }
@@ -23,22 +23,20 @@ export async function POST(req) {
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
-    const { emoji, name, url, description } = body;
+    const { text } = body;
 
-    const link = {
+    const task = {
       id: crypto.randomBytes(8).toString("hex"),
-      emoji: emoji || null,
-      name: name || "",
-      url: url || "",
-      description: description || "",
+      text,
+      done: false,
       createdAt: new Date().toISOString(),
     };
 
-    const links = (await kvGet(`tcf:personallinks:${user.id}`)) || [];
-    links.unshift(link);
-    await kvSet(`tcf:personallinks:${user.id}`, links);
+    const tasks = (await kvGet(`tcf:dailytasks:${user.id}`)) || [];
+    tasks.unshift(task);
+    await kvSet(`tcf:dailytasks:${user.id}`, tasks);
 
-    return Response.json(link, { status: 201 });
+    return Response.json(task, { status: 201 });
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });
   }
