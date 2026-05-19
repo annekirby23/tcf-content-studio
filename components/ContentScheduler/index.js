@@ -14,17 +14,21 @@ import SettingsModal from "./SettingsModal";
 import SlackPlanner from "./SlackPlanner";
 import QuickLinks from "./QuickLinks";
 import AssetTracker from "./AssetTracker";
+import MemberProfile from "./MemberProfile";
+import MyDashboard from "./MyDashboard";
 
 const TOKEN_KEY = "tcf_session";
 
 const VIEWS = [
   { id: "dashboard", label: "Dashboard", icon: "◉" },
+  { id: "mydash", label: "My Workspace", icon: "🏠" },
   { id: "calendar", label: "Calendar", icon: "📅" },
   { id: "pipeline", label: "Pipeline", icon: "⬛" },
   { id: "list", label: "List", icon: "☰" },
   { id: "slack", label: "Slack", icon: "💬" },
   { id: "links", label: "Quick Links", icon: "🔗" },
   { id: "assets", label: "Assets", icon: "📦" },
+  { id: "profile", label: "Profile", icon: "👤" },
 ];
 
 function CampaignModal({ onSave, onClose }) {
@@ -657,6 +661,8 @@ export default function ContentScheduler() {
               {view === "slack" && <SlackPlanner currentUser={currentUser} token={authToken} onMakePost={handleMakePost} />}
               {view === "links" && <QuickLinks currentUser={currentUser} token={authToken} />}
               {view === "assets" && <AssetTracker currentUser={currentUser} token={authToken} teamMembers={teamMembers} />}
+              {view === "mydash" && <MyDashboard currentUser={currentUser} token={authToken} />}
+              {view === "profile" && <MemberProfile currentUser={currentUser} token={authToken} teamMembers={teamMembers} />}
             </>
           )}
         </div>
