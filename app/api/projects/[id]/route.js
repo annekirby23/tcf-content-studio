@@ -2,6 +2,8 @@ import crypto from "crypto";
 import { getSession } from "@/lib/serverAuth";
 import { kvGet, kvSet } from "@/lib/redis";
 
+const KEY = "tcf:projects";
+
 export async function PUT(req, { params }) {
   try {
     const user = await getSession(req);
@@ -10,17 +12,22 @@ export async function PUT(req, { params }) {
     const { id } = await params;
     const body = await req.json();
 
-    const projects = (await kvGet(`tcf:projects:${user.id}`)) || [];
+    const projects = (await kvGet(KEY)) || [];
     const index = projects.findIndex((p) => p.id === id);
     if (index === -1) return Response.json({ error: "Project not found" }, { status: 404 });
 
-    const project = { ...projects[index], tasks: [...(projects[index].tasks || [])] };
+    const project = {
+      ...projects[index],
+      tasks: [...(projects[index].tasks || [])],
+      statusUpdates: [...(projects[index].statusUpdates || [])],
+    };
 
     if (body.taskAction === "add") {
       const task = {
         id: crypto.randomBytes(8).toString("hex"),
         text: body.taskText,
         done: false,
+        assignedTo: body.assignedTo || null,
         createdAt: new Date().toISOString(),
       };
       project.tasks.push(task);
@@ -35,10 +42,23 @@ export async function PUT(req, { params }) {
       if (body.description !== undefined) project.description = body.description;
       if (body.color !== undefined) project.color = body.color;
       if (body.status !== undefined) project.status = body.status;
+      if (body.tasks !== undefined) project.tasks = body.tasks;
+      if (body.members !== undefined) project.members = body.members;
+      if (body.statusUpdates !== undefined) project.statusUpdates = body.statusUpdates;
+      if (body.addStatusUpdate !== undefined) {
+        const update = {
+          id: crypto.randomBytes(8).toString("hex"),
+          text: body.addStatusUpdate,
+          authorName: user.name,
+          createdAt: new Date().toISOString(),
+        };
+        project.statusUpdates = [...project.statusUpdates, update];
+      }
     }
 
+    project.updatedAt = new Date().toISOString();
     projects[index] = project;
-    await kvSet(`tcf:projects:${user.id}`, projects);
+    await kvSet(KEY, projects);
 
     return Response.json(project);
   } catch (e) {
@@ -53,12 +73,12 @@ export async function DELETE(req, { params }) {
 
     const { id } = await params;
 
-    const projects = (await kvGet(`tcf:projects:${user.id}`)) || [];
+    const projects = (await kvGet(KEY)) || [];
     const exists = projects.some((p) => p.id === id);
     if (!exists) return Response.json({ error: "Project not found" }, { status: 404 });
 
     const updated = projects.filter((p) => p.id !== id);
-    await kvSet(`tcf:projects:${user.id}`, updated);
+    await kvSet(KEY, updated);
 
     return Response.json({ ok: true });
   } catch (e) {

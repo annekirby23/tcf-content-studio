@@ -64,13 +64,13 @@ function genHex() {
   return Math.random().toString(16).slice(2, 10);
 }
 
-function InventoryRow({ item, isEditing, isLast, editForm, setEditForm, onSaveEdit, onCancelEdit, onStartEdit, onDelete, NEEDED_COLORS, STATUS_COLORS, NEEDED_WHEN_OPTIONS, ORDER_STATUS_OPTIONS, AvatarSmall, inputS }) {
+function InventoryRow({ item, isEditing, isLast, editForm, setEditForm, onSaveEdit, onCancelEdit, onStartEdit, onDelete, onStatusChange, NEEDED_COLORS, STATUS_COLORS, NEEDED_WHEN_OPTIONS, ORDER_STATUS_OPTIONS, LOCATION_OPTIONS, AvatarSmall, inputS }) {
   const [rowHov, setRowHov] = useState(false);
   const nwCfg = NEEDED_COLORS[item.neededWhen] || { color:C.muted, bg:C.cardBg };
   const stCfg = STATUS_COLORS[item.orderStatus] || { color:C.muted, bg:C.cardBg };
   return (
     <div
-      style={{ display:"grid", gridTemplateColumns:"2fr 90px 130px 1fr 110px 1fr 60px 60px", borderBottom: !isLast ? `1px solid ${C.border}` : "none", padding:"0 8px", background:rowHov ? C.hover : "transparent", transition:"background 0.1s", alignItems:"center" }}
+      style={{ display:"grid", gridTemplateColumns:"2fr 90px 130px 1fr 130px 70px 1fr 60px 60px", borderBottom: !isLast ? `1px solid ${C.border}` : "none", padding:"0 8px", background:rowHov ? C.hover : "transparent", transition:"background 0.1s", alignItems:"center" }}
       onMouseEnter={()=>setRowHov(true)} onMouseLeave={()=>setRowHov(false)}
     >
       {isEditing ? (
@@ -80,6 +80,7 @@ function InventoryRow({ item, isEditing, isLast, editForm, setEditForm, onSaveEd
           <div style={{ padding:"8px" }}><select value={editForm.neededWhen||""} onChange={(e)=>setEditForm((f)=>({...f,neededWhen:e.target.value}))} style={{ ...inputS, width:"100%" }}><option value="">—</option>{NEEDED_WHEN_OPTIONS.map((n)=><option key={n} value={n}>{n}</option>)}</select></div>
           <div style={{ padding:"8px" }}><input value={editForm.forWhat||""} onChange={(e)=>setEditForm((f)=>({...f,forWhat:e.target.value}))} style={{ ...inputS, width:"100%" }} /></div>
           <div style={{ padding:"8px" }}><select value={editForm.orderStatus||"Not Started"} onChange={(e)=>setEditForm((f)=>({...f,orderStatus:e.target.value}))} style={{ ...inputS, width:"100%" }}>{ORDER_STATUS_OPTIONS.map((s)=><option key={s} value={s}>{s}</option>)}</select></div>
+          <div style={{ padding:"8px" }}><select value={editForm.location||""} onChange={(e)=>setEditForm((f)=>({...f,location:e.target.value}))} style={{ ...inputS, width:"100%" }}><option value="">—</option>{LOCATION_OPTIONS.map((l)=><option key={l} value={l}>{l}</option>)}</select></div>
           <div style={{ padding:"8px" }}><input value={editForm.notes||""} onChange={(e)=>setEditForm((f)=>({...f,notes:e.target.value}))} style={{ ...inputS, width:"100%" }} /></div>
           <div style={{ padding:"8px" }}>{item.personAdded && <AvatarSmall name={item.personAdded} />}</div>
           <div style={{ padding:"8px", display:"flex", gap:"4px" }}>
@@ -93,7 +94,19 @@ function InventoryRow({ item, isEditing, isLast, editForm, setEditForm, onSaveEd
           <div style={{ padding:"10px 8px", fontSize:"12px", color:C.muted }}>{item.date}</div>
           <div style={{ padding:"10px 8px" }}>{item.neededWhen && <span style={{ padding:"2px 8px", borderRadius:"20px", background:nwCfg.bg, color:nwCfg.color, fontSize:"11px", fontWeight:"600" }}>{item.neededWhen}</span>}</div>
           <div style={{ padding:"10px 8px", fontSize:"13px", color:C.text }}>{item.forWhat}</div>
-          <div style={{ padding:"10px 8px" }}><span style={{ padding:"2px 8px", borderRadius:"20px", background:stCfg.bg, color:stCfg.color, fontSize:"11px", fontWeight:"600" }}>{item.orderStatus}</span></div>
+          <div style={{ padding:"6px 8px" }}>
+            <div style={{ position:"relative", display:"inline-block", borderRadius:"20px", background:stCfg.bg }}>
+              <select
+                value={item.orderStatus}
+                onChange={(e) => onStatusChange(item.id, e.target.value)}
+                style={{ appearance:"none", WebkitAppearance:"none", border:"none", background:"transparent", color:stCfg.color, fontSize:"11px", fontWeight:"600", padding:"2px 20px 2px 8px", cursor:"pointer", outline:"none", fontFamily:"inherit" }}
+              >
+                {ORDER_STATUS_OPTIONS.map((s)=><option key={s} value={s}>{s}</option>)}
+              </select>
+              <span style={{ position:"absolute", right:"6px", top:"50%", transform:"translateY(-50%)", fontSize:"8px", color:stCfg.color, pointerEvents:"none" }}>▼</span>
+            </div>
+          </div>
+          <div style={{ padding:"10px 8px" }}>{item.location && <span style={{ padding:"2px 8px", borderRadius:"6px", background:C.cardBg, border:`1px solid ${C.border}`, fontSize:"11px", color:C.muted }}>{item.location}</span>}</div>
           <div style={{ padding:"10px 8px", fontSize:"12px", color:C.muted }}>{item.notes}</div>
           <div style={{ padding:"10px 8px" }}>{item.personAdded && <AvatarSmall name={item.personAdded} />}</div>
           <div style={{ padding:"10px 8px", display:"flex", gap:"4px", alignItems:"center" }}>
@@ -112,6 +125,7 @@ function InventoryRow({ item, isEditing, isLast, editForm, setEditForm, onSaveEd
 function InventoryTab({ token, currentUser }) {
   const NEEDED_WHEN_OPTIONS = ["Next Amazon Order", "Wish List", "Weekly Order", "Next Trip", "ASAP"];
   const ORDER_STATUS_OPTIONS = ["Not Started", "Ordered", "In Progress", "Received", "Cancelled"];
+  const LOCATION_OPTIONS = ["321", "342", "812"];
 
   const NEEDED_COLORS = {
     "Next Amazon Order": { color: "#3B82F6", bg: "rgba(59,130,246,0.12)" },
@@ -136,7 +150,7 @@ function InventoryTab({ token, currentUser }) {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterNeeded, setFilterNeeded] = useState("");
 
-  const emptyForm = { itemName: "", neededWhen: "", forWhat: "", orderStatus: "Not Started", notes: "", url: "" };
+  const emptyForm = { itemName: "", neededWhen: "", forWhat: "", orderStatus: "Not Started", location: "", notes: "", url: "" };
   const [addForm, setAddForm] = useState(emptyForm);
   const [editForm, setEditForm] = useState({});
 
@@ -183,6 +197,17 @@ function InventoryTab({ token, currentUser }) {
         setItems((p) => p.map((it) => it.id === id ? saved : it));
         setEditingId(null);
       }
+    } catch {}
+  };
+
+  const handleStatusChange = async (id, newStatus) => {
+    setItems((p) => p.map((it) => it.id === id ? { ...it, orderStatus: newStatus } : it));
+    try {
+      await fetch("/api/inventory", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-session": token },
+        body: JSON.stringify({ id, orderStatus: newStatus }),
+      });
     } catch {}
   };
 
@@ -240,6 +265,11 @@ function InventoryTab({ token, currentUser }) {
             <select value={addForm.orderStatus} onChange={(e)=>setAddForm((f)=>({...f,orderStatus:e.target.value}))} style={{ ...inputS, width:"100%" }}>
               {ORDER_STATUS_OPTIONS.map((s)=><option key={s} value={s}>{s}</option>)}
             </select></div>
+          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>Location</label>
+            <select value={addForm.location} onChange={(e)=>setAddForm((f)=>({...f,location:e.target.value}))} style={{ ...inputS, width:"100%" }}>
+              <option value="">—</option>
+              {LOCATION_OPTIONS.map((l)=><option key={l} value={l}>{l}</option>)}
+            </select></div>
           <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>URL</label>
             <input value={addForm.url} onChange={(e)=>setAddForm((f)=>({...f,url:e.target.value}))} style={{ ...inputS, width:"100%" }} placeholder="https://…" /></div>
           <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>Notes</label>
@@ -253,8 +283,8 @@ function InventoryTab({ token, currentUser }) {
 
       {/* Table */}
       <div style={{ border:`1px solid ${C.border}`, borderRadius:"12px", overflow:"hidden" }}>
-        <div style={{ display:"grid", gridTemplateColumns:"2fr 90px 130px 1fr 110px 1fr 60px 60px", background:C.cardBg, borderBottom:`1px solid ${C.border}`, padding:"0 8px" }}>
-          {["Item Needed","Date","Needed When","For What","Status","Notes","Person","Link"].map((h,i)=>(
+        <div style={{ display:"grid", gridTemplateColumns:"2fr 90px 130px 1fr 130px 70px 1fr 60px 60px", background:C.cardBg, borderBottom:`1px solid ${C.border}`, padding:"0 8px" }}>
+          {["Item Needed","Date","Needed When","For What","Status","Location","Notes","Person","Link"].map((h,i)=>(
             <div key={i} style={{ padding:"10px 8px", fontSize:"11px", fontWeight:"700", textTransform:"uppercase", letterSpacing:"0.05em", color:C.muted }}>{h}</div>
           ))}
         </div>
@@ -270,12 +300,14 @@ function InventoryTab({ token, currentUser }) {
             setEditForm={setEditForm}
             onSaveEdit={()=>saveEdit(item.id)}
             onCancelEdit={()=>setEditingId(null)}
-            onStartEdit={()=>{ setEditingId(item.id); setEditForm({ itemName:item.itemName, neededWhen:item.neededWhen, forWhat:item.forWhat, orderStatus:item.orderStatus, notes:item.notes, url:item.url }); }}
+            onStartEdit={()=>{ setEditingId(item.id); setEditForm({ itemName:item.itemName, neededWhen:item.neededWhen, forWhat:item.forWhat, orderStatus:item.orderStatus, location:item.location||"", notes:item.notes, url:item.url }); }}
             onDelete={()=>handleDelete(item.id)}
+            onStatusChange={handleStatusChange}
             NEEDED_COLORS={NEEDED_COLORS}
             STATUS_COLORS={STATUS_COLORS}
             NEEDED_WHEN_OPTIONS={NEEDED_WHEN_OPTIONS}
             ORDER_STATUS_OPTIONS={ORDER_STATUS_OPTIONS}
+            LOCATION_OPTIONS={LOCATION_OPTIONS}
             AvatarSmall={AvatarSmall}
             inputS={inputS}
           />
@@ -1081,6 +1113,8 @@ export default function ContentScheduler() {
 
   const assignedPostsForViewer = posts.filter((p) => p.assignedTo === effectiveViewingUserId);
 
+  const activeNotifs = notifications.filter((n) => !n.postId || posts.find((p) => p.id === n.postId));
+
   const otherMembers = teamMembers.filter((m) => m.id !== currentUser.id);
 
   return (
@@ -1324,9 +1358,9 @@ export default function ContentScheduler() {
                 title="Notifications"
               >
                 🔔
-                {notifications.filter((n) => !n.read).length > 0 && (
+                {activeNotifs.filter((n) => !n.read).length > 0 && (
                   <span style={{ position: "absolute", top: "2px", right: "2px", width: "16px", height: "16px", borderRadius: "50%", background: "#EF4444", color: "#fff", fontSize: "9px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
-                    {notifications.filter((n) => !n.read).length > 9 ? "9+" : notifications.filter((n) => !n.read).length}
+                    {activeNotifs.filter((n) => !n.read).length > 9 ? "9+" : activeNotifs.filter((n) => !n.read).length}
                   </span>
                 )}
               </button>
@@ -1334,15 +1368,15 @@ export default function ContentScheduler() {
                 <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, width: "340px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px", boxShadow: C.shadowMd, zIndex: 1000, overflow: "hidden" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: `1px solid ${C.border}` }}>
                     <span style={{ fontSize: "13px", fontWeight: "700", color: C.text }}>Notifications</span>
-                    {notifications.some((n) => !n.read) && (
+                    {activeNotifs.some((n) => !n.read) && (
                       <button onClick={handleMarkAllRead} style={{ fontSize: "11px", color: C.accentBright, background: "none", border: "none", cursor: "pointer", fontWeight: "600" }}>Mark all read</button>
                     )}
                   </div>
                   <div style={{ maxHeight: "380px", overflowY: "auto" }}>
-                    {notifications.length === 0 ? (
+                    {activeNotifs.length === 0 ? (
                       <div style={{ padding: "32px 16px", textAlign: "center", color: C.muted, fontSize: "13px" }}>No notifications yet</div>
                     ) : (
-                      notifications.slice(0, 20).map((n) => (
+                      activeNotifs.slice(0, 20).map((n) => (
                         <div
                           key={n.id}
                           onClick={() => { setNotifOpen(false); const post = posts.find((p) => p.id === n.postId); if (post) openEdit(post); }}

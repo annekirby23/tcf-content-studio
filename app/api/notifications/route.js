@@ -25,8 +25,9 @@ export async function POST(req) {
     const notifKey = `tcf:notifications:${user.id}`;
     const notifications = JSON.parse((await redis.get(notifKey)) || "[]");
 
+    const markAll = !ids || ids.length === 0;
     const updated = notifications.map((n) =>
-      (!ids || ids.includes(n.id)) ? { ...n, read: true } : n
+      (markAll || ids.includes(n.id)) ? { ...n, read: true } : n
     );
     await redis.set(notifKey, JSON.stringify(updated));
     return Response.json({ ok: true });

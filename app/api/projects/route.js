@@ -2,15 +2,14 @@ import crypto from "crypto";
 import { getSession } from "@/lib/serverAuth";
 import { kvGet, kvSet } from "@/lib/redis";
 
+const KEY = "tcf:projects";
+
 export async function GET(req) {
   try {
     const user = await getSession(req);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { searchParams } = new URL(req.url);
-    const targetId = searchParams.get("userId") || user.id;
-
-    const projects = (await kvGet(`tcf:projects:${targetId}`)) || [];
+    const projects = (await kvGet(KEY)) || [];
     return Response.json(projects);
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });
@@ -23,21 +22,25 @@ export async function POST(req) {
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
-    const { name, description, color, status } = body;
+    const { name, description, color, status, members } = body;
 
     const project = {
       id: crypto.randomBytes(8).toString("hex"),
       name,
       description: description || "",
       color: color || null,
-      status: status || "active",
+      status: status || "planning",
       tasks: [],
+      members: Array.isArray(members) ? members : [],
+      statusUpdates: [],
+      createdBy: user.name,
+      createdById: user.id,
       createdAt: new Date().toISOString(),
     };
 
-    const projects = (await kvGet(`tcf:projects:${user.id}`)) || [];
+    const projects = (await kvGet(KEY)) || [];
     projects.unshift(project);
-    await kvSet(`tcf:projects:${user.id}`, projects);
+    await kvSet(KEY, projects);
 
     return Response.json(project, { status: 201 });
   } catch (e) {

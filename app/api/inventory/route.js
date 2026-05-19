@@ -49,6 +49,7 @@ export async function POST(req) {
       personAdded: user.name,
       personAddedId: user.id,
       orderStatus: body.orderStatus || "Not Started",
+      location: body.location || "",
       notes: body.notes || "",
       url: body.url || "",
       createdAt: new Date().toISOString(),

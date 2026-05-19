@@ -23,12 +23,13 @@ export async function POST(req) {
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
-    const { text } = body;
+    const { text, days } = body;
 
     const task = {
       id: crypto.randomBytes(8).toString("hex"),
       text,
       done: false,
+      days: Array.isArray(days) && days.length > 0 ? days : ["mon","tue","wed","thu","fri"],
       createdAt: new Date().toISOString(),
     };
 

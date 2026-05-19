@@ -637,6 +637,26 @@ function MyProfileTab({ currentUser, token }) {
 
 function TeamDirectoryTab({ teamMembers, token }) {
   const [selectedMember, setSelectedMember] = useState(null);
+  const [profiles, setProfiles] = useState({});
+
+  useEffect(() => {
+    if (!teamMembers.length) return;
+    teamMembers.forEach((m) => {
+      fetch(`/api/profile?userId=${m.id}`, { headers: { "x-session": token } })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data && !data.error) {
+            setProfiles((prev) => ({ ...prev, [m.id]: data }));
+          }
+        })
+        .catch(() => {});
+    });
+  }, [teamMembers, token]);
+
+  const membersWithProfiles = teamMembers.map((m) => ({
+    ...m,
+    profile: profiles[m.id] || m.profile || null,
+  }));
 
   return (
     <div>
@@ -655,7 +675,7 @@ function TeamDirectoryTab({ teamMembers, token }) {
           gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
           gap: "14px",
         }}>
-          {teamMembers.map((member) => (
+          {membersWithProfiles.map((member) => (
             <MemberCard
               key={member.id}
               member={member}
