@@ -30,7 +30,7 @@ const EMPTY = {
   hashtags: "",
   cta: "",
   assetUrl: "",
-  notes: "",
+  internalNotes: "",
   audience: "external",
   theme: "",
   threadNotes: [],
@@ -87,7 +87,14 @@ export default function ContentForm({
   const isAdmin = currentUser?.role === "admin";
   const allowedStatuses = isAdmin ? STATUSES : STATUSES.filter((s) => MEMBER_STATUSES.includes(s.id));
 
-  const [form, setForm] = useState(post ? { ...EMPTY, ...post } : { ...EMPTY });
+  const [form, setForm] = useState(() => {
+    if (!post) return { ...EMPTY };
+    return {
+      ...EMPTY,
+      ...post,
+      internalNotes: post.internalNotes ?? (typeof post.notes === "string" ? post.notes : ""),
+    };
+  });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -98,7 +105,7 @@ export default function ContentForm({
   const [aiSuggestion, setAiSuggestion] = useState(null);
 
   // Thread / notes state
-  const [threadNotes, setThreadNotes] = useState(post?.notes || []);
+  const [threadNotes, setThreadNotes] = useState(Array.isArray(post?.notes) ? post.notes : []);
   const [noteInput, setNoteInput] = useState("");
   const [sendingNote, setSendingNote] = useState(false);
   const [mentionQuery, setMentionQuery] = useState(null); // null or string
@@ -107,12 +114,18 @@ export default function ContentForm({
   const threadBottomRef = useRef(null);
 
   useEffect(() => {
-    const next = post ? { ...EMPTY, ...post } : { ...EMPTY };
+    const next = post
+      ? {
+          ...EMPTY,
+          ...post,
+          internalNotes: post.internalNotes ?? (typeof post.notes === "string" ? post.notes : ""),
+        }
+      : { ...EMPTY };
     setForm(next);
     setTab("content");
     setConfirmDelete(false);
     setAiSuggestion(null);
-    setThreadNotes(post?.notes || []);
+    setThreadNotes(Array.isArray(post?.notes) ? post.notes : []);
     setNoteInput("");
     setMentionQuery(null);
   }, [post]);
@@ -900,8 +913,8 @@ export default function ContentForm({
                     resize: "vertical",
                     lineHeight: "1.6",
                   }}
-                  value={form.notes}
-                  onChange={(e) => set("notes", e.target.value)}
+                  value={form.internalNotes}
+                  onChange={(e) => set("internalNotes", e.target.value)}
                   placeholder="Notes for yourself, revision requests, context..."
                 />
               </div>
