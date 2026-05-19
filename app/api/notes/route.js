@@ -44,7 +44,7 @@ export async function POST(req) {
       createdAt: new Date().toISOString(),
     };
 
-    if (!posts[idx].notes) posts[idx].notes = [];
+    if (!Array.isArray(posts[idx].notes)) posts[idx].notes = [];
     posts[idx].notes.push(note);
     await kvSet(POSTS_KEY, posts);
 

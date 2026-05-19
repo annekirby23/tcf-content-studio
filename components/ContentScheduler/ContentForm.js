@@ -89,10 +89,11 @@ export default function ContentForm({
 
   const [form, setForm] = useState(() => {
     if (!post) return { ...EMPTY };
+    const { notes, ...postRest } = post;
     return {
       ...EMPTY,
-      ...post,
-      internalNotes: post.internalNotes ?? (typeof post.notes === "string" ? post.notes : ""),
+      ...postRest,
+      internalNotes: post.internalNotes ?? (typeof notes === "string" ? notes : ""),
     };
   });
   const [saving, setSaving] = useState(false);
@@ -114,13 +115,17 @@ export default function ContentForm({
   const threadBottomRef = useRef(null);
 
   useEffect(() => {
-    const next = post
-      ? {
-          ...EMPTY,
-          ...post,
-          internalNotes: post.internalNotes ?? (typeof post.notes === "string" ? post.notes : ""),
-        }
-      : { ...EMPTY };
+    let next;
+    if (post) {
+      const { notes, ...postRest } = post;
+      next = {
+        ...EMPTY,
+        ...postRest,
+        internalNotes: post.internalNotes ?? (typeof notes === "string" ? notes : ""),
+      };
+    } else {
+      next = { ...EMPTY };
+    }
     setForm(next);
     setTab("content");
     setConfirmDelete(false);
