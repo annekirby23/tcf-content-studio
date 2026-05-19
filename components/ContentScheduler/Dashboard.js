@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PLATFORMS, STATUSES, STATUS_MAP, PLATFORM_MAP, PILLARS, THEMES, THEME_MAP, AUDIENCES, C } from "./constants";
+import IdeaBoard from "./IdeaBoard";
 
 // ─── KPI Card ────────────────────────────────────────────────────────────────
 
@@ -414,7 +415,7 @@ function CampaignCard({ campaign, postCount, onClick }) {
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
-export default function Dashboard({ posts, campaigns, goals, currentUser, onEdit, onNewPost, onNavigate, onGoalsUpdate }) {
+export default function Dashboard({ posts, campaigns, goals, currentUser, ideas, onEdit, onNewPost, onNavigate, onGoalsUpdate, onIdeasUpdate, onMakePost, token }) {
   const safeGoals = goals || { publishedPerMonth: 0, scheduledPerWeek: 0, reviewTargetDays: 3 };
 
   const today = new Date().toISOString().split("T")[0];
@@ -682,7 +683,7 @@ export default function Dashboard({ posts, campaigns, goals, currentUser, onEdit
 
       {/* Campaigns */}
       {campaignList.length > 0 && (
-        <div style={{ marginBottom: "8px" }}>
+        <div style={{ marginBottom: "24px" }}>
           {sectionTitle("Campaigns")}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px" }}>
             {campaignList.map((campaign) => {
@@ -700,6 +701,13 @@ export default function Dashboard({ posts, campaigns, goals, currentUser, onEdit
           </div>
         </div>
       )}
+
+      {/* Idea Board */}
+      <IdeaBoard
+        currentUser={currentUser}
+        token={token}
+        onMakePost={onMakePost}
+      />
     </div>
   );
 }

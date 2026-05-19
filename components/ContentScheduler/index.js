@@ -9,6 +9,8 @@ import Pipeline from "./Pipeline";
 import ListView from "./ListView";
 import AuthScreen from "./AuthScreen";
 import TeamManager from "./TeamManager";
+import IdeaBoard from "./IdeaBoard";
+import SettingsModal from "./SettingsModal";
 
 const TOKEN_KEY = "tcf_session";
 
@@ -116,6 +118,8 @@ export default function ContentScheduler() {
   const [notifications, setNotifications] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [listFilters, setListFilters] = useState({});
+  const [ideas, setIdeas] = useState([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -195,6 +199,8 @@ export default function ContentScheduler() {
       if (campaignsRes.ok) setCampaigns(await campaignsRes.json());
       if (teamRes.ok) setTeamMembers(await teamRes.json());
       if (goalsRes.ok) setGoals(await goalsRes.json());
+      const ideasRes = await authFetch("/api/ideas");
+      if (ideasRes.ok) setIdeas(await ideasRes.json());
     } catch (e) {
       showToast("Failed to load content", "error");
     } finally {
@@ -288,6 +294,27 @@ export default function ContentScheduler() {
   };
 
   const handleGoalsUpdate = (updated) => setGoals(updated);
+
+  const handleDateChange = async (postId, newDate) => {
+    const post = posts.find((p) => p.id === postId);
+    if (!post || post.scheduledDate === newDate) return;
+    setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, scheduledDate: newDate } : p));
+    try {
+      const res = await authFetch(`/api/scheduler/${postId}`, {
+        method: "PUT",
+        body: JSON.stringify({ ...post, scheduledDate: newDate }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setPosts((prev) => prev.map((p) => p.id === postId ? post : p));
+      showToast("Failed to move post", "error");
+    }
+  };
+
+  const handleMakePost = (idea) => {
+    setEditingPost({ title: idea.title || "", caption: idea.description || "", status: "draft" });
+    setFormOpen(true);
+  };
 
   const handleMarkAllRead = async () => {
     try {
@@ -432,6 +459,20 @@ export default function ContentScheduler() {
             </button>
           </div>
 
+          {/* Settings button — admin only */}
+          {currentUser.role === "admin" && (
+            <button
+              onClick={() => setSettingsOpen(true)}
+              title={!sidebarOpen ? "Settings" : undefined}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "9px 10px", borderRadius: "8px", border: "none", background: "transparent", color: C.muted, fontSize: "13px", cursor: "pointer", transition: "all 0.15s", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            >
+              <span style={{ fontSize: "16px", flexShrink: 0 }}>⚙️</span>
+              {sidebarOpen && "Settings"}
+            </button>
+          )}
+
           {/* Team button — admin only */}
           {currentUser.role === "admin" && (
             <button
@@ -451,14 +492,20 @@ export default function ContentScheduler() {
             </button>
           )}
 
-          {/* Campaigns list */}
+          {/* Campaigns list — clickable */}
           {sidebarOpen && campaigns.length > 0 && (
             <div style={{ padding: "0 4px", marginTop: "8px" }}>
               <div style={{ fontSize: "10px", color: C.muted, fontWeight: "600", letterSpacing: "0.08em", textTransform: "uppercase", padding: "4px 6px", marginBottom: "4px" }}>Campaigns</div>
               {campaigns.slice(0, 8).map((c) => (
-                <div key={c.id} style={{ fontSize: "12px", color: C.muted, padding: "5px 8px", borderRadius: "6px", cursor: "default", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  · {c.name}
-                </div>
+                <button
+                  key={c.id}
+                  onClick={() => handleNavigate("list", { campaign: c.name })}
+                  style={{ width: "100%", textAlign: "left", fontSize: "12px", color: listFilters.campaign === c.name ? C.accentBright : C.muted, padding: "5px 8px", borderRadius: "6px", cursor: "pointer", border: "none", background: listFilters.campaign === c.name ? C.accentLight : "transparent", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", transition: "all 0.15s" }}
+                  onMouseEnter={(e) => { if (listFilters.campaign !== c.name) e.currentTarget.style.background = C.hover; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = listFilters.campaign === c.name ? C.accentLight : "transparent"; }}
+                >
+                  🎯 {c.name}
+                </button>
               ))}
             </div>
           )}
@@ -589,8 +636,8 @@ export default function ContentScheduler() {
             </div>
           ) : (
             <>
-              {view === "dashboard" && <Dashboard posts={posts} campaigns={campaigns} goals={goals} currentUser={currentUser} onEdit={openEdit} onNewPost={() => openNew()} onNavigate={handleNavigate} onGoalsUpdate={handleGoalsUpdate} />}
-              {view === "calendar" && <CalendarView posts={posts} onEdit={openEdit} onNewPost={(date) => openNew(date)} />}
+              {view === "dashboard" && <Dashboard posts={posts} campaigns={campaigns} goals={goals} currentUser={currentUser} ideas={ideas} onEdit={openEdit} onNewPost={() => openNew()} onNavigate={handleNavigate} onGoalsUpdate={handleGoalsUpdate} onIdeasUpdate={setIdeas} onMakePost={handleMakePost} token={authToken} />}
+              {view === "calendar" && <CalendarView posts={posts} onEdit={openEdit} onNewPost={(date) => openNew(date)} onDateChange={handleDateChange} />}
               {view === "pipeline" && <Pipeline posts={posts} onEdit={openEdit} onNewPost={(date, status) => openNew(date, status || "draft")} onStatusChange={handleStatusChange} currentUser={currentUser} />}
               {view === "list" && <ListView key={JSON.stringify(listFilters)} posts={posts} campaigns={campaigns} onEdit={openEdit} onNewPost={() => openNew()} initialFilters={listFilters} />}
             </>
@@ -628,6 +675,16 @@ export default function ContentScheduler() {
           token={authToken}
           onClose={() => setTeamModalOpen(false)}
           onTeamUpdate={setTeamMembers}
+        />
+      )}
+
+      {/* Settings modal */}
+      {settingsOpen && (
+        <SettingsModal
+          token={authToken}
+          currentUser={currentUser}
+          onClose={() => setSettingsOpen(false)}
+          onSettingsUpdate={() => {}}
         />
       )}
 
