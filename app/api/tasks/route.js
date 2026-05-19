@@ -22,6 +22,9 @@ export async function POST(req) {
     const user = await getSession(req);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
+    const { searchParams } = new URL(req.url);
+    const targetId = searchParams.get("userId") || user.id;
+
     const body = await req.json();
     const { text, priority, dueDate, description } = body;
 
@@ -32,12 +35,14 @@ export async function POST(req) {
       dueDate: dueDate || null,
       description: description || "",
       done: false,
+      addedBy: user.name,
+      addedById: user.id,
       createdAt: new Date().toISOString(),
     };
 
-    const tasks = (await kvGet(`tcf:tasks:${user.id}`)) || [];
+    const tasks = (await kvGet(`tcf:tasks:${targetId}`)) || [];
     tasks.unshift(task);
-    await kvSet(`tcf:tasks:${user.id}`, tasks);
+    await kvSet(`tcf:tasks:${targetId}`, tasks);
 
     return Response.json(task, { status: 201 });
   } catch (e) {

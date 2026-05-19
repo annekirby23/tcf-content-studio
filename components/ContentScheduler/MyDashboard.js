@@ -484,25 +484,27 @@ function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSave
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [openTask, setOpenTask] = useState(null);
-  const readOnly = viewingUserId !== currentUserId;
+  // readOnly means you can't edit/delete existing tasks, but you CAN add new tasks for someone
+  const isOwnWorkspace = viewingUserId === currentUserId;
 
-  const url = readOnly ? `/api/tasks?userId=${viewingUserId}` : "/api/tasks";
+  const fetchUrl = isOwnWorkspace ? "/api/tasks" : `/api/tasks?userId=${viewingUserId}`;
+  const postUrl = isOwnWorkspace ? "/api/tasks" : `/api/tasks?userId=${viewingUserId}`;
 
   useEffect(() => {
     setLoading(true);
-    apiFetch(url, {}, token)
+    apiFetch(fetchUrl, {}, token)
       .then((r) => r.json())
       .then((data) => setTasks(Array.isArray(data) ? data : []))
       .catch(() => setTasks([]))
       .finally(() => setLoading(false));
-  }, [token, url]);
+  }, [token, fetchUrl]);
 
   const handleAdd = async (taskData) => {
     const tempId = genId();
-    const optimistic = { id: tempId, ...taskData, done: false };
-    setTasks((prev) => [...prev, optimistic]);
+    const optimistic = { id: tempId, ...taskData, done: false, addedBy: isOwnWorkspace ? undefined : "You" };
+    setTasks((prev) => [optimistic, ...prev]);
     try {
-      const res = await apiFetch("/api/tasks", { method: "POST", body: JSON.stringify(taskData) }, token);
+      const res = await apiFetch(postUrl, { method: "POST", body: JSON.stringify(taskData) }, token);
       const saved = await res.json();
       setTasks((prev) => prev.map((t) => t.id === tempId ? saved : t));
     } catch {
@@ -511,6 +513,7 @@ function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSave
   };
 
   const handleToggle = async (task) => {
+    if (!isOwnWorkspace) return;
     const updated = { ...task, done: !task.done };
     setTasks((prev) => prev.map((t) => t.id === task.id ? updated : t));
     try {
@@ -521,6 +524,7 @@ function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSave
   };
 
   const handleDelete = async (id) => {
+    if (!isOwnWorkspace) return;
     const prev = tasks.find((t) => t.id === id);
     setTasks((ts) => ts.filter((t) => t.id !== id));
     try {
@@ -541,45 +545,45 @@ function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSave
   const noDue = active.filter((t) => !t.dueDate);
 
   return (
-    <div style={{ marginBottom: "16px" }}>
+    <div style={{ marginBottom: "4px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-        <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={readOnly} />
-        {!readOnly && <AddBtn onClick={() => setShowForm((v) => !v)} label={showForm ? "✕ Cancel" : "+ Add Task"} />}
+        <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={!isOwnWorkspace} />
+        <AddBtn onClick={() => setShowForm((v) => !v)} label={showForm ? "✕ Cancel" : `+ Add${!isOwnWorkspace ? " for them" : ""}`} />
       </div>
 
-      {showForm && !readOnly && <AddTaskForm onAdd={handleAdd} />}
+      {showForm && <AddTaskForm onAdd={handleAdd} />}
 
       {loading ? (
         <div style={{ textAlign: "center", padding: "32px", color: C.muted, fontSize: "13px" }}>Loading tasks…</div>
       ) : tasks.length === 0 ? (
-        <EmptyState icon="✅" message={readOnly ? "No tasks yet." : "No tasks yet. Add your first task above."} />
+        <EmptyState icon="✅" message={!isOwnWorkspace ? "No tasks yet." : "No tasks yet. Add your first task above."} />
       ) : (
         <div>
           {todayOverdue.length > 0 && (
             <CollapsibleSection title="Today & Overdue" count={todayOverdue.length}>
               {todayOverdue.map((t) => (
-                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={setOpenTask} readOnly={readOnly} />
+                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={isOwnWorkspace ? setOpenTask : null} readOnly={!isOwnWorkspace} />
               ))}
             </CollapsibleSection>
           )}
           {(upcoming.length > 0 || noDue.length > 0) && (
             <CollapsibleSection title="Upcoming" count={upcoming.length + noDue.length}>
               {[...upcoming, ...noDue].map((t) => (
-                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={setOpenTask} readOnly={readOnly} />
+                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={setOpenTask} readOnly={!isOwnWorkspace} />
               ))}
             </CollapsibleSection>
           )}
           {done.length > 0 && (
             <CollapsibleSection title="Done" count={done.length} defaultOpen={false}>
               {done.map((t) => (
-                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={setOpenTask} readOnly={readOnly} />
+                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={isOwnWorkspace ? setOpenTask : null} readOnly={!isOwnWorkspace} />
               ))}
             </CollapsibleSection>
           )}
         </div>
       )}
 
-      {openTask && !readOnly && (
+      {openTask && isOwnWorkspace && (
         <TaskDetailModal
           task={openTask}
           token={token}
@@ -594,7 +598,7 @@ function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSave
 
 // ─── DAILY ROUTINES ───────────────────────────────────────────────────────────
 
-function DailyTaskItem({ task, onToggle, onDelete, readOnly }) {
+function DailyTaskItem({ task, onToggle, onDelete, readOnly, isDone }) {
   const [hov, setHov] = useState(false);
   return (
     <div
@@ -610,20 +614,20 @@ function DailyTaskItem({ task, onToggle, onDelete, readOnly }) {
       <button
         onClick={() => !readOnly && onToggle(task)}
         style={{
-          width: "16px", height: "16px", borderRadius: "4px", flexShrink: 0,
-          border: `2px solid ${task.done ? "#10B981" : C.border}`,
-          background: task.done ? "#10B981" : "transparent",
+          width: "18px", height: "18px", borderRadius: "5px", flexShrink: 0,
+          border: `2px solid ${isDone ? "#10B981" : C.border}`,
+          background: isDone ? "#10B981" : "transparent",
           cursor: readOnly ? "default" : "pointer",
           display: "flex", alignItems: "center", justifyContent: "center",
-          padding: 0,
+          padding: 0, transition: "all 0.12s",
         }}
       >
-        {task.done && <span style={{ color: "#fff", fontSize: "10px" }}>✓</span>}
+        {isDone && <span style={{ color: "#fff", fontSize: "11px" }}>✓</span>}
       </button>
       <span style={{
         flex: 1, fontSize: "13px", fontWeight: "500",
-        color: task.done ? C.muted : C.text,
-        textDecoration: task.done ? "line-through" : "none",
+        color: isDone ? C.muted : C.text,
+        textDecoration: isDone ? "line-through" : "none",
       }}>
         {task.text}
       </span>
@@ -649,6 +653,14 @@ const DAY_OPTIONS = [
 function todayDayId() {
   const days = ["sun","mon","tue","wed","thu","fri","sat"];
   return days[new Date().getDay()];
+}
+
+function currentISOWeek() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  return `${d.getFullYear()}-W${Math.ceil(((d - yearStart) / 86400000 + 1) / 7)}`;
 }
 
 function DailyRoutinesSection({ token, viewingUserId, currentUserId, sectionTitle, onSaveTitle }) {
@@ -689,11 +701,15 @@ function DailyRoutinesSection({ token, viewingUserId, currentUserId, sectionTitl
     }
   };
 
+  const thisWeek = currentISOWeek();
+  const isDoneThisWeek = (task) => task.done && task.doneWeek === thisWeek;
+
   const handleToggle = async (task) => {
-    const updated = { ...task, done: !task.done };
+    const nowDone = !isDoneThisWeek(task);
+    const updated = { ...task, done: nowDone, doneWeek: nowDone ? thisWeek : null };
     setTasks((prev) => prev.map((t) => t.id === task.id ? updated : t));
     try {
-      await apiFetch(`/api/dailytasks/${task.id}`, { method: "PUT", body: JSON.stringify({ done: updated.done }) }, token);
+      await apiFetch(`/api/dailytasks/${task.id}`, { method: "PUT", body: JSON.stringify({ done: nowDone, doneWeek: updated.doneWeek }) }, token);
     } catch {
       setTasks((prev) => prev.map((t) => t.id === task.id ? task : t));
     }
@@ -774,7 +790,7 @@ function DailyRoutinesSection({ token, viewingUserId, currentUserId, sectionTitl
         <div>
           {filteredTasks.map((t) => (
             <div key={t.id}>
-              <DailyTaskItem task={t} onToggle={handleToggle} onDelete={handleDelete} readOnly={readOnly} />
+              <DailyTaskItem task={t} onToggle={handleToggle} onDelete={handleDelete} readOnly={readOnly} isDone={isDoneThisWeek(t)} />
               {/* Day badges */}
               {(t.days && t.days.length > 0 && t.days.length < 7) && (
                 <div style={{ display: "flex", gap: "3px", paddingLeft: "36px", marginBottom: "2px", flexWrap: "wrap" }}>
@@ -1002,11 +1018,12 @@ function MemberInitials({ name, size = 24 }) {
 function ProjectCard({ project, onToggleTask, onAddTask, onDelete, onAddStatusUpdate, teamMembers = [] }) {
   const [taskInput, setTaskInput] = useState("");
   const [expanded, setExpanded] = useState(false);
-  const [statusInput, setStatusInput] = useState("");
+  const [commentInput, setCommentInput] = useState("");
+  const [mentionSuggestions, setMentionSuggestions] = useState([]);
+  const [showComments, setShowComments] = useState(false);
   const tasks = project.tasks || [];
   const members = project.members || [];
   const statusUpdates = project.statusUpdates || [];
-  const latestUpdate = statusUpdates.length > 0 ? statusUpdates[statusUpdates.length - 1] : null;
 
   const submitTask = () => {
     if (!taskInput.trim()) return;
@@ -1014,10 +1031,31 @@ function ProjectCard({ project, onToggleTask, onAddTask, onDelete, onAddStatusUp
     setTaskInput("");
   };
 
-  const submitStatusUpdate = () => {
-    if (!statusInput.trim()) return;
-    onAddStatusUpdate(project.id, statusInput.trim());
-    setStatusInput("");
+  const handleCommentChange = (val) => {
+    setCommentInput(val);
+    const atIdx = val.lastIndexOf("@");
+    if (atIdx !== -1 && atIdx === val.length - 1) {
+      setMentionSuggestions(teamMembers);
+    } else if (atIdx !== -1) {
+      const query = val.slice(atIdx + 1).toLowerCase();
+      setMentionSuggestions(teamMembers.filter((m) => m.name.toLowerCase().startsWith(query)));
+    } else {
+      setMentionSuggestions([]);
+    }
+  };
+
+  const insertMention = (member) => {
+    const atIdx = commentInput.lastIndexOf("@");
+    setCommentInput(commentInput.slice(0, atIdx) + `@${member.name} `);
+    setMentionSuggestions([]);
+  };
+
+  const submitComment = () => {
+    if (!commentInput.trim()) return;
+    onAddStatusUpdate(project.id, commentInput.trim());
+    setCommentInput("");
+    setMentionSuggestions([]);
+    setShowComments(true);
   };
 
   return (
@@ -1064,11 +1102,32 @@ function ProjectCard({ project, onToggleTask, onAddTask, onDelete, onAddStatusUp
         <div style={{ fontSize: "12px", color: C.muted, marginBottom: "10px", lineHeight: "1.4" }}>{project.description}</div>
       )}
 
-      {latestUpdate && (
-        <div style={{ fontSize: "12px", color: C.text, marginBottom: "8px", padding: "6px 10px", background: C.cardBg, borderRadius: "6px", border: `1px solid ${C.border}`, lineHeight: "1.4" }}>
-          <span style={{ color: C.muted, fontSize: "10px", fontWeight: "600" }}>Latest update: </span>
-          {latestUpdate.text}
-          <span style={{ color: C.muted, fontSize: "10px", marginLeft: "6px" }}>— {latestUpdate.authorName}</span>
+      {statusUpdates.length > 0 && (
+        <div style={{ marginBottom: "10px" }}>
+          <button
+            onClick={() => setShowComments((v) => !v)}
+            style={{ fontSize: "11px", color: C.muted, background: "none", border: "none", cursor: "pointer", padding: "0", fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}
+          >
+            <span style={{ fontSize: "9px", transform: showComments ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block", transition: "transform 0.12s" }}>▶</span>
+            {statusUpdates.length} comment{statusUpdates.length !== 1 ? "s" : ""}
+          </button>
+          {showComments && (
+            <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "6px" }}>
+              {statusUpdates.map((u, i) => (
+                <div key={u.id || i} style={{ padding: "6px 10px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}` }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: "6px", marginBottom: "2px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: "700", color: C.accent }}>{u.authorName}</span>
+                    <span style={{ fontSize: "10px", color: C.muted }}>{u.createdAt ? new Date(u.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""}</span>
+                  </div>
+                  <div style={{ fontSize: "12px", color: C.text, lineHeight: "1.5" }}>
+                    {u.text.split(/(@\w[\w\s]*)/g).map((part, j) =>
+                      part.startsWith("@") ? <strong key={j} style={{ color: C.accent }}>{part}</strong> : part
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -1114,25 +1173,47 @@ function ProjectCard({ project, onToggleTask, onAddTask, onDelete, onAddStatusUp
         </div>
       )}
 
-      {expanded && (
-        <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "10px", marginTop: "4px" }}>
-          <div style={{ fontSize: "10px", color: C.muted, fontWeight: "600", textTransform: "uppercase", marginBottom: "6px" }}>Status Update</div>
+      {/* Comment / @mention thread */}
+      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "10px", marginTop: "8px", position: "relative" }}>
+        <div style={{ fontSize: "10px", color: C.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>
+          Comments
+        </div>
+        <div style={{ position: "relative" }}>
           <div style={{ display: "flex", gap: "6px" }}>
             <input
-              value={statusInput}
-              onChange={(e) => setStatusInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submitStatusUpdate()}
-              placeholder="Add a status update…"
-              style={{ ...textInput({ flex: 1, fontSize: "12px", padding: "5px 8px" }) }}
+              value={commentInput}
+              onChange={(e) => handleCommentChange(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitComment(); } }}
+              placeholder="Comment or @mention a teammate…"
+              style={{ ...textInput({ flex: 1, fontSize: "12px", padding: "6px 8px" }) }}
             />
-            {statusInput.trim() && (
-              <button onClick={submitStatusUpdate} style={{ padding: "5px 10px", borderRadius: "6px", border: "none", background: project.color || C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer", flexShrink: 0 }}>
+            {commentInput.trim() && (
+              <button
+                onClick={submitComment}
+                style={{ padding: "5px 12px", borderRadius: "6px", border: "none", background: project.color || C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer", flexShrink: 0 }}
+              >
                 Post
               </button>
             )}
           </div>
+          {mentionSuggestions.length > 0 && (
+            <div style={{ position: "absolute", bottom: "calc(100% + 4px)", left: 0, background: C.card, border: `1px solid ${C.border}`, borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.15)", zIndex: 100, minWidth: "180px", overflow: "hidden" }}>
+              {mentionSuggestions.map((m) => (
+                <button
+                  key={m.id}
+                  onMouseDown={(e) => { e.preventDefault(); insertMention(m); }}
+                  style={{ width: "100%", textAlign: "left", padding: "8px 12px", border: "none", background: "transparent", cursor: "pointer", fontSize: "13px", color: C.text, display: "flex", alignItems: "center", gap: "8px" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  <MemberInitials name={m.name} size={20} />
+                  {m.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       <div style={{ display: "flex", gap: "6px", marginTop: "10px" }}>
         <input
@@ -1594,7 +1675,7 @@ const STATUS_COLORS = {
   paused: { color: "#EF4444", bg: "rgba(239,68,68,0.15)" },
 };
 
-function AssignedContentSection({ assignedPosts = [], assignedAssets = [], assignedSlackChannels = [], sectionTitle }) {
+function AssignedContentSection({ assignedPosts = [], assignedAssets = [], assignedSlackChannels = [], sectionTitle, onOpenPost, onOpenAsset }) {
   const [activeSubTab, setActiveSubTab] = useState("posts");
 
   const hasAny = assignedPosts.length > 0 || assignedAssets.length > 0 || assignedSlackChannels.length > 0;
@@ -1636,7 +1717,13 @@ function AssignedContentSection({ assignedPosts = [], assignedAssets = [], assig
             {assignedPosts.map((post) => {
               const statusCfg = STATUS_COLORS[post.status] || STATUS_COLORS.draft;
               return (
-                <div key={post.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", boxShadow: C.shadow }}>
+                <div
+                  key={post.id}
+                  onClick={() => onOpenPost?.(post)}
+                  style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", boxShadow: C.shadow, cursor: onOpenPost ? "pointer" : "default", transition: "border-color 0.12s" }}
+                  onMouseEnter={(e) => { if (onOpenPost) e.currentTarget.style.borderColor = C.accent; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; }}
+                >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: "13px", fontWeight: "600", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {post.title || "Untitled"}
@@ -1668,7 +1755,13 @@ function AssignedContentSection({ assignedPosts = [], assignedAssets = [], assig
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {assignedAssets.map((asset) => (
-              <div key={asset.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", boxShadow: C.shadow }}>
+              <div
+                key={asset.id}
+                onClick={() => onOpenAsset?.(asset)}
+                style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", boxShadow: C.shadow, cursor: onOpenAsset ? "pointer" : "default", transition: "border-color 0.12s" }}
+                onMouseEnter={(e) => { if (onOpenAsset) e.currentTarget.style.borderColor = C.accent; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; }}
+              >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: "13px", fontWeight: "600", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {asset.name || "Untitled"}
@@ -1724,7 +1817,7 @@ const DEFAULT_SECTION_TITLES = {
   assignedContent: "Assigned to Me",
 };
 
-export default function MyDashboard({ currentUser, token, viewingUserId, teamMembers = [], assignedPosts = [], assignedAssets = [], assignedSlackChannels = [] }) {
+export default function MyDashboard({ currentUser, token, viewingUserId, teamMembers = [], assignedPosts = [], assignedAssets = [], assignedSlackChannels = [], onOpenPost, onOpenAsset }) {
   const currentUserId = currentUser?.id;
   const effectiveViewingUserId = viewingUserId || currentUserId;
   const readOnly = effectiveViewingUserId !== currentUserId;
@@ -1920,43 +2013,45 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
         </div>
       </div>
 
+      {/* Daily Routines — full width below header */}
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px 24px", boxShadow: C.shadow, marginBottom: "20px" }}>
+        <DailyRoutinesSection
+          token={token}
+          viewingUserId={effectiveViewingUserId}
+          currentUserId={currentUserId}
+          sectionTitle={sectionTitles.dailyRoutines}
+          onSaveTitle={(v) => saveSectionTitle("dailyRoutines", v)}
+        />
+      </div>
+
       {/* 2-column layout */}
       <div style={{ display: "flex", gap: "20px", alignItems: "flex-start" }}>
 
         {/* LEFT column */}
         <div style={{
-          width: "360px", flexShrink: 0,
-          background: C.card, border: `1px solid ${C.border}`,
-          borderRadius: "16px", padding: "20px",
-          boxShadow: C.shadow,
-          maxHeight: "calc(100vh - 180px)", overflowY: "auto",
+          width: "380px", flexShrink: 0,
+          display: "flex", flexDirection: "column", gap: "16px",
         }}>
-          <DailyRoutinesSection
-            token={token}
-            viewingUserId={effectiveViewingUserId}
-            currentUserId={currentUserId}
-            sectionTitle={sectionTitles.dailyRoutines}
-            onSaveTitle={(v) => saveSectionTitle("dailyRoutines", v)}
-          />
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", boxShadow: C.shadow }}>
+            <TasksColumn
+              token={token}
+              viewingUserId={effectiveViewingUserId}
+              currentUserId={currentUserId}
+              sectionTitle={sectionTitles.tasks}
+              onSaveTitle={(v) => saveSectionTitle("tasks", v)}
+            />
+          </div>
 
-          <div style={{ borderTop: `1px solid ${C.border}`, margin: "16px 0" }} />
-
-          <TasksColumn
-            token={token}
-            viewingUserId={effectiveViewingUserId}
-            currentUserId={currentUserId}
-            sectionTitle={sectionTitles.tasks}
-            onSaveTitle={(v) => saveSectionTitle("tasks", v)}
-          />
-
-          <div style={{ borderTop: `1px solid ${C.border}`, margin: "16px 0" }} />
-
-          <AssignedContentSection
-            assignedPosts={assignedPosts}
-            assignedAssets={assignedAssets}
-            assignedSlackChannels={assignedSlackChannels}
-            sectionTitle={sectionTitles.assignedContent}
-          />
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", boxShadow: C.shadow }}>
+            <AssignedContentSection
+              assignedPosts={assignedPosts}
+              assignedAssets={assignedAssets}
+              assignedSlackChannels={assignedSlackChannels}
+              sectionTitle={sectionTitles.assignedContent}
+              onOpenPost={onOpenPost}
+              onOpenAsset={onOpenAsset}
+            />
+          </div>
         </div>
 
         {/* RIGHT column */}

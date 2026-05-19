@@ -1432,6 +1432,8 @@ export default function ContentScheduler() {
                   assignedPosts={assignedPostsForViewer}
                   assignedAssets={assets.filter((a) => a.assignedTo === effectiveViewingUserId)}
                   assignedSlackChannels={slackChannels.filter((c) => c.assignedTo === effectiveViewingUserId)}
+                  onOpenPost={(post) => { openEdit(post); }}
+                  onOpenAsset={(asset) => { setView("assets"); }}
                 />
               )}
               {view === "profile" && (

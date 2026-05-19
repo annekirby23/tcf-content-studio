@@ -134,7 +134,8 @@ export default function ContentForm({
     setThreadNotes(Array.isArray(post?.notes) ? post.notes : []);
     setNoteInput("");
     setMentionQuery(null);
-  }, [post]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post?.id]);
 
   useEffect(() => {
     if (threadBottomRef.current) {
