@@ -1338,48 +1338,120 @@ const STATUS_COLORS = {
   paused: { color: "#EF4444", bg: "rgba(239,68,68,0.15)" },
 };
 
-function AssignedContentSection({ assignedPosts, sectionTitle }) {
-  if (!assignedPosts || assignedPosts.length === 0) {
-    return (
-      <div style={{ marginBottom: "16px" }}>
-        <h2 style={{ margin: "0 0 12px", fontSize: "14px", fontWeight: "700", color: C.text }}>{sectionTitle}</h2>
-        <EmptyState icon="📋" message="No content assigned to you yet." />
-      </div>
-    );
-  }
+function AssignedContentSection({ assignedPosts = [], assignedAssets = [], assignedSlackChannels = [], sectionTitle }) {
+  const [activeSubTab, setActiveSubTab] = useState("posts");
+
+  const hasAny = assignedPosts.length > 0 || assignedAssets.length > 0 || assignedSlackChannels.length > 0;
+
+  const subTabs = [
+    { id: "posts", label: "Posts", count: assignedPosts.length },
+    { id: "assets", label: "Assets", count: assignedAssets.length },
+    { id: "slack", label: "Slack", count: assignedSlackChannels.length },
+  ];
 
   return (
     <div style={{ marginBottom: "16px" }}>
       <h2 style={{ margin: "0 0 12px", fontSize: "14px", fontWeight: "700", color: C.text }}>{sectionTitle}</h2>
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        {assignedPosts.map((post) => {
-          const statusCfg = STATUS_COLORS[post.status] || STATUS_COLORS.draft;
-          return (
-            <div key={post.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", boxShadow: C.shadow }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: "13px", fontWeight: "600", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {post.title || "Untitled"}
-                </div>
-                {post.scheduledDate && (
-                  <div style={{ fontSize: "11px", color: C.muted, marginTop: "2px" }}>
-                    {formatDate(post.scheduledDate)}
+
+      {/* Sub-tab pills */}
+      <div style={{ display: "flex", gap: "4px", marginBottom: "12px" }}>
+        {subTabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setActiveSubTab(t.id)}
+            style={{
+              padding: "4px 10px", borderRadius: "20px", border: "none",
+              background: activeSubTab === t.id ? C.accentLight : C.cardBg,
+              color: activeSubTab === t.id ? C.accentBright : C.muted,
+              fontSize: "11px", fontWeight: "600", cursor: "pointer",
+              transition: "all 0.15s",
+            }}
+          >
+            {t.label}{t.count > 0 ? ` (${t.count})` : ""}
+          </button>
+        ))}
+      </div>
+
+      {activeSubTab === "posts" && (
+        assignedPosts.length === 0 ? (
+          <EmptyState icon="📋" message="No posts assigned yet." />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {assignedPosts.map((post) => {
+              const statusCfg = STATUS_COLORS[post.status] || STATUS_COLORS.draft;
+              return (
+                <div key={post.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", boxShadow: C.shadow }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "13px", fontWeight: "600", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {post.title || "Untitled"}
+                    </div>
+                    {post.scheduledDate && (
+                      <div style={{ fontSize: "11px", color: C.muted, marginTop: "2px" }}>{formatDate(post.scheduledDate)}</div>
+                    )}
                   </div>
+                  {post.platforms && post.platforms.length > 0 && (
+                    <div style={{ display: "flex", gap: "3px" }}>
+                      {post.platforms.slice(0, 3).map((p) => (
+                        <span key={p} title={p} style={{ fontSize: "14px" }}>{PLATFORM_ICONS[p] || "📄"}</span>
+                      ))}
+                    </div>
+                  )}
+                  <span style={{ padding: "2px 8px", borderRadius: "20px", background: statusCfg.bg, color: statusCfg.color, fontSize: "11px", fontWeight: "700", flexShrink: 0 }}>
+                    {post.status ? post.status.charAt(0).toUpperCase() + post.status.slice(1) : "Draft"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      {activeSubTab === "assets" && (
+        assignedAssets.length === 0 ? (
+          <EmptyState icon="📦" message="No assets assigned yet." />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {assignedAssets.map((asset) => (
+              <div key={asset.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", boxShadow: C.shadow }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "13px", fontWeight: "600", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {asset.name || "Untitled"}
+                  </div>
+                </div>
+                {asset.type && (
+                  <span style={{ padding: "2px 8px", borderRadius: "6px", background: C.cardBg, border: `1px solid ${C.border}`, fontSize: "11px", color: C.muted, flexShrink: 0 }}>
+                    {asset.type}
+                  </span>
+                )}
+                {asset.status && (
+                  <span style={{ padding: "2px 8px", borderRadius: "20px", background: "rgba(99,102,241,0.12)", color: C.accent, fontSize: "11px", fontWeight: "700", flexShrink: 0 }}>
+                    {asset.status}
+                  </span>
                 )}
               </div>
-              {post.platforms && post.platforms.length > 0 && (
-                <div style={{ display: "flex", gap: "3px" }}>
-                  {post.platforms.slice(0, 3).map((p) => (
-                    <span key={p} title={p} style={{ fontSize: "14px" }}>{PLATFORM_ICONS[p] || "📄"}</span>
-                  ))}
+            ))}
+          </div>
+        )
+      )}
+
+      {activeSubTab === "slack" && (
+        assignedSlackChannels.length === 0 ? (
+          <EmptyState icon="💬" message="No Slack channels assigned yet." />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {assignedSlackChannels.map((ch) => (
+              <div key={ch.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", boxShadow: C.shadow }}>
+                <span style={{ fontSize: "16px", flexShrink: 0 }}>{ch.emoji || "💬"}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "13px", fontWeight: "600", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    #{ch.name}
+                  </div>
                 </div>
-              )}
-              <span style={{ padding: "2px 8px", borderRadius: "20px", background: statusCfg.bg, color: statusCfg.color, fontSize: "11px", fontWeight: "700", flexShrink: 0 }}>
-                {post.status ? post.status.charAt(0).toUpperCase() + post.status.slice(1) : "Draft"}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
     </div>
   );
 }
@@ -1396,7 +1468,7 @@ const DEFAULT_SECTION_TITLES = {
   assignedContent: "Assigned to Me",
 };
 
-export default function MyDashboard({ currentUser, token, viewingUserId, teamMembers = [], assignedPosts = [] }) {
+export default function MyDashboard({ currentUser, token, viewingUserId, teamMembers = [], assignedPosts = [], assignedAssets = [], assignedSlackChannels = [] }) {
   const currentUserId = currentUser?.id;
   const effectiveViewingUserId = viewingUserId || currentUserId;
   const readOnly = effectiveViewingUserId !== currentUserId;
@@ -1457,37 +1529,101 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
   const processRole = profile?.processRole || "";
   const headerImage = profile?.headerImage || null;
 
+  const [posX, setPosX] = useState(50);
+  const [posY, setPosY] = useState(50);
+
+  useEffect(() => {
+    if (profile) {
+      setPosX(profile.headerImagePositionX ?? 50);
+      setPosY(profile.headerImagePositionY ?? 50);
+    }
+  }, [profile]);
+
+  const saveHeaderPosition = async (x, y) => {
+    try {
+      await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-session": token },
+        body: JSON.stringify({ headerImagePositionX: x, headerImagePositionY: y }),
+      });
+    } catch {}
+  };
+
   return (
     <div style={{ padding: "0", minHeight: "100vh", background: C.bg }}>
       {/* Header banner */}
       <div style={{ position: "relative", marginBottom: "24px" }}>
         <div style={{
-          width: "100%", height: "140px",
+          width: "100%", height: "200px",
           background: headerImage
-            ? `url(${headerImage}) center/cover no-repeat`
+            ? "transparent"
             : `linear-gradient(135deg, ${C.accent}22, #8B5CF622)`,
           borderRadius: "12px",
           overflow: "hidden",
           border: `1px solid ${C.border}`,
+          position: "relative",
           display: "flex",
           alignItems: "flex-end",
           padding: "16px 20px",
         }}>
-          {!headerImage && !readOnly && (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              style={{ padding: "6px 14px", borderRadius: "20px", border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.85)", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
-            >
-              + Upload Header Image
-            </button>
+          {headerImage && (
+            <img
+              src={headerImage}
+              alt="Header"
+              style={{
+                position: "absolute", inset: 0,
+                width: "100%", height: "100%",
+                objectFit: "cover",
+                objectPosition: `${posX}% ${posY}%`,
+              }}
+            />
           )}
+          <div style={{ position: "relative", zIndex: 1, display: "flex", gap: "8px", alignItems: "center" }}>
+            {!headerImage && !readOnly && (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                style={{ padding: "6px 14px", borderRadius: "20px", border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.85)", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
+              >
+                + Upload Header Image
+              </button>
+            )}
+            {headerImage && !readOnly && (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                style={{ padding: "5px 12px", borderRadius: "20px", border: `1px solid rgba(255,255,255,0.4)`, background: "rgba(0,0,0,0.35)", color: "#fff", fontSize: "11px", fontWeight: "600", cursor: "pointer" }}
+              >
+                ✏ Change
+              </button>
+            )}
+          </div>
           {headerImage && !readOnly && (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              style={{ padding: "5px 12px", borderRadius: "20px", border: `1px solid rgba(255,255,255,0.4)`, background: "rgba(0,0,0,0.35)", color: "#fff", fontSize: "11px", fontWeight: "600", cursor: "pointer" }}
-            >
-              ✏ Change
-            </button>
+            <div style={{
+              position: "absolute", bottom: "8px", right: "12px", zIndex: 2,
+              background: "rgba(0,0,0,0.5)", borderRadius: "10px",
+              padding: "8px 12px", display: "flex", flexDirection: "column", gap: "6px",
+              backdropFilter: "blur(4px)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.8)", fontWeight: "600", width: "16px" }}>↔</span>
+                <input
+                  type="range" min={0} max={100} value={posX}
+                  onChange={(e) => setPosX(Number(e.target.value))}
+                  onMouseUp={(e) => saveHeaderPosition(Number(e.target.value), posY)}
+                  onTouchEnd={(e) => saveHeaderPosition(posX, posY)}
+                  style={{ width: "80px", cursor: "pointer", accentColor: C.accent }}
+                />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.8)", fontWeight: "600", width: "16px" }}>↕</span>
+                <input
+                  type="range" min={0} max={100} value={posY}
+                  onChange={(e) => setPosY(Number(e.target.value))}
+                  onMouseUp={(e) => saveHeaderPosition(posX, Number(e.target.value))}
+                  onTouchEnd={(e) => saveHeaderPosition(posX, posY)}
+                  style={{ width: "80px", cursor: "pointer", accentColor: C.accent }}
+                />
+              </div>
+            </div>
           )}
         </div>
         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleHeaderImageUpload} style={{ display: "none" }} />
@@ -1533,6 +1669,8 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
 
           <AssignedContentSection
             assignedPosts={assignedPosts}
+            assignedAssets={assignedAssets}
+            assignedSlackChannels={assignedSlackChannels}
             sectionTitle={sectionTitles.assignedContent}
           />
         </div>

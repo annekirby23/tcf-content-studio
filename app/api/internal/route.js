@@ -19,12 +19,10 @@ export async function PUT(req) {
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
-    const existing = (await kvGet("tcf:internal")) || { hrInfo: "", contacts: "", membership: "" };
+    const existing = (await kvGet("tcf:internal")) || {};
     const updated = {
       ...existing,
-      ...(body.hrInfo !== undefined && { hrInfo: body.hrInfo }),
-      ...(body.contacts !== undefined && { contacts: body.contacts }),
-      ...(body.membership !== undefined && { membership: body.membership }),
+      ...body,
       updatedAt: new Date().toISOString(),
       updatedBy: user.id,
     };

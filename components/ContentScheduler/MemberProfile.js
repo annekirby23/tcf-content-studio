@@ -324,6 +324,7 @@ function MyProfileTab({ currentUser, token }) {
     image: "", jobTitle: "", email: "", phone: "",
     bio: "", orgLevel: "", funFacts: "",
   });
+  const photoInputRef = useRef(null);
 
   useEffect(() => {
     fetch("/api/profile", { headers: { "x-session": token } })
@@ -470,6 +471,56 @@ function MyProfileTab({ currentUser, token }) {
 
         {editing ? (
           <div>
+            {/* Photo upload */}
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>
+                Upload Photo
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                {form.image ? (
+                  <img
+                    src={form.image}
+                    alt="Preview"
+                    style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: `2px solid ${C.border}`, flexShrink: 0 }}
+                    onError={(e) => { e.target.style.display = "none"; }}
+                  />
+                ) : (
+                  <div style={{
+                    width: 48, height: 48, borderRadius: "50%",
+                    background: "#6366F1", color: "#fff",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 17, fontWeight: "700", flexShrink: 0,
+                    border: `2px solid ${C.border}`,
+                  }}>
+                    {(currentUser?.name || "?").split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  style={{
+                    padding: "7px 14px", borderRadius: "8px",
+                    border: `1px solid ${C.border}`, background: C.cardBg,
+                    color: C.text, fontSize: "13px", fontWeight: "600", cursor: "pointer",
+                  }}
+                >
+                  Choose Photo
+                </button>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => set("image", ev.target.result);
+                    reader.readAsDataURL(file);
+                  }}
+                />
+              </div>
+            </div>
             <FocusInput
               label="Profile Image URL"
               value={form.image}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { C } from "./constants";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -34,10 +34,11 @@ function Spinner() {
 
 // ─── Add / Edit Channel Form ─────────────────────────────────────────────────
 
-function ChannelForm({ initial, onSave, onCancel }) {
+function ChannelForm({ initial, onSave, onCancel, teamMembers = [] }) {
   const [emoji, setEmoji] = useState(initial?.emoji || "💬");
   const [name, setName] = useState(initial?.name || "");
   const [description, setDescription] = useState(initial?.description || "");
+  const [assignedTo, setAssignedTo] = useState(initial?.assignedTo || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -47,7 +48,7 @@ function ChannelForm({ initial, onSave, onCancel }) {
     setSaving(true);
     setError("");
     try {
-      await onSave({ emoji, name: name.trim(), description: description.trim() });
+      await onSave({ emoji, name: name.trim(), description: description.trim(), assignedTo: assignedTo || null });
     } catch (e) {
       setError(e.message || "Failed to save.");
       setSaving(false);
@@ -91,6 +92,18 @@ function ChannelForm({ initial, onSave, onCancel }) {
         placeholder="Description (optional)"
         style={{ ...inputStyle, marginBottom: 6 }}
       />
+      {teamMembers.length > 0 && (
+        <select
+          value={assignedTo}
+          onChange={(e) => setAssignedTo(e.target.value)}
+          style={{ ...inputStyle, marginBottom: 6, color: C.text }}
+        >
+          <option value="">Unassigned</option>
+          {teamMembers.map((m) => (
+            <option key={m.id} value={m.id}>{m.name}</option>
+          ))}
+        </select>
+      )}
       {error && <div style={{ fontSize: 12, color: "#EF4444", marginBottom: 6 }}>{error}</div>}
       <div style={{ display: "flex", gap: 6 }}>
         <button
@@ -239,12 +252,63 @@ function AddIdeaForm({ onSave, onCancel, teamMembers = [] }) {
   );
 }
 
+// ─── Edit Idea Form ──────────────────────────────────────────────────────────
+
+function EditIdeaForm({ idea, onSave, onCancel, teamMembers = [] }) {
+  const [title, setTitle] = useState(idea.title || "");
+  const [copy, setCopy] = useState(idea.copy || "");
+  const [assignedTo, setAssignedTo] = useState(idea.assignedTo || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSave() {
+    if (!title.trim()) { setError("Title is required."); return; }
+    if (!copy.trim()) { setError("Copy is required."); return; }
+    setSaving(true);
+    setError("");
+    try {
+      await onSave({ title: title.trim(), copy: copy.trim(), assignedTo: assignedTo || null });
+    } catch (e) {
+      setError(e.message || "Failed to save.");
+      setSaving(false);
+    }
+  }
+
+  const inputStyle = {
+    width: "100%", padding: "8px 10px", border: `1px solid ${C.border}`,
+    borderRadius: 8, fontSize: 13, background: C.inputBg, color: C.text,
+    outline: "none", boxSizing: "border-box", fontFamily: "inherit",
+  };
+
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.accent}40`, borderRadius: 12, padding: 16, marginBottom: 12, boxShadow: C.shadow }}>
+      <div style={{ fontWeight: 600, fontSize: 13, color: C.text, marginBottom: 10 }}>Edit Idea</div>
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Idea title…" style={{ ...inputStyle, marginBottom: 8 }} autoFocus />
+      <textarea value={copy} onChange={(e) => setCopy(e.target.value)} placeholder="Write your copy here…" rows={4} style={{ ...inputStyle, resize: "vertical", marginBottom: 8 }} />
+      {teamMembers.length > 0 && (
+        <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} style={{ ...inputStyle, marginBottom: 8, color: C.text }}>
+          <option value="">Unassigned</option>
+          {teamMembers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+      )}
+      {error && <div style={{ fontSize: 12, color: "#EF4444", marginBottom: 8 }}>{error}</div>}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={handleSave} disabled={saving} style={{ padding: "7px 18px", background: C.accent, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, fontWeight: 500 }}>
+          {saving ? "Saving…" : "Save"}
+        </button>
+        <button onClick={onCancel} style={{ padding: "7px 18px", background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Idea Card ───────────────────────────────────────────────────────────────
 
-function IdeaCard({ idea, currentUser, token, onDelete, onMakePost, teamMembers = [] }) {
+function IdeaCard({ idea, currentUser, token, onDelete, onUpdate, onMakePost, teamMembers = [] }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const isAdmin = currentUser?.role === "admin";
   const isSubmitter = idea.submittedById === currentUser?.id;
@@ -278,6 +342,18 @@ function IdeaCard({ idea, currentUser, token, onDelete, onMakePost, teamMembers 
     }
   }
 
+  async function handleEdit({ title, copy, assignedTo }) {
+    const res = await fetch("/api/slack/ideas", {
+      method: "PUT",
+      headers: { "x-session": token, "Content-Type": "application/json" },
+      body: JSON.stringify({ id: idea.id, title, copy, assignedTo }),
+    });
+    if (!res.ok) throw new Error("Failed to update idea");
+    const updated = await res.json();
+    onUpdate(updated);
+    setEditing(false);
+  }
+
   const btnBase = {
     padding: "5px 12px",
     border: `1px solid ${C.border}`,
@@ -288,6 +364,17 @@ function IdeaCard({ idea, currentUser, token, onDelete, onMakePost, teamMembers 
     color: C.muted,
     fontFamily: "inherit",
   };
+
+  if (editing) {
+    return (
+      <EditIdeaForm
+        idea={idea}
+        onSave={handleEdit}
+        onCancel={() => setEditing(false)}
+        teamMembers={teamMembers}
+      />
+    );
+  }
 
   return (
     <div
@@ -353,6 +440,14 @@ function IdeaCard({ idea, currentUser, token, onDelete, onMakePost, teamMembers 
         >
           Make into Post →
         </button>
+        {(isAdmin || isSubmitter) && (
+          <button
+            onClick={() => setEditing(true)}
+            style={{ ...btnBase }}
+          >
+            ✏️ Edit
+          </button>
+        )}
         {canDelete && (
           <button
             onClick={handleDelete}
@@ -466,11 +561,11 @@ export default function SlackPlanner({ currentUser, token, onMakePost, teamMembe
     setShowAddChannel(false);
   }
 
-  async function handleEditChannel({ emoji, name, description }) {
+  async function handleEditChannel({ emoji, name, description, assignedTo }) {
     const res = await fetch("/api/slack/channels", {
       method: "PUT",
       headers: { "x-session": token, "Content-Type": "application/json" },
-      body: JSON.stringify({ id: editingChannelId, emoji, name, description }),
+      body: JSON.stringify({ id: editingChannelId, emoji, name, description, assignedTo }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -515,6 +610,10 @@ export default function SlackPlanner({ currentUser, token, onMakePost, teamMembe
 
   function handleIdeaDeleted(ideaId) {
     setIdeas((prev) => prev.filter((i) => i.id !== ideaId));
+  }
+
+  function handleIdeaUpdated(updatedIdea) {
+    setIdeas((prev) => prev.map((i) => i.id === updatedIdea.id ? updatedIdea : i));
   }
 
   // ── Styles ───────────────────────────────────────────────────────────────
@@ -599,6 +698,7 @@ export default function SlackPlanner({ currentUser, token, onMakePost, teamMembe
             <ChannelForm
               onSave={handleAddChannel}
               onCancel={() => setShowAddChannel(false)}
+              teamMembers={teamMembers}
             />
           )}
 
@@ -654,6 +754,18 @@ export default function SlackPlanner({ currentUser, token, onMakePost, teamMembe
                       <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         #{channel.name}
                       </span>
+                      {channel.assignedTo && (() => {
+                        const m = teamMembers.find((t) => t.id === channel.assignedTo);
+                        if (!m) return null;
+                        const colors = ["#6366F1","#8B5CF6","#EC4899","#EF4444","#F59E0B","#10B981","#3B82F6","#06B6D4"];
+                        let h = 0; for (let i = 0; i < m.name.length; i++) h = m.name.charCodeAt(i) + ((h << 5) - h);
+                        const bg = colors[Math.abs(h) % colors.length];
+                        return (
+                          <div title={m.name} style={{ width:18, height:18, borderRadius:"50%", background:bg, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:"700", flexShrink:0 }}>
+                            {m.name.split(" ").map((n)=>n[0]).join("").toUpperCase().slice(0,2)}
+                          </div>
+                        );
+                      })()}
                       {isSelected && isAdmin && (
                         <span style={{ display: "flex", gap: 2, flexShrink: 0 }}>
                           <button
@@ -705,6 +817,7 @@ export default function SlackPlanner({ currentUser, token, onMakePost, teamMembe
                         initial={channel}
                         onSave={handleEditChannel}
                         onCancel={() => setEditingChannelId(null)}
+                        teamMembers={teamMembers}
                       />
                     )}
                   </div>
@@ -799,6 +912,7 @@ export default function SlackPlanner({ currentUser, token, onMakePost, teamMembe
                     currentUser={currentUser}
                     token={token}
                     onDelete={handleIdeaDeleted}
+                    onUpdate={handleIdeaUpdated}
                     onMakePost={onMakePost}
                     teamMembers={teamMembers}
                   />

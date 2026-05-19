@@ -73,7 +73,6 @@ export async function DELETE(req) {
 export async function PUT(req) {
   const user = await getSession(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (user.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let body;
   try {
@@ -82,8 +81,13 @@ export async function PUT(req) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { id, name, description, emoji } = body;
+  const { id, name, description, emoji, assignedTo } = body;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+
+  // Only admins can rename/edit channel details; anyone can assign
+  if ((name !== undefined || emoji !== undefined || description !== undefined) && user.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   if (name !== undefined) {
     if (typeof name !== "string" || name.trim().length === 0) {
@@ -103,6 +107,7 @@ export async function PUT(req) {
   if (name !== undefined) updated.name = name.trim();
   if (description !== undefined) updated.description = description;
   if (emoji !== undefined) updated.emoji = emoji;
+  if (assignedTo !== undefined) updated.assignedTo = assignedTo || null;
 
   channels[idx] = updated;
   await kvSet(CHANNELS_KEY, channels);

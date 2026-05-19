@@ -60,40 +60,510 @@ function UserAvatar({ name, size = 26 }) {
 
 // ─── Internal View ───────────────────────────────────────────────────────────
 
-function InternalView({ token }) {
-  const [data, setData] = useState({ hrInfo: "", contacts: "", membership: "" });
+function genHex() {
+  return Math.random().toString(16).slice(2, 10);
+}
+
+function InventoryRow({ item, isEditing, isLast, editForm, setEditForm, onSaveEdit, onCancelEdit, onStartEdit, onDelete, NEEDED_COLORS, STATUS_COLORS, NEEDED_WHEN_OPTIONS, ORDER_STATUS_OPTIONS, AvatarSmall, inputS }) {
+  const [rowHov, setRowHov] = useState(false);
+  const nwCfg = NEEDED_COLORS[item.neededWhen] || { color:C.muted, bg:C.cardBg };
+  const stCfg = STATUS_COLORS[item.orderStatus] || { color:C.muted, bg:C.cardBg };
+  return (
+    <div
+      style={{ display:"grid", gridTemplateColumns:"2fr 90px 130px 1fr 110px 1fr 60px 60px", borderBottom: !isLast ? `1px solid ${C.border}` : "none", padding:"0 8px", background:rowHov ? C.hover : "transparent", transition:"background 0.1s", alignItems:"center" }}
+      onMouseEnter={()=>setRowHov(true)} onMouseLeave={()=>setRowHov(false)}
+    >
+      {isEditing ? (
+        <>
+          <div style={{ padding:"8px" }}><input value={editForm.itemName||""} onChange={(e)=>setEditForm((f)=>({...f,itemName:e.target.value}))} style={{ ...inputS, width:"100%" }} /></div>
+          <div style={{ padding:"8px", fontSize:"12px", color:C.muted }}>{item.date}</div>
+          <div style={{ padding:"8px" }}><select value={editForm.neededWhen||""} onChange={(e)=>setEditForm((f)=>({...f,neededWhen:e.target.value}))} style={{ ...inputS, width:"100%" }}><option value="">—</option>{NEEDED_WHEN_OPTIONS.map((n)=><option key={n} value={n}>{n}</option>)}</select></div>
+          <div style={{ padding:"8px" }}><input value={editForm.forWhat||""} onChange={(e)=>setEditForm((f)=>({...f,forWhat:e.target.value}))} style={{ ...inputS, width:"100%" }} /></div>
+          <div style={{ padding:"8px" }}><select value={editForm.orderStatus||"Not Started"} onChange={(e)=>setEditForm((f)=>({...f,orderStatus:e.target.value}))} style={{ ...inputS, width:"100%" }}>{ORDER_STATUS_OPTIONS.map((s)=><option key={s} value={s}>{s}</option>)}</select></div>
+          <div style={{ padding:"8px" }}><input value={editForm.notes||""} onChange={(e)=>setEditForm((f)=>({...f,notes:e.target.value}))} style={{ ...inputS, width:"100%" }} /></div>
+          <div style={{ padding:"8px" }}>{item.personAdded && <AvatarSmall name={item.personAdded} />}</div>
+          <div style={{ padding:"8px", display:"flex", gap:"4px" }}>
+            <button onClick={onSaveEdit} style={{ fontSize:"11px", padding:"4px 8px", borderRadius:"6px", border:"none", background:C.accent, color:"#fff", cursor:"pointer" }}>✓</button>
+            <button onClick={onCancelEdit} style={{ fontSize:"11px", padding:"4px 8px", borderRadius:"6px", border:`1px solid ${C.border}`, background:"none", color:C.muted, cursor:"pointer" }}>✕</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={{ padding:"10px 8px", fontSize:"13px", fontWeight:"600", color:C.text }}>{item.itemName}</div>
+          <div style={{ padding:"10px 8px", fontSize:"12px", color:C.muted }}>{item.date}</div>
+          <div style={{ padding:"10px 8px" }}>{item.neededWhen && <span style={{ padding:"2px 8px", borderRadius:"20px", background:nwCfg.bg, color:nwCfg.color, fontSize:"11px", fontWeight:"600" }}>{item.neededWhen}</span>}</div>
+          <div style={{ padding:"10px 8px", fontSize:"13px", color:C.text }}>{item.forWhat}</div>
+          <div style={{ padding:"10px 8px" }}><span style={{ padding:"2px 8px", borderRadius:"20px", background:stCfg.bg, color:stCfg.color, fontSize:"11px", fontWeight:"600" }}>{item.orderStatus}</span></div>
+          <div style={{ padding:"10px 8px", fontSize:"12px", color:C.muted }}>{item.notes}</div>
+          <div style={{ padding:"10px 8px" }}>{item.personAdded && <AvatarSmall name={item.personAdded} />}</div>
+          <div style={{ padding:"10px 8px", display:"flex", gap:"4px", alignItems:"center" }}>
+            {item.url && <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ fontSize:"14px", color:C.accent, textDecoration:"none" }} title={item.url}>🔗</a>}
+            {rowHov && <>
+              <button onClick={onStartEdit} style={{ background:"none", border:"none", cursor:"pointer", fontSize:"13px", color:C.muted, padding:"2px" }}>✏️</button>
+              <button onClick={onDelete} style={{ background:"none", border:"none", cursor:"pointer", fontSize:"13px", color:"#EF4444", padding:"2px" }}>🗑</button>
+            </>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function InventoryTab({ token, currentUser }) {
+  const NEEDED_WHEN_OPTIONS = ["Next Amazon Order", "Wish List", "Weekly Order", "Next Trip", "ASAP"];
+  const ORDER_STATUS_OPTIONS = ["Not Started", "Ordered", "In Progress", "Received", "Cancelled"];
+
+  const NEEDED_COLORS = {
+    "Next Amazon Order": { color: "#3B82F6", bg: "rgba(59,130,246,0.12)" },
+    "Wish List": { color: "#F59E0B", bg: "rgba(245,158,11,0.12)" },
+    "Weekly Order": { color: "#10B981", bg: "rgba(16,185,129,0.12)" },
+    "Next Trip": { color: "#8B5CF6", bg: "rgba(139,92,246,0.12)" },
+    "ASAP": { color: "#EF4444", bg: "rgba(239,68,68,0.12)" },
+  };
+
+  const STATUS_COLORS = {
+    "Not Started": { color: "#94A3B8", bg: "rgba(148,163,184,0.12)" },
+    "Ordered": { color: "#8B5CF6", bg: "rgba(139,92,246,0.12)" },
+    "In Progress": { color: "#F59E0B", bg: "rgba(245,158,11,0.12)" },
+    "Received": { color: "#10B981", bg: "rgba(16,185,129,0.12)" },
+    "Cancelled": { color: "#EF4444", bg: "rgba(239,68,68,0.12)" },
+  };
+
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState({});
+  const [showAdd, setShowAdd] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterNeeded, setFilterNeeded] = useState("");
+
+  const emptyForm = { itemName: "", neededWhen: "", forWhat: "", orderStatus: "Not Started", notes: "", url: "" };
+  const [addForm, setAddForm] = useState(emptyForm);
+  const [editForm, setEditForm] = useState({});
+
+  useEffect(() => {
+    fetch("/api/inventory", { headers: { "x-session": token } })
+      .then((r) => r.json())
+      .then((d) => setItems(Array.isArray(d) ? d : []))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  const filtered = items.filter((item) => {
+    if (filterStatus && item.orderStatus !== filterStatus) return false;
+    if (filterNeeded && item.neededWhen !== filterNeeded) return false;
+    return true;
+  });
+
+  const saveAdd = async () => {
+    if (!addForm.itemName.trim()) return;
+    try {
+      const res = await fetch("/api/inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-session": token },
+        body: JSON.stringify(addForm),
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setItems((p) => [saved, ...p]);
+        setAddForm(emptyForm);
+        setShowAdd(false);
+      }
+    } catch {}
+  };
+
+  const saveEdit = async (id) => {
+    try {
+      const res = await fetch("/api/inventory", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-session": token },
+        body: JSON.stringify({ id, ...editForm }),
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setItems((p) => p.map((it) => it.id === id ? saved : it));
+        setEditingId(null);
+      }
+    } catch {}
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this item?")) return;
+    setItems((p) => p.filter((it) => it.id !== id));
+    try {
+      await fetch(`/api/inventory?id=${id}`, { method: "DELETE", headers: { "x-session": token } });
+    } catch {}
+  };
+
+  const inputS = { padding: "6px 10px", border: `1px solid ${C.border}`, borderRadius: "7px", background: C.inputBg, color: C.text, fontSize: "13px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
+
+  function AvatarSmall({ name }) {
+    const colors = ["#6366F1","#8B5CF6","#EC4899","#EF4444","#F59E0B","#10B981","#3B82F6","#06B6D4"];
+    let h = 0; for (let i = 0; i < (name||"").length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+    const bg = colors[Math.abs(h) % colors.length];
+    const ini = (name||"?").split(" ").map((n)=>n[0]).join("").toUpperCase().slice(0,2);
+    return <div style={{ width:24, height:24, borderRadius:"50%", background:bg, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:"700", flexShrink:0 }}>{ini}</div>;
+  }
+
+  if (loading) return <div style={{ textAlign:"center", padding:"48px", color:C.muted }}>Loading inventory…</div>;
+
+  return (
+    <div>
+      {/* Filter bar + Add button */}
+      <div style={{ display:"flex", gap:"10px", alignItems:"center", marginBottom:"16px", flexWrap:"wrap" }}>
+        <select value={filterStatus} onChange={(e)=>setFilterStatus(e.target.value)} style={{ ...inputS, flex:"0 0 auto" }}>
+          <option value="">All Statuses</option>
+          {ORDER_STATUS_OPTIONS.map((s)=><option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={filterNeeded} onChange={(e)=>setFilterNeeded(e.target.value)} style={{ ...inputS, flex:"0 0 auto" }}>
+          <option value="">All Timings</option>
+          {NEEDED_WHEN_OPTIONS.map((n)=><option key={n} value={n}>{n}</option>)}
+        </select>
+        <div style={{ flex:1 }} />
+        <button onClick={()=>setShowAdd((v)=>!v)} style={{ padding:"8px 16px", borderRadius:"8px", border:"none", background:C.accent, color:"#fff", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>
+          {showAdd ? "Cancel" : "+ Add Item"}
+        </button>
+      </div>
+
+      {/* Add form */}
+      {showAdd && (
+        <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:"12px", padding:"16px", marginBottom:"16px", display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(180px, 1fr))", gap:"10px" }}>
+          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>Item Name *</label>
+            <input value={addForm.itemName} onChange={(e)=>setAddForm((f)=>({...f,itemName:e.target.value}))} style={{ ...inputS, width:"100%" }} placeholder="What's needed?" /></div>
+          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>Needed When</label>
+            <select value={addForm.neededWhen} onChange={(e)=>setAddForm((f)=>({...f,neededWhen:e.target.value}))} style={{ ...inputS, width:"100%" }}>
+              <option value="">Select…</option>
+              {NEEDED_WHEN_OPTIONS.map((n)=><option key={n} value={n}>{n}</option>)}
+            </select></div>
+          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>For What</label>
+            <input value={addForm.forWhat} onChange={(e)=>setAddForm((f)=>({...f,forWhat:e.target.value}))} style={{ ...inputS, width:"100%" }} placeholder="Purpose…" /></div>
+          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>Status</label>
+            <select value={addForm.orderStatus} onChange={(e)=>setAddForm((f)=>({...f,orderStatus:e.target.value}))} style={{ ...inputS, width:"100%" }}>
+              {ORDER_STATUS_OPTIONS.map((s)=><option key={s} value={s}>{s}</option>)}
+            </select></div>
+          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>URL</label>
+            <input value={addForm.url} onChange={(e)=>setAddForm((f)=>({...f,url:e.target.value}))} style={{ ...inputS, width:"100%" }} placeholder="https://…" /></div>
+          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>Notes</label>
+            <input value={addForm.notes} onChange={(e)=>setAddForm((f)=>({...f,notes:e.target.value}))} style={{ ...inputS, width:"100%" }} placeholder="Notes…" /></div>
+          <div style={{ display:"flex", alignItems:"flex-end", gap:"8px" }}>
+            <button onClick={saveAdd} style={{ padding:"8px 18px", borderRadius:"8px", border:"none", background:C.accent, color:"#fff", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>Save</button>
+            <button onClick={()=>setShowAdd(false)} style={{ padding:"8px 14px", borderRadius:"8px", border:`1px solid ${C.border}`, background:"none", color:C.muted, fontSize:"13px", cursor:"pointer" }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      <div style={{ border:`1px solid ${C.border}`, borderRadius:"12px", overflow:"hidden" }}>
+        <div style={{ display:"grid", gridTemplateColumns:"2fr 90px 130px 1fr 110px 1fr 60px 60px", background:C.cardBg, borderBottom:`1px solid ${C.border}`, padding:"0 8px" }}>
+          {["Item Needed","Date","Needed When","For What","Status","Notes","Person","Link"].map((h,i)=>(
+            <div key={i} style={{ padding:"10px 8px", fontSize:"11px", fontWeight:"700", textTransform:"uppercase", letterSpacing:"0.05em", color:C.muted }}>{h}</div>
+          ))}
+        </div>
+        {filtered.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"48px", color:C.muted, fontSize:"14px" }}>No inventory items yet</div>
+        ) : filtered.map((item, i) => (
+          <InventoryRow
+            key={item.id}
+            item={item}
+            isEditing={editingId === item.id}
+            isLast={i === filtered.length - 1}
+            editForm={editForm}
+            setEditForm={setEditForm}
+            onSaveEdit={()=>saveEdit(item.id)}
+            onCancelEdit={()=>setEditingId(null)}
+            onStartEdit={()=>{ setEditingId(item.id); setEditForm({ itemName:item.itemName, neededWhen:item.neededWhen, forWhat:item.forWhat, orderStatus:item.orderStatus, notes:item.notes, url:item.url }); }}
+            onDelete={()=>handleDelete(item.id)}
+            NEEDED_COLORS={NEEDED_COLORS}
+            STATUS_COLORS={STATUS_COLORS}
+            NEEDED_WHEN_OPTIONS={NEEDED_WHEN_OPTIONS}
+            ORDER_STATUS_OPTIONS={ORDER_STATUS_OPTIONS}
+            AvatarSmall={AvatarSmall}
+            inputS={inputS}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ContactsTab({ token }) {
+  const [contacts, setContacts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const emptyForm = { name:"", role:"", phone:"", email:"", notes:"" };
+  const [addForm, setAddForm] = useState(emptyForm);
+  const [editForm, setEditForm] = useState({});
+  const [hoverIds, setHoverIds] = useState(new Set());
+
+  useEffect(() => {
+    fetch("/api/internal", { headers:{"x-session":token} })
+      .then((r)=>r.json())
+      .then((d)=>setContacts(Array.isArray(d?.contacts) ? d.contacts : []))
+      .catch(()=>setContacts([]))
+      .finally(()=>setLoading(false));
+  }, [token]);
+
+  const save = async (contacts) => {
+    await fetch("/api/internal", {
+      method:"PUT", headers:{"Content-Type":"application/json","x-session":token},
+      body:JSON.stringify({ contacts }),
+    });
+  };
+
+  const addContact = async () => {
+    if (!addForm.name.trim()) return;
+    const newContact = { ...addForm, id: genHex() };
+    const updated = [newContact, ...contacts];
+    setContacts(updated);
+    setAddForm(emptyForm);
+    setShowAdd(false);
+    await save(updated);
+  };
+
+  const updateContact = async (id) => {
+    const updated = contacts.map((c)=>c.id===id ? { ...c, ...editForm } : c);
+    setContacts(updated);
+    setEditingId(null);
+    await save(updated);
+  };
+
+  const deleteContact = async (id) => {
+    if (!window.confirm("Delete this contact?")) return;
+    const updated = contacts.filter((c)=>c.id!==id);
+    setContacts(updated);
+    await save(updated);
+  };
+
+  const inputS = { padding:"8px 10px", border:`1px solid ${C.border}`, borderRadius:"8px", background:C.inputBg, color:C.text, fontSize:"13px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", width:"100%" };
+
+  if (loading) return <div style={{ textAlign:"center", padding:"48px", color:C.muted }}>Loading contacts…</div>;
+
+  return (
+    <div>
+      <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:"16px" }}>
+        <button onClick={()=>setShowAdd((v)=>!v)} style={{ padding:"8px 16px", borderRadius:"8px", border:"none", background:C.accent, color:"#fff", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>
+          {showAdd ? "Cancel" : "+ Add Contact"}
+        </button>
+      </div>
+      {showAdd && (
+        <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:"12px", padding:"16px", marginBottom:"16px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
+          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px" }}>Name *</label><input value={addForm.name} onChange={(e)=>setAddForm((f)=>({...f,name:e.target.value}))} style={inputS} /></div>
+          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px" }}>Role</label><input value={addForm.role} onChange={(e)=>setAddForm((f)=>({...f,role:e.target.value}))} style={inputS} /></div>
+          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px" }}>Phone</label><input value={addForm.phone} onChange={(e)=>setAddForm((f)=>({...f,phone:e.target.value}))} style={inputS} /></div>
+          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px" }}>Email</label><input value={addForm.email} onChange={(e)=>setAddForm((f)=>({...f,email:e.target.value}))} style={inputS} /></div>
+          <div style={{ gridColumn:"1/-1" }}><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px" }}>Notes</label><input value={addForm.notes} onChange={(e)=>setAddForm((f)=>({...f,notes:e.target.value}))} style={inputS} /></div>
+          <div style={{ gridColumn:"1/-1", display:"flex", gap:"8px" }}>
+            <button onClick={addContact} style={{ padding:"8px 18px", borderRadius:"8px", border:"none", background:C.accent, color:"#fff", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>Save Contact</button>
+            <button onClick={()=>setShowAdd(false)} style={{ padding:"8px 14px", borderRadius:"8px", border:`1px solid ${C.border}`, background:"none", color:C.muted, fontSize:"13px", cursor:"pointer" }}>Cancel</button>
+          </div>
+        </div>
+      )}
+      <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+        {contacts.length === 0 && <div style={{ textAlign:"center", padding:"48px", color:C.muted, fontSize:"14px" }}>No contacts yet. Add the first one!</div>}
+        {contacts.map((c) => (
+          <div key={c.id}
+            style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:"12px", padding:"16px", position:"relative" }}
+            onMouseEnter={()=>setHoverIds((h)=>{ const n=new Set(h); n.add(c.id); return n; })}
+            onMouseLeave={()=>setHoverIds((h)=>{ const n=new Set(h); n.delete(c.id); return n; })}
+          >
+            {editingId === c.id ? (
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px" }}>
+                <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"3px" }}>Name</label><input value={editForm.name||""} onChange={(e)=>setEditForm((f)=>({...f,name:e.target.value}))} style={inputS} /></div>
+                <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"3px" }}>Role</label><input value={editForm.role||""} onChange={(e)=>setEditForm((f)=>({...f,role:e.target.value}))} style={inputS} /></div>
+                <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"3px" }}>Phone</label><input value={editForm.phone||""} onChange={(e)=>setEditForm((f)=>({...f,phone:e.target.value}))} style={inputS} /></div>
+                <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"3px" }}>Email</label><input value={editForm.email||""} onChange={(e)=>setEditForm((f)=>({...f,email:e.target.value}))} style={inputS} /></div>
+                <div style={{ gridColumn:"1/-1" }}><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"3px" }}>Notes</label><input value={editForm.notes||""} onChange={(e)=>setEditForm((f)=>({...f,notes:e.target.value}))} style={inputS} /></div>
+                <div style={{ gridColumn:"1/-1", display:"flex", gap:"8px" }}>
+                  <button onClick={()=>updateContact(c.id)} style={{ padding:"7px 16px", borderRadius:"8px", border:"none", background:C.accent, color:"#fff", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>Save</button>
+                  <button onClick={()=>setEditingId(null)} style={{ padding:"7px 12px", borderRadius:"8px", border:`1px solid ${C.border}`, background:"none", color:C.muted, fontSize:"13px", cursor:"pointer" }}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between" }}>
+                  <div>
+                    <div style={{ fontSize:"15px", fontWeight:"700", color:C.text }}>{c.name}</div>
+                    {c.role && <div style={{ fontSize:"12px", color:C.muted, marginTop:"2px" }}>{c.role}</div>}
+                  </div>
+                  {hoverIds.has(c.id) && (
+                    <div style={{ display:"flex", gap:"6px" }}>
+                      <button onClick={()=>{ setEditingId(c.id); setEditForm({...c}); }} style={{ padding:"4px 10px", borderRadius:"6px", border:`1px solid ${C.border}`, background:C.cardBg, color:C.muted, fontSize:"12px", cursor:"pointer" }}>Edit</button>
+                      <button onClick={()=>deleteContact(c.id)} style={{ padding:"4px 10px", borderRadius:"6px", border:"1px solid #FECACA", background:"rgba(239,68,68,0.06)", color:"#EF4444", fontSize:"12px", cursor:"pointer" }}>Delete</button>
+                    </div>
+                  )}
+                </div>
+                <div style={{ display:"flex", gap:"16px", marginTop:"10px", flexWrap:"wrap" }}>
+                  {c.phone && <span style={{ fontSize:"13px", color:C.text }}>📞 {c.phone}</span>}
+                  {c.email && <span style={{ fontSize:"13px", color:C.text }}>✉️ {c.email}</span>}
+                </div>
+                {c.notes && <div style={{ fontSize:"13px", color:C.muted, marginTop:"8px", lineHeight:"1.5" }}>{c.notes}</div>}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MembershipsTab({ token }) {
+  const BILLING_OPTIONS = ["monthly", "annual", "one-time"];
+  const [memberships, setMemberships] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const emptyForm = { name:"", cost:"", billingCycle:"monthly", details:"", link:"" };
+  const [addForm, setAddForm] = useState(emptyForm);
+  const [editForm, setEditForm] = useState({});
+  const [hoverIds, setHoverIds] = useState(new Set());
+
+  useEffect(() => {
+    fetch("/api/internal", { headers:{"x-session":token} })
+      .then((r)=>r.json())
+      .then((d)=>setMemberships(Array.isArray(d?.memberships) ? d.memberships : []))
+      .catch(()=>setMemberships([]))
+      .finally(()=>setLoading(false));
+  }, [token]);
+
+  const save = async (memberships) => {
+    await fetch("/api/internal", {
+      method:"PUT", headers:{"Content-Type":"application/json","x-session":token},
+      body:JSON.stringify({ memberships }),
+    });
+  };
+
+  const addMembership = async () => {
+    if (!addForm.name.trim()) return;
+    const item = { ...addForm, id: genHex() };
+    const updated = [item, ...memberships];
+    setMemberships(updated);
+    setAddForm(emptyForm);
+    setShowAdd(false);
+    await save(updated);
+  };
+
+  const updateMembership = async (id) => {
+    const updated = memberships.map((m)=>m.id===id ? { ...m, ...editForm } : m);
+    setMemberships(updated);
+    setEditingId(null);
+    await save(updated);
+  };
+
+  const deleteMembership = async (id) => {
+    if (!window.confirm("Delete this membership?")) return;
+    const updated = memberships.filter((m)=>m.id!==id);
+    setMemberships(updated);
+    await save(updated);
+  };
+
+  const inputS = { padding:"8px 10px", border:`1px solid ${C.border}`, borderRadius:"8px", background:C.inputBg, color:C.text, fontSize:"13px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", width:"100%" };
+
+  if (loading) return <div style={{ textAlign:"center", padding:"48px", color:C.muted }}>Loading memberships…</div>;
+
+  return (
+    <div>
+      <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:"16px" }}>
+        <button onClick={()=>setShowAdd((v)=>!v)} style={{ padding:"8px 16px", borderRadius:"8px", border:"none", background:C.accent, color:"#fff", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>
+          {showAdd ? "Cancel" : "+ Add Membership"}
+        </button>
+      </div>
+      {showAdd && (
+        <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:"12px", padding:"16px", marginBottom:"16px", display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"12px" }}>
+          <div style={{ gridColumn:"1/-1" }}><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px" }}>Name *</label><input value={addForm.name} onChange={(e)=>setAddForm((f)=>({...f,name:e.target.value}))} style={inputS} placeholder="e.g. Canva Pro" /></div>
+          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px" }}>Cost ($)</label><input type="number" value={addForm.cost} onChange={(e)=>setAddForm((f)=>({...f,cost:e.target.value}))} style={inputS} placeholder="0" /></div>
+          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px" }}>Billing Cycle</label>
+            <select value={addForm.billingCycle} onChange={(e)=>setAddForm((f)=>({...f,billingCycle:e.target.value}))} style={inputS}>
+              {BILLING_OPTIONS.map((b)=><option key={b} value={b}>{b}</option>)}
+            </select></div>
+          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px" }}>Link</label><input value={addForm.link} onChange={(e)=>setAddForm((f)=>({...f,link:e.target.value}))} style={inputS} placeholder="https://…" /></div>
+          <div style={{ gridColumn:"1/-1" }}><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px" }}>Details</label><textarea value={addForm.details} onChange={(e)=>setAddForm((f)=>({...f,details:e.target.value}))} rows={2} style={{ ...inputS, resize:"vertical" }} placeholder="What's included, login info, notes…" /></div>
+          <div style={{ gridColumn:"1/-1", display:"flex", gap:"8px" }}>
+            <button onClick={addMembership} style={{ padding:"8px 18px", borderRadius:"8px", border:"none", background:C.accent, color:"#fff", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>Save Membership</button>
+            <button onClick={()=>setShowAdd(false)} style={{ padding:"8px 14px", borderRadius:"8px", border:`1px solid ${C.border}`, background:"none", color:C.muted, fontSize:"13px", cursor:"pointer" }}>Cancel</button>
+          </div>
+        </div>
+      )}
+      <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+        {memberships.length === 0 && <div style={{ textAlign:"center", padding:"48px", color:C.muted, fontSize:"14px" }}>No memberships yet. Add the first one!</div>}
+        {memberships.map((m) => (
+          <div key={m.id}
+            style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:"12px", padding:"16px" }}
+            onMouseEnter={()=>setHoverIds((h)=>{ const n=new Set(h); n.add(m.id); return n; })}
+            onMouseLeave={()=>setHoverIds((h)=>{ const n=new Set(h); n.delete(m.id); return n; })}
+          >
+            {editingId === m.id ? (
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"10px" }}>
+                <div style={{ gridColumn:"1/-1" }}><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"3px" }}>Name</label><input value={editForm.name||""} onChange={(e)=>setEditForm((f)=>({...f,name:e.target.value}))} style={inputS} /></div>
+                <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"3px" }}>Cost ($)</label><input type="number" value={editForm.cost||""} onChange={(e)=>setEditForm((f)=>({...f,cost:e.target.value}))} style={inputS} /></div>
+                <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"3px" }}>Billing</label><select value={editForm.billingCycle||"monthly"} onChange={(e)=>setEditForm((f)=>({...f,billingCycle:e.target.value}))} style={inputS}>{BILLING_OPTIONS.map((b)=><option key={b} value={b}>{b}</option>)}</select></div>
+                <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"3px" }}>Link</label><input value={editForm.link||""} onChange={(e)=>setEditForm((f)=>({...f,link:e.target.value}))} style={inputS} /></div>
+                <div style={{ gridColumn:"1/-1" }}><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"3px" }}>Details</label><textarea value={editForm.details||""} onChange={(e)=>setEditForm((f)=>({...f,details:e.target.value}))} rows={2} style={{ ...inputS, resize:"vertical" }} /></div>
+                <div style={{ gridColumn:"1/-1", display:"flex", gap:"8px" }}>
+                  <button onClick={()=>updateMembership(m.id)} style={{ padding:"7px 16px", borderRadius:"8px", border:"none", background:C.accent, color:"#fff", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>Save</button>
+                  <button onClick={()=>setEditingId(null)} style={{ padding:"7px 12px", borderRadius:"8px", border:`1px solid ${C.border}`, background:"none", color:C.muted, fontSize:"13px", cursor:"pointer" }}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:"12px" }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"6px" }}>
+                    <span style={{ fontSize:"15px", fontWeight:"700", color:C.text }}>{m.name}</span>
+                    {m.cost && <span style={{ padding:"2px 8px", borderRadius:"20px", background:`${C.accent}18`, color:C.accent, fontSize:"11px", fontWeight:"700" }}>${m.cost}/{m.billingCycle}</span>}
+                  </div>
+                  {m.details && <div style={{ fontSize:"13px", color:C.muted, lineHeight:"1.5", marginBottom:"6px" }}>{m.details}</div>}
+                  {m.link && <a href={m.link} target="_blank" rel="noopener noreferrer" style={{ fontSize:"12px", color:C.accent, textDecoration:"none" }}>🔗 Visit</a>}
+                </div>
+                {hoverIds.has(m.id) && (
+                  <div style={{ display:"flex", gap:"6px", flexShrink:0 }}>
+                    <button onClick={()=>{ setEditingId(m.id); setEditForm({...m}); }} style={{ padding:"4px 10px", borderRadius:"6px", border:`1px solid ${C.border}`, background:C.cardBg, color:C.muted, fontSize:"12px", cursor:"pointer" }}>Edit</button>
+                    <button onClick={()=>deleteMembership(m.id)} style={{ padding:"4px 10px", borderRadius:"6px", border:"1px solid #FECACA", background:"rgba(239,68,68,0.06)", color:"#EF4444", fontSize:"12px", cursor:"pointer" }}>Delete</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function InternalView({ token }) {
+  const [data, setData] = useState({ hrInfo: "" });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState("hrInfo");
 
   useEffect(() => {
     fetch("/api/internal", { headers: { "x-session": token } })
       .then((r) => r.json())
-      .then((d) => setData(d || { hrInfo: "", contacts: "", membership: "" }))
+      .then((d) => setData(d || { hrInfo: "" }))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [token]);
 
-  const saveField = async (key, value) => {
-    setSaving((s) => ({ ...s, [key]: true }));
+  const saveHrInfo = async (value) => {
+    setSaving(true);
     try {
       const res = await fetch("/api/internal", {
         method: "PUT",
         headers: { "Content-Type": "application/json", "x-session": token },
-        body: JSON.stringify({ [key]: value }),
+        body: JSON.stringify({ hrInfo: value }),
       });
       if (res.ok) {
         const saved = await res.json();
         setData(saved);
       }
     } finally {
-      setSaving((s) => ({ ...s, [key]: false }));
+      setSaving(false);
     }
   };
 
-  const cards = [
-    { key: "hrInfo", label: "HR Info", icon: "🏢", placeholder: "HR policies, benefits, contacts, onboarding info…" },
-    { key: "contacts", label: "Important Contacts", icon: "📞", placeholder: "Key contacts, emergency numbers, vendor contacts…" },
-    { key: "membership", label: "Membership Details", icon: "🏛", placeholder: "Membership tiers, pricing, policies, FAQs…" },
+  const tabs = [
+    { id: "hrInfo", label: "HR Info", icon: "🏢" },
+    { id: "contacts", label: "Important Contacts", icon: "📞" },
+    { id: "membership", label: "Membership Details", icon: "🏛" },
+    { id: "inventory", label: "Inventory 📦", icon: "" },
   ];
 
   if (loading) {
@@ -106,37 +576,51 @@ function InternalView({ token }) {
 
   return (
     <div>
-      <div style={{ marginBottom: "24px" }}>
+      <div style={{ marginBottom: "20px" }}>
         <h1 style={{ margin: "0 0 4px", fontSize: "24px", fontWeight: "800", color: C.text }}>Internal</h1>
-        <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>Internal resources — HR info, contacts, and membership details</p>
+        <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>Internal resources — HR info, contacts, membership details, and inventory</p>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}>
-        {cards.map(({ key, label, icon, placeholder }) => (
-          <div key={key} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", boxShadow: C.shadow }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "18px" }}>{icon}</span>
-                <h2 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: C.text }}>{label}</h2>
-              </div>
-              {saving[key] && <span style={{ fontSize: "11px", color: C.muted }}>Saving…</span>}
-            </div>
-            <textarea
-              value={data[key] || ""}
-              onChange={(e) => setData((d) => ({ ...d, [key]: e.target.value }))}
-              onBlur={(e) => saveField(key, e.target.value)}
-              rows={10}
-              placeholder={placeholder}
-              style={{
-                width: "100%", padding: "10px 12px",
-                border: `1px solid ${C.border}`, borderRadius: "8px",
-                background: C.inputBg, color: C.text,
-                fontSize: "13px", outline: "none", resize: "vertical",
-                fontFamily: "inherit", lineHeight: "1.6", boxSizing: "border-box",
-              }}
-            />
-          </div>
+
+      {/* Tab bar */}
+      <div style={{ display:"flex", gap:"4px", marginBottom:"24px", borderBottom:`1px solid ${C.border}`, paddingBottom:"0" }}>
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            style={{
+              padding:"10px 18px", border:"none", background:"none", cursor:"pointer",
+              fontSize:"14px", fontWeight:"600",
+              color: activeTab === t.id ? C.accent : C.muted,
+              borderBottom:`2px solid ${activeTab === t.id ? C.accent : "transparent"}`,
+              marginBottom:"-1px", transition:"color 0.15s, border-color 0.15s",
+              whiteSpace:"nowrap",
+            }}
+          >
+            {t.icon && t.id !== "inventory" ? `${t.icon} ` : ""}{t.label}
+          </button>
         ))}
       </div>
+
+      {activeTab === "hrInfo" && (
+        <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:"16px", padding:"20px", boxShadow:C.shadow }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"14px" }}>
+            <h2 style={{ margin:0, fontSize:"15px", fontWeight:"700", color:C.text }}>HR Info</h2>
+            {saving && <span style={{ fontSize:"11px", color:C.muted }}>Saving…</span>}
+          </div>
+          <textarea
+            value={data.hrInfo || ""}
+            onChange={(e) => setData((d) => ({ ...d, hrInfo: e.target.value }))}
+            onBlur={(e) => saveHrInfo(e.target.value)}
+            rows={16}
+            placeholder="HR policies, benefits, contacts, onboarding info…"
+            style={{ width:"100%", padding:"10px 12px", border:`1px solid ${C.border}`, borderRadius:"8px", background:C.inputBg, color:C.text, fontSize:"13px", outline:"none", resize:"vertical", fontFamily:"inherit", lineHeight:"1.6", boxSizing:"border-box" }}
+          />
+        </div>
+      )}
+
+      {activeTab === "contacts" && <ContactsTab token={token} />}
+      {activeTab === "membership" && <MembershipsTab token={token} />}
+      {activeTab === "inventory" && <InventoryTab token={token} />}
     </div>
   );
 }
@@ -250,6 +734,51 @@ function NavBtn({ icon, label, active, onClick, title, sidebarOpen }) {
   );
 }
 
+// ─── Draggable Nav Item ──────────────────────────────────────────────────────
+
+function DraggableNavItem({ v, idx, active, sidebarOpen, dragIndexRef, orderedContentViews, onNavigate, onReorder }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <div
+      draggable
+      onDragStart={() => { dragIndexRef.current = idx; }}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={() => {
+        const from = dragIndexRef.current;
+        if (from === null || from === idx) return;
+        const newOrder = [...orderedContentViews];
+        const [moved] = newOrder.splice(from, 1);
+        newOrder.splice(idx, 0, moved);
+        onReorder(newOrder.map((cv) => cv.id));
+        dragIndexRef.current = null;
+      }}
+      style={{ display: "flex", alignItems: "center", gap: "2px" }}
+    >
+      {sidebarOpen && (
+        <span style={{ fontSize: "11px", color: C.muted, opacity: 0.4, flexShrink: 0, userSelect: "none", cursor: "grab", padding: "0 2px" }}>⠿</span>
+      )}
+      <button
+        onClick={onNavigate}
+        title={!sidebarOpen ? v.label : undefined}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        style={{
+          flex: 1, display: "flex", alignItems: "center", gap: "10px",
+          padding: "9px 10px", borderRadius: "8px", border: "none",
+          background: active ? C.accentLight : hov ? C.hover : "transparent",
+          color: active ? C.accentBright : C.muted,
+          fontSize: "13px", fontWeight: active ? "600" : "400",
+          cursor: "pointer", transition: "all 0.15s", textAlign: "left",
+          marginBottom: "2px", whiteSpace: "nowrap", overflow: "hidden",
+        }}
+      >
+        <span style={{ fontSize: "16px", flexShrink: 0 }}>{v.icon}</span>
+        {sidebarOpen && v.label}
+      </button>
+    </div>
+  );
+}
+
 // ─── Main export ─────────────────────────────────────────────────────────────
 
 export default function ContentScheduler() {
@@ -275,6 +804,15 @@ export default function ContentScheduler() {
   const [listFilters, setListFilters] = useState({});
   const [ideas, setIdeas] = useState([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [assets, setAssets] = useState([]);
+  const [slackChannels, setSlackChannels] = useState([]);
+  const [contentViewOrder, setContentViewOrder] = useState(() => {
+    try {
+      const s = typeof window !== "undefined" ? localStorage.getItem("tcf_nav_order") : null;
+      return s ? JSON.parse(s) : null;
+    } catch { return null; }
+  });
+  const dragIndexRef = useRef(null);
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -342,16 +880,20 @@ export default function ContentScheduler() {
     if (!authToken) return;
     setLoading(true);
     try {
-      const [postsRes, campaignsRes, teamRes, goalsRes] = await Promise.all([
+      const [postsRes, campaignsRes, teamRes, goalsRes, assetsRes, channelsRes] = await Promise.all([
         authFetch("/api/scheduler"),
         authFetch("/api/scheduler?type=campaigns"),
         authFetch("/api/team"),
         authFetch("/api/goals"),
+        authFetch("/api/assets"),
+        authFetch("/api/slack/channels"),
       ]);
       if (postsRes.ok) setPosts(await postsRes.json());
       if (campaignsRes.ok) setCampaigns(await campaignsRes.json());
       if (teamRes.ok) setTeamMembers(await teamRes.json());
       if (goalsRes.ok) setGoals(await goalsRes.json());
+      if (assetsRes.ok) setAssets(await assetsRes.json());
+      if (channelsRes.ok) setSlackChannels(await channelsRes.json());
       const ideasRes = await authFetch("/api/ideas");
       if (ideasRes.ok) setIdeas(await ideasRes.json());
     } catch {
@@ -514,6 +1056,17 @@ export default function ContentScheduler() {
   }
 
   // Derived workspace owner name for top bar
+  const orderedContentViews = (() => {
+    if (!contentViewOrder) return CONTENT_VIEWS;
+    const ordered = [];
+    contentViewOrder.forEach((id) => {
+      const v = CONTENT_VIEWS.find((cv) => cv.id === id);
+      if (v) ordered.push(v);
+    });
+    CONTENT_VIEWS.forEach((v) => { if (!ordered.find((o) => o.id === v.id)) ordered.push(v); });
+    return ordered;
+  })();
+
   const effectiveViewingUserId = viewingUserId || currentUser?.id;
   const viewingUser = viewingUserId
     ? teamMembers.find((m) => m.id === viewingUserId)
@@ -628,14 +1181,20 @@ export default function ContentScheduler() {
           {/* ── CONTENT section ── */}
           <SidebarSectionLabel label="Content" visible={sidebarOpen} />
 
-          {CONTENT_VIEWS.map((v) => (
-            <NavBtn
+          {orderedContentViews.map((v, idx) => (
+            <DraggableNavItem
               key={v.id}
-              icon={v.icon}
-              label={v.label}
+              v={v}
+              idx={idx}
               active={view === v.id}
-              onClick={() => { setView(v.id); setViewingUserId(null); }}
               sidebarOpen={sidebarOpen}
+              dragIndexRef={dragIndexRef}
+              orderedContentViews={orderedContentViews}
+              onNavigate={() => { setView(v.id); setViewingUserId(null); }}
+              onReorder={(ids) => {
+                setContentViewOrder(ids);
+                try { localStorage.setItem("tcf_nav_order", JSON.stringify(ids)); } catch {}
+              }}
             />
           ))}
 
@@ -837,6 +1396,8 @@ export default function ContentScheduler() {
                   viewingUserId={effectiveViewingUserId}
                   teamMembers={teamMembers}
                   assignedPosts={assignedPostsForViewer}
+                  assignedAssets={assets.filter((a) => a.assignedTo === effectiveViewingUserId)}
+                  assignedSlackChannels={slackChannels.filter((c) => c.assignedTo === effectiveViewingUserId)}
                 />
               )}
               {view === "profile" && (
