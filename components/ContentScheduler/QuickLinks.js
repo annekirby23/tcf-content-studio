@@ -447,24 +447,24 @@ export default function QuickLinks({ currentUser, token }) {
   async function handleEditSave(form) {
     setModalSaving(true);
     try {
-      const res = await fetch("/api/quicklinks", {
-        method: "PUT",
-        headers: authHeaders(),
-        body: JSON.stringify({
-          id: editTarget.id,
-          name: form.name.trim(),
-          url: form.url.trim(),
-          emoji: form.emoji.trim() || "🔗",
-          description: form.description.trim(),
-          category: form.category.trim() || "General",
-        }),
-      });
+      const isDefault = editTarget.id.startsWith("default-");
+      const method = isDefault ? "POST" : "PUT";
+      const body = isDefault
+        ? { name: form.name.trim(), url: form.url.trim(), emoji: form.emoji.trim() || "🔗", description: form.description.trim(), category: form.category.trim() || "General" }
+        : { id: editTarget.id, name: form.name.trim(), url: form.url.trim(), emoji: form.emoji.trim() || "🔗", description: form.description.trim(), category: form.category.trim() || "General" };
+
+      const res = await fetch("/api/quicklinks", { method, headers: authHeaders(), body: JSON.stringify(body) });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Failed to update link");
       }
-      const updated = await res.json();
-      setLinks((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+      const saved = await res.json();
+      setLinks((prev) => {
+        const updated = prev.map((l) => (l.id === editTarget.id ? saved : l));
+        // If we were using defaults, switching to real links now
+        setUsingDefaults(false);
+        return updated;
+      });
       setEditTarget(null);
     } catch (e) {
       alert(e.message || "Failed to update link");
@@ -476,13 +476,15 @@ export default function QuickLinks({ currentUser, token }) {
   async function handleDeleteConfirm() {
     if (!deleteTarget) return;
     try {
-      const res = await fetch(`/api/quicklinks?id=${encodeURIComponent(deleteTarget.id)}`, {
-        method: "DELETE",
-        headers: authHeaders(),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Failed to delete link");
+      if (!deleteTarget.id.startsWith("default-")) {
+        const res = await fetch(`/api/quicklinks?id=${encodeURIComponent(deleteTarget.id)}`, {
+          method: "DELETE",
+          headers: authHeaders(),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to delete link");
+        }
       }
       setLinks((prev) => {
         const next = prev.filter((l) => l.id !== deleteTarget.id);
@@ -615,7 +617,7 @@ export default function QuickLinks({ currentUser, token }) {
             <LinkCard
               key={link.id}
               link={link}
-              isAdmin={isAdmin && !usingDefaults}
+              isAdmin={isAdmin}
               onEdit={(l) => setEditTarget(l)}
               onDelete={(l) => setDeleteTarget(l)}
             />
