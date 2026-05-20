@@ -23,6 +23,7 @@ import TCFInfoView from "./TCFInfoView";
 import LocationsView from "./LocationsView";
 import MemberJourneyView from "./MemberJourneyView";
 import BulletinBoardView from "./BulletinBoardView";
+import ReportingView from "./ReportingView";
 
 const TOKEN_KEY = "tcf_session";
 
@@ -36,6 +37,24 @@ const CONTENT_VIEWS = [
 ];
 
 const INTERNAL_VIEW = { id: "internal", label: "Internal", icon: "🔒" };
+
+const DEFAULT_TCF_HUB_VIEWS = [
+  { id: "tcfinfo",      icon: "🏫", label: "About TCF" },
+  { id: "memberjourney",icon: "🗺️", label: "Member Journey" },
+  { id: "events",       icon: "📅", label: "Event Planning" },
+  { id: "slack",        icon: "💬", label: "Slack" },
+  { id: "bulletin",     icon: "📋", label: "Bulletin Board" },
+  { id: "reporting",    icon: "📊", label: "Reports" },
+];
+
+const DEFAULT_INTERNAL_VIEWS = [
+  { id: "internal",    icon: "🔒", label: "Internal" },
+  { id: "memberships", icon: "🏛",  label: "Memberships" },
+  { id: "locations",   icon: "📍", label: "Locations" },
+  { id: "inventory",   icon: "📦", label: "Inventory" },
+  { id: "teamtasks",   icon: "✅", label: "Task Tracker" },
+  { id: "training",    icon: "🎓", label: "Training" },
+];
 
 // ─── Avatar helpers ──────────────────────────────────────────────────────────
 
@@ -327,13 +346,13 @@ function InventoryTab({ token, currentUser }) {
         const renderSection = (label, emoji, sectionItems, accentColor) => {
           if (sectionItems.length === 0) return null;
           return (
-            <div style={{ marginBottom:"20px" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px" }}>
-                <span style={{ fontSize:"16px" }}>{emoji}</span>
-                <span style={{ fontSize:"13px", fontWeight:"700", color: C.text }}>{label}</span>
-                <span style={{ fontSize:"11px", color:C.muted, padding:"1px 8px", borderRadius:"10px", background:C.cardBg, border:`1px solid ${C.border}` }}>{sectionItems.length} item{sectionItems.length!==1?"s":""}</span>
+            <div style={{ marginBottom:"28px", background: C.card, borderRadius:"16px", border:`1px solid ${C.border}`, boxShadow: C.shadow, overflow:"hidden" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:"10px", padding:"16px 20px", borderBottom:`1px solid ${C.border}`, background: accentColor + "10", borderTop:`4px solid ${accentColor}` }}>
+                <span style={{ fontSize:"20px" }}>{emoji}</span>
+                <span style={{ fontSize:"15px", fontWeight:"800", color: C.text }}>{label}</span>
+                <span style={{ fontSize:"11px", color: accentColor, padding:"2px 10px", borderRadius:"10px", background: accentColor + "20", fontWeight:"700", marginLeft:"auto" }}>{sectionItems.length} item{sectionItems.length!==1?"s":""}</span>
               </div>
-              <div style={{ border:`1px solid ${C.border}`, borderRadius:"12px", overflow:"hidden", borderTop:`3px solid ${accentColor}` }}>
+              <div style={{ border:"none", borderRadius:"0", overflow:"hidden" }}>
                 <div style={{ display:"grid", gridTemplateColumns:"2fr 90px 130px 1fr 130px 70px 1fr 60px 60px", background:C.cardBg, borderBottom:`1px solid ${C.border}`, padding:"0 8px" }}>
                   {tableHeaders.map((h,i)=>(<div key={i} style={{ padding:"10px 8px", fontSize:"11px", fontWeight:"700", textTransform:"uppercase", letterSpacing:"0.05em", color:C.muted }}>{h}</div>))}
                 </div>
@@ -1031,8 +1050,9 @@ function NavBtn({ icon, label, active, onClick, title, sidebarOpen }) {
 
 // ─── Draggable Nav Item ──────────────────────────────────────────────────────
 
-function DraggableNavItem({ v, idx, active, sidebarOpen, dragIndexRef, orderedContentViews, onNavigate, onReorder }) {
+function DraggableNavItem({ v, idx, active, sidebarOpen, dragIndexRef, orderedContentViews, orderedItems, onNavigate, onReorder }) {
   const [hov, setHov] = useState(false);
+  const items = orderedItems || orderedContentViews;
   return (
     <div
       draggable
@@ -1041,7 +1061,7 @@ function DraggableNavItem({ v, idx, active, sidebarOpen, dragIndexRef, orderedCo
       onDrop={() => {
         const from = dragIndexRef.current;
         if (from === null || from === idx) return;
-        const newOrder = [...orderedContentViews];
+        const newOrder = [...items];
         const [moved] = newOrder.splice(from, 1);
         newOrder.splice(idx, 0, moved);
         onReorder(newOrder.map((cv) => cv.id));
@@ -1116,6 +1136,13 @@ export default function ContentScheduler() {
   const [tcfHubCollapsed, setTcfHubCollapsed] = useState(false);
   const [contentCollapsed, setContentCollapsed] = useState(false);
   const [internalCollapsed, setInternalCollapsed] = useState(false);
+
+  const [tcfHubViewOrder, setTcfHubViewOrder] = useState(() => {
+    try { const s = typeof window !== "undefined" ? localStorage.getItem("tcf_tcfhub_order") : null; return s ? JSON.parse(s) : null; } catch { return null; }
+  });
+  const [internalViewOrder, setInternalViewOrder] = useState(() => {
+    try { const s = typeof window !== "undefined" ? localStorage.getItem("tcf_internal_order") : null; return s ? JSON.parse(s) : null; } catch { return null; }
+  });
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -1383,6 +1410,28 @@ export default function ContentScheduler() {
     return ordered;
   })();
 
+  const orderedTcfHubViews = (() => {
+    if (!tcfHubViewOrder) return DEFAULT_TCF_HUB_VIEWS;
+    const ordered = [];
+    tcfHubViewOrder.forEach((id) => {
+      const v = DEFAULT_TCF_HUB_VIEWS.find((cv) => cv.id === id);
+      if (v) ordered.push(v);
+    });
+    DEFAULT_TCF_HUB_VIEWS.forEach((v) => { if (!ordered.find((o) => o.id === v.id)) ordered.push(v); });
+    return ordered;
+  })();
+
+  const orderedInternalViews = (() => {
+    if (!internalViewOrder) return DEFAULT_INTERNAL_VIEWS;
+    const ordered = [];
+    internalViewOrder.forEach((id) => {
+      const v = DEFAULT_INTERNAL_VIEWS.find((cv) => cv.id === id);
+      if (v) ordered.push(v);
+    });
+    DEFAULT_INTERNAL_VIEWS.forEach((v) => { if (!ordered.find((o) => o.id === v.id)) ordered.push(v); });
+    return ordered;
+  })();
+
   const effectiveViewingUserId = viewingUserId || currentUser?.id;
   const viewingUser = viewingUserId
     ? teamMembers.find((m) => m.id === viewingUserId)
@@ -1404,6 +1453,7 @@ export default function ContentScheduler() {
     { id: "memberjourney", label: "Member Journey" },
     { id: "locations", label: "Locations" },
     { id: "bulletin", label: "Bulletin Board" },
+    { id: "reporting", label: "Reports" },
   ];
   const topBarTitle = view === "mydash"
     ? workspaceTitle
@@ -1577,49 +1627,22 @@ export default function ContentScheduler() {
           {/* ── TCF HUB section ── */}
           <SidebarSectionLabel label="TCF Hub" visible={sidebarOpen} collapsed={tcfHubCollapsed} onToggle={() => setTcfHubCollapsed((v) => !v)} />
 
-          {!tcfHubCollapsed && (
-            <>
-              <NavBtn
-                icon="🏫"
-                label="About TCF"
-                active={view === "tcfinfo"}
-                onClick={() => navigate("tcfinfo")}
-                sidebarOpen={sidebarOpen}
-              />
-
-              <NavBtn
-                icon="🗺️"
-                label="Member Journey"
-                active={view === "memberjourney"}
-                onClick={() => navigate("memberjourney")}
-                sidebarOpen={sidebarOpen}
-              />
-
-              <NavBtn
-                icon="📅"
-                label="Event Planning"
-                active={view === "events"}
-                onClick={() => navigate("events")}
-                sidebarOpen={sidebarOpen}
-              />
-
-              <NavBtn
-                icon="💬"
-                label="Slack"
-                active={view === "slack"}
-                onClick={() => navigate("slack")}
-                sidebarOpen={sidebarOpen}
-              />
-
-              <NavBtn
-                icon="📋"
-                label="Bulletin Board"
-                active={view === "bulletin"}
-                onClick={() => navigate("bulletin")}
-                sidebarOpen={sidebarOpen}
-              />
-            </>
-          )}
+          {!tcfHubCollapsed && orderedTcfHubViews.map((v, idx) => (
+            <DraggableNavItem
+              key={v.id}
+              v={v}
+              idx={idx}
+              active={view === v.id}
+              sidebarOpen={sidebarOpen}
+              dragIndexRef={dragIndexRef}
+              orderedItems={orderedTcfHubViews}
+              onNavigate={() => navigate(v.id)}
+              onReorder={(ids) => {
+                setTcfHubViewOrder(ids);
+                try { localStorage.setItem("tcf_tcfhub_order", JSON.stringify(ids)); } catch {}
+              }}
+            />
+          ))}
 
           {/* ── CONTENT section ── */}
           <SidebarSectionLabel label="Content & Marketing" visible={sidebarOpen} collapsed={contentCollapsed} onToggle={() => setContentCollapsed((v) => !v)} />
@@ -1695,57 +1718,22 @@ export default function ContentScheduler() {
           {/* ── INTERNAL section ── */}
           <SidebarSectionLabel label="Internal" visible={sidebarOpen} collapsed={internalCollapsed} onToggle={() => setInternalCollapsed((v) => !v)} />
 
-          {!internalCollapsed && (
-            <>
-              <NavBtn
-                icon={INTERNAL_VIEW.icon}
-                label={INTERNAL_VIEW.label}
-                active={view === "internal"}
-                onClick={() => navigate("internal")}
-                sidebarOpen={sidebarOpen}
-              />
-
-              <NavBtn
-                icon="🏛"
-                label="Memberships"
-                active={view === "memberships"}
-                onClick={() => navigate("memberships")}
-                sidebarOpen={sidebarOpen}
-              />
-
-              <NavBtn
-                icon="📍"
-                label="Locations"
-                active={view === "locations"}
-                onClick={() => navigate("locations")}
-                sidebarOpen={sidebarOpen}
-              />
-
-              <NavBtn
-                icon="📦"
-                label="Inventory"
-                active={view === "inventory"}
-                onClick={() => navigate("inventory")}
-                sidebarOpen={sidebarOpen}
-              />
-
-              <NavBtn
-                icon="✅"
-                label="Task Tracker"
-                active={view === "teamtasks"}
-                onClick={() => navigate("teamtasks")}
-                sidebarOpen={sidebarOpen}
-              />
-
-              <NavBtn
-                icon="🎓"
-                label="Training"
-                active={view === "training"}
-                onClick={() => navigate("training")}
-                sidebarOpen={sidebarOpen}
-              />
-            </>
-          )}
+          {!internalCollapsed && orderedInternalViews.map((v, idx) => (
+            <DraggableNavItem
+              key={v.id}
+              v={v}
+              idx={idx}
+              active={view === v.id}
+              sidebarOpen={sidebarOpen}
+              dragIndexRef={dragIndexRef}
+              orderedItems={orderedInternalViews}
+              onNavigate={() => navigate(v.id)}
+              onReorder={(ids) => {
+                setInternalViewOrder(ids);
+                try { localStorage.setItem("tcf_internal_order", JSON.stringify(ids)); } catch {}
+              }}
+            />
+          ))}
 
           {/* ── Admin tools ── */}
           <div style={{ borderTop: `1px solid ${C.border}`, margin: "10px 0", padding: "10px 0 0" }}>
@@ -1907,6 +1895,7 @@ export default function ContentScheduler() {
               {view === "list" && <ListView key={JSON.stringify(listFilters)} posts={posts} campaigns={campaigns} onEdit={openEdit} onNewPost={() => openNew()} initialFilters={listFilters} />}
               {view === "slack" && <SlackPlanner currentUser={currentUser} token={authToken} onMakePost={handleMakePost} teamMembers={teamMembers} />}
               {view === "bulletin" && <BulletinBoardView token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
+              {view === "reporting" && <ReportingView token={authToken} teamMembers={teamMembers} />}
               {view === "links" && <QuickLinks currentUser={currentUser} token={authToken} />}
               {view === "assets" && <AssetTracker currentUser={currentUser} token={authToken} teamMembers={teamMembers} />}
               {view === "mydash" && (

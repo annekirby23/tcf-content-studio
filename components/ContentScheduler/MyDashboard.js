@@ -2048,6 +2048,7 @@ function LocationAndEventTasksBar({ token, userId, onNavigate }) {
   const [myLocation, setMyLocation] = useState(null);
   const [eventTasks, setEventTasks] = useState([]);
   const [teamTasks, setTeamTasks] = useState([]);
+  const [assignedTeamTasks, setAssignedTeamTasks] = useState([]);
   const [journeyStages, setJourneyStages] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -2084,6 +2085,14 @@ function LocationAndEventTasksBar({ token, userId, onNavigate }) {
         setTeamTasks(locTasks);
       }
 
+      // Team tasks directly assigned to this user (not done)
+      if (Array.isArray(teamTasksData)) {
+        const myAssigned = teamTasksData.filter((t) =>
+          t.status !== "done" && (t.assignees || []).some((a) => a.id === userId)
+        );
+        setAssignedTeamTasks(myAssigned);
+      }
+
       // Journey stages assigned to this user
       if (journeyData?.stages) {
         const myStages = journeyData.stages.filter((s) => (s.assignedMembers || []).some((m) => m.id === userId));
@@ -2092,7 +2101,7 @@ function LocationAndEventTasksBar({ token, userId, onNavigate }) {
     }).finally(() => setLoading(false));
   }, [token, userId]);
 
-  const hasContent = myLocation || eventTasks.length > 0 || journeyStages.length > 0;
+  const hasContent = myLocation || eventTasks.length > 0 || journeyStages.length > 0 || assignedTeamTasks.length > 0;
   if (loading || !hasContent) return null;
 
   return (
@@ -2148,6 +2157,40 @@ function LocationAndEventTasksBar({ token, userId, onNavigate }) {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Assigned Team Tasks */}
+      {assignedTeamTasks.length > 0 && (
+        <div style={{ flex: "1 1 280px", minWidth: "260px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px 20px", boxShadow: C.shadow }}>
+          <div
+            onClick={() => onNavigate && onNavigate("teamtasks")}
+            style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px", cursor: onNavigate ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+          >
+            <span>✅ My Assigned Tasks</span>
+            {onNavigate && <span style={{ fontSize: "10px", color: C.accent, fontWeight: "600" }}>View all →</span>}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
+            {assignedTeamTasks.slice(0, 5).map((task) => {
+              const isOverdue = task.dueDate && task.dueDate < new Date().toISOString().split("T")[0];
+              const priColors = { high: "#EF4444", medium: "#F59E0B", low: "#10B981", critical: "#7C3AED" };
+              const borderColor = priColors[task.priority] || C.accent;
+              return (
+                <div
+                  key={task.id}
+                  onClick={() => onNavigate && onNavigate("teamtasks")}
+                  style={{ padding: "8px 10px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}`, borderLeft: `3px solid ${borderColor}`, cursor: onNavigate ? "pointer" : "default" }}
+                >
+                  <div style={{ fontSize: "12px", color: C.text, fontWeight: "500", wordBreak: "break-word", marginBottom: "3px" }}>{task.text}</div>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    {task.dueDate && <span style={{ fontSize: "10px", color: isOverdue ? "#EF4444" : C.muted, fontWeight: isOverdue ? "700" : "400" }}>{isOverdue ? "⚠ " : ""}Due {task.dueDate}</span>}
+                    {(task.locations || []).length > 0 && <span style={{ fontSize: "10px", color: C.muted }}>📍 {task.locations[0]}</span>}
+                  </div>
+                </div>
+              );
+            })}
+            {assignedTeamTasks.length > 5 && <div style={{ fontSize: "11px", color: C.muted, textAlign: "center", marginTop: "2px" }}>+{assignedTeamTasks.length - 5} more</div>}
           </div>
         </div>
       )}
