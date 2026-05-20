@@ -2520,6 +2520,7 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
 
       {/* ── AI Daily Briefing ── */}
       <WorkspaceAISummary
+        key={effectiveViewingUserId}
         token={token}
         currentUser={currentUser}
         viewingUserId={effectiveViewingUserId}
