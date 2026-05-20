@@ -276,197 +276,9 @@ const TABS = [
   { id: "contentTypes", label: "Content Types" },
   { id: "platforms", label: "Platforms" },
   { id: "pillars", label: "Content Pillars" },
-  { id: "bugreports", label: "🐛 Bug Reports" },
 ];
 
-// ─── Bug Reports Tab ──────────────────────────────────────────────────────────
-
-const BUG_PRIORITY = [
-  { value: "low",      label: "Low",      color: "#10B981" },
-  { value: "medium",   label: "Medium",   color: "#F59E0B" },
-  { value: "high",     label: "High",     color: "#EF4444" },
-  { value: "critical", label: "Critical", color: "#7C3AED" },
-];
-const BUG_STATUS = [
-  { value: "open",        label: "Open",        color: "#3B82F6" },
-  { value: "in_progress", label: "In Progress", color: "#F59E0B" },
-  { value: "resolved",    label: "Resolved",    color: "#10B981" },
-];
-
-function BugReportsTab({ token, currentUser, isAdmin }) {
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState("medium");
-  const [saving, setSaving] = useState(false);
-  const [expandedId, setExpandedId] = useState(null);
-  const [editingNote, setEditingNote] = useState({});
-
-  const inputStyle = { width: "100%", padding: "8px 10px", border: `1px solid ${C.border}`, borderRadius: "7px", background: C.inputBg, color: C.text, fontSize: "13px", outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
-
-  useEffect(() => {
-    fetch("/api/bugreports", { headers: { "x-session": token } })
-      .then((r) => r.json())
-      .then((d) => setReports(Array.isArray(d) ? d : []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [token]);
-
-  const submit = async () => {
-    if (!title.trim()) return;
-    setSaving(true);
-    try {
-      const res = await fetch("/api/bugreports", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-session": token },
-        body: JSON.stringify({ title, description, priority }),
-      });
-      const newReport = await res.json();
-      setReports((prev) => [newReport, ...prev]);
-      setTitle(""); setDescription(""); setPriority("medium"); setShowForm(false);
-    } finally { setSaving(false); }
-  };
-
-  const updateStatus = async (id, status) => {
-    try {
-      const res = await fetch("/api/bugreports", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "x-session": token },
-        body: JSON.stringify({ id, status }),
-      });
-      const updated = await res.json();
-      setReports((prev) => prev.map((r) => r.id === id ? updated : r));
-    } catch {}
-  };
-
-  const saveNote = async (id) => {
-    try {
-      const res = await fetch("/api/bugreports", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "x-session": token },
-        body: JSON.stringify({ id, adminNote: editingNote[id] }),
-      });
-      const updated = await res.json();
-      setReports((prev) => prev.map((r) => r.id === id ? updated : r));
-    } catch {}
-  };
-
-  const deleteReport = async (id) => {
-    if (!window.confirm("Delete this bug report?")) return;
-    try {
-      await fetch("/api/bugreports", { method: "DELETE", headers: { "Content-Type": "application/json", "x-session": token }, body: JSON.stringify({ id }) });
-      setReports((prev) => prev.filter((r) => r.id !== id));
-    } catch {}
-  };
-
-  const openCount = reports.filter((r) => r.status !== "resolved").length;
-
-  return (
-    <div>
-      {/* Submit form toggle */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-        <div style={{ fontSize: "13px", color: C.muted }}>{openCount} open report{openCount !== 1 ? "s" : ""}</div>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          style={{ padding: "7px 14px", borderRadius: "8px", border: "none", background: showForm ? C.border : C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
-        >
-          {showForm ? "Cancel" : "+ Report a Bug"}
-        </button>
-      </div>
-
-      {showForm && (
-        <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", marginBottom: "16px" }}>
-          <div style={{ marginBottom: "10px" }}>
-            <label style={{ fontSize: "11px", color: C.muted, fontWeight: "600", display: "block", marginBottom: "4px" }}>Title *</label>
-            <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Brief description of the issue…" style={inputStyle} />
-          </div>
-          <div style={{ marginBottom: "10px" }}>
-            <label style={{ fontSize: "11px", color: C.muted, fontWeight: "600", display: "block", marginBottom: "4px" }}>Details (optional)</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Steps to reproduce, what you expected vs what happened…" style={{ ...inputStyle, resize: "vertical", lineHeight: "1.6" }} />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
-            <div style={{ display: "flex", gap: "6px" }}>
-              {BUG_PRIORITY.map((p) => (
-                <button key={p.value} onClick={() => setPriority(p.value)} style={{ padding: "4px 10px", borderRadius: "20px", border: `1px solid ${priority === p.value ? p.color : C.border}`, background: priority === p.value ? p.color + "20" : "transparent", color: priority === p.value ? p.color : C.muted, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}>
-                  {p.label}
-                </button>
-              ))}
-            </div>
-            <button onClick={submit} disabled={!title.trim() || saving} style={{ padding: "7px 16px", borderRadius: "7px", border: "none", background: title.trim() ? C.accent : C.border, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: title.trim() ? "pointer" : "not-allowed" }}>
-              {saving ? "Submitting…" : "Submit Report"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {loading ? (
-        <div style={{ padding: "24px 0", color: C.muted, fontSize: "13px" }}>Loading…</div>
-      ) : reports.length === 0 ? (
-        <div style={{ padding: "32px 0", textAlign: "center", color: C.muted, fontSize: "13px" }}>No bug reports yet. 🎉</div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          {reports.map((r) => {
-            const priCfg = BUG_PRIORITY.find((p) => p.value === r.priority) || BUG_PRIORITY[1];
-            const stCfg = BUG_STATUS.find((s) => s.value === r.status) || BUG_STATUS[0];
-            const expanded = expandedId === r.id;
-            return (
-              <div key={r.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${priCfg.color}`, borderRadius: "9px", padding: "12px 14px" }}>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "13px", fontWeight: "600", color: r.status === "resolved" ? C.muted : C.text, textDecoration: r.status === "resolved" ? "line-through" : "none", cursor: "pointer" }} onClick={() => setExpandedId(expanded ? null : r.id)}>{r.title}</div>
-                    <div style={{ display: "flex", gap: "8px", marginTop: "4px", flexWrap: "wrap", alignItems: "center" }}>
-                      <span style={{ fontSize: "10px", padding: "1px 7px", borderRadius: "10px", background: priCfg.color + "20", color: priCfg.color, fontWeight: "700" }}>{priCfg.label}</span>
-                      <span style={{ fontSize: "10px", color: C.muted }}>by {r.submittedBy}</span>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-                    {isAdmin ? (
-                      <select
-                        value={r.status}
-                        onChange={(e) => updateStatus(r.id, e.target.value)}
-                        style={{ padding: "3px 8px", borderRadius: "7px", border: `1px solid ${C.border}`, background: stCfg.color + "20", color: stCfg.color, fontSize: "11px", fontWeight: "600", outline: "none", cursor: "pointer", fontFamily: "inherit" }}
-                      >
-                        {BUG_STATUS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                      </select>
-                    ) : (
-                      <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "10px", background: stCfg.color + "20", color: stCfg.color, fontWeight: "700" }}>{stCfg.label}</span>
-                    )}
-                    {isAdmin && (
-                      <button onClick={() => deleteReport(r.id)} style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer", fontSize: "13px", padding: "2px" }}>🗑</button>
-                    )}
-                  </div>
-                </div>
-                {expanded && (
-                  <div style={{ marginTop: "10px", borderTop: `1px solid ${C.border}`, paddingTop: "10px" }}>
-                    {r.description && <div style={{ fontSize: "12px", color: C.muted, lineHeight: "1.7", marginBottom: "10px", whiteSpace: "pre-wrap" }}>{r.description}</div>}
-                    {isAdmin && (
-                      <div>
-                        <label style={{ fontSize: "11px", color: C.muted, fontWeight: "600", display: "block", marginBottom: "4px" }}>Admin Note</label>
-                        <div style={{ display: "flex", gap: "8px" }}>
-                          <input
-                            value={editingNote[r.id] !== undefined ? editingNote[r.id] : (r.adminNote || "")}
-                            onChange={(e) => setEditingNote((n) => ({ ...n, [r.id]: e.target.value }))}
-                            placeholder="Add a note for the team…"
-                            style={{ ...inputStyle, flex: 1 }}
-                          />
-                          <button onClick={() => saveNote(r.id)} style={{ padding: "6px 12px", borderRadius: "7px", border: "none", background: C.accent, color: "#fff", fontSize: "11px", fontWeight: "600", cursor: "pointer", flexShrink: 0 }}>Save</button>
-                        </div>
-                        {r.adminNote && <div style={{ fontSize: "12px", color: C.accent, marginTop: "6px" }}>📝 {r.adminNote}</div>}
-                      </div>
-                    )}
-                    {!isAdmin && r.adminNote && <div style={{ fontSize: "12px", color: C.accent, marginTop: "6px" }}>📝 Admin note: {r.adminNote}</div>}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
+// Bug Reports tab removed — moved to BugReportsView.js as a standalone sidebar page.
 
 export default function SettingsModal({ token, currentUser, onClose, onSettingsUpdate }) {
   const [activeTab, setActiveTab] = useState("themes");
@@ -553,7 +365,7 @@ export default function SettingsModal({ token, currentUser, onClose, onSettingsU
           ))}
         </div>
 
-        {!isAdmin && activeTab !== "bugreports" && (
+        {!isAdmin && (
           <div style={{ background: "#FEF3C7", borderBottom: `1px solid #FDE68A`, padding: "10px 24px", fontSize: 13, color: "#92400E" }}>
             Read-only — admin role required to make changes.
           </div>
@@ -561,7 +373,7 @@ export default function SettingsModal({ token, currentUser, onClose, onSettingsU
 
         {/* Tab content */}
         <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
-          {loading[activeTab] && activeTab !== "bugreports" ? (
+          {loading[activeTab] ? (
             <div style={{ color: C.muted, fontSize: 14, padding: "24px 0" }}>Loading…</div>
           ) : (
             <>
@@ -577,9 +389,7 @@ export default function SettingsModal({ token, currentUser, onClose, onSettingsU
               {activeTab === "pillars" && (
                 <SimpleListTab items={data.pillars} isAdmin={isAdmin} saving={saving.pillars} onSave={(updated) => handleSave("pillars", updated)} />
               )}
-              {activeTab === "bugreports" && (
-                <BugReportsTab token={token} currentUser={currentUser} isAdmin={isAdmin} />
-              )}
+
             </>
           )}
         </div>

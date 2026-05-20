@@ -71,6 +71,21 @@ export async function PUT(req) {
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
+
+    // ── Bulk reorder ────────────────────────────────────────────────────────────
+    if (body.bulkReorder) {
+      const orderedIds = body.bulkReorder;
+      const items = (await kvGet(KEY)) || [];
+      const reordered = orderedIds
+        .map((id) => items.find((i) => i.id === id))
+        .filter(Boolean);
+      // Append any items not in the reorder list (shouldn't normally happen)
+      items.forEach((i) => { if (!orderedIds.includes(i.id)) reordered.push(i); });
+      await kvSet(KEY, reordered);
+      return Response.json(reordered);
+    }
+
+    // ── Single item update ──────────────────────────────────────────────────────
     if (!body.id) return Response.json({ error: "id is required" }, { status: 400 });
 
     const items = (await kvGet(KEY)) || [];

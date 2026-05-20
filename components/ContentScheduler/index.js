@@ -24,6 +24,8 @@ import LocationsView from "./LocationsView";
 import MemberJourneyView from "./MemberJourneyView";
 import BulletinBoardView from "./BulletinBoardView";
 import ReportingView from "./ReportingView";
+import BugReportsView from "./BugReportsView";
+import InventoryView from "./InventoryView";
 
 const TOKEN_KEY = "tcf_session";
 
@@ -1741,8 +1743,22 @@ export default function ContentScheduler() {
             />
           ))}
 
-          {/* ── Admin tools ── */}
+          {/* ── Bug Reports (all users) ── */}
           <div style={{ borderTop: `1px solid ${C.border}`, margin: "10px 0", padding: "10px 0 0" }}>
+            <button
+              onClick={() => navigate("bugreports")}
+              title={!sidebarOpen ? "Bug Reports" : undefined}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "9px 10px", borderRadius: "8px", border: "none", background: view === "bugreports" ? C.accentLight : "transparent", color: view === "bugreports" ? C.accentBright : C.muted, fontSize: "13px", fontWeight: view === "bugreports" ? "600" : "400", cursor: "pointer", transition: "all 0.15s", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}
+              onMouseEnter={(e) => { if (view !== "bugreports") e.currentTarget.style.background = C.hover; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = view === "bugreports" ? C.accentLight : "transparent"; }}
+            >
+              <span style={{ fontSize: "16px", flexShrink: 0 }}>🐛</span>
+              {sidebarOpen && "Bug Reports"}
+            </button>
+          </div>
+
+          {/* ── Admin tools ── */}
+          <div style={{ margin: "0", padding: "0" }}>
             {currentUser.role === "admin" && (
               <button
                 onClick={() => setSettingsOpen(true)}
@@ -1929,13 +1945,10 @@ export default function ContentScheduler() {
               )}
               {view === "internal" && <InternalView token={authToken} />}
               {view === "inventory" && (
-                <div>
-                  <div style={{ marginBottom: "20px" }}>
-                    <h1 style={{ margin: "0 0 4px", fontSize: "24px", fontWeight: "800", color: C.text }}>Inventory</h1>
-                    <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>Track supplies, equipment, and orders. Filter by location: 321, 342, or 812.</p>
-                  </div>
-                  <InventoryTab token={authToken} currentUser={currentUser} />
-                </div>
+                <InventoryView token={authToken} currentUser={currentUser} />
+              )}
+              {view === "bugreports" && (
+                <BugReportsView token={authToken} currentUser={currentUser} />
               )}
               {view === "teamtasks" && <TeamTaskTracker token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
               {view === "training" && <TrainingView token={authToken} currentUser={currentUser} />}

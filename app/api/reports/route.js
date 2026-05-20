@@ -51,7 +51,7 @@ Write a concise, friendly 2–4 paragraph summary covering:
 Keep it conversational, specific, and encouraging. Speak as if you're a knowledgeable team lead briefing the group.`;
 
       const message = await client.messages.create({
-        model: "claude-opus-4-5",
+        model: "claude-opus-4-7",
         max_tokens: 800,
         messages: [{ role: "user", content: prompt }],
       });
@@ -96,7 +96,7 @@ ${contentType === "Newsletter" ? `Write a complete newsletter with:
 Format clearly with section labels.` : ""}`;
 
       const message = await client.messages.create({
-        model: "claude-opus-4-5",
+        model: "claude-opus-4-7",
         max_tokens: 1500,
         messages: [{ role: "user", content: prompt }],
       });
