@@ -2538,9 +2538,20 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
             )}
             <div>
               <h1 style={{ margin: "0 0 2px", fontSize: "26px", fontWeight: "800", color: C.text }}>{workspaceName}</h1>
-              {readOnly && (
-                <p style={{ margin: 0, fontSize: "13px", color: C.muted }}>Read-only view</p>
-              )}
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                {profile?.jobTitle && (
+                  <span style={{ fontSize: "13px", color: C.muted }}>{profile.jobTitle}</span>
+                )}
+                {profile?.reportsToName && (
+                  <span style={{ fontSize: "12px", color: C.muted, display: "flex", alignItems: "center", gap: "4px" }}>
+                    {profile.jobTitle && <span style={{ opacity: 0.4 }}>·</span>}
+                    👤 Reports to: <span style={{ fontWeight: "600", color: C.text }}>{profile.reportsToName}</span>
+                  </span>
+                )}
+                {readOnly && !profile?.jobTitle && !profile?.reportsToName && (
+                  <p style={{ margin: 0, fontSize: "13px", color: C.muted }}>Read-only view</p>
+                )}
+              </div>
             </div>
           </div>
         </div>

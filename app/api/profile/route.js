@@ -23,9 +23,13 @@ export async function PUT(req) {
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
-    const { image, title, jobTitle, email, phone, bio, orgLevel, funFacts, headerImage, processRole, sectionTitles, headerImagePositionX, headerImagePositionY } = body;
 
-    const existing = (await kvGet(`tcf:profile:${user.id}`)) || {};
+    // Admins can edit any user's profile by passing targetUserId
+    const targetId = (user.role === "admin" && body.targetUserId) ? body.targetUserId : user.id;
+
+    const { image, title, jobTitle, email, phone, bio, orgLevel, funFacts, headerImage, processRole, sectionTitles, headerImagePositionX, headerImagePositionY, reportsTo, reportsToName } = body;
+
+    const existing = (await kvGet(`tcf:profile:${targetId}`)) || {};
     const updated = {
       ...existing,
       ...(image !== undefined && { image }),
@@ -41,10 +45,12 @@ export async function PUT(req) {
       ...(sectionTitles !== undefined && { sectionTitles }),
       ...(headerImagePositionX !== undefined && { headerImagePositionX }),
       ...(headerImagePositionY !== undefined && { headerImagePositionY }),
+      ...(reportsTo !== undefined && { reportsTo }),
+      ...(reportsToName !== undefined && { reportsToName }),
       updatedAt: new Date().toISOString(),
     };
 
-    await kvSet(`tcf:profile:${user.id}`, updated);
+    await kvSet(`tcf:profile:${targetId}`, updated);
     return Response.json(updated);
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });

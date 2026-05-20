@@ -138,6 +138,102 @@ function FocusTextarea({ label, value, onChange, placeholder, hint, rows = 4 }) 
 
 const ORG_LEVELS = ["Leadership", "Manager", "Team Lead", "Member", "Volunteer"];
 
+// ─── Profile Edit Form (shared between MyProfile and admin slide-over) ─────────
+
+function ProfileEditForm({ form, set, currentUserName, photoInputRef, teamMembers = [], hidingUserId }) {
+  const otherMembers = teamMembers.filter((m) => m.id !== hidingUserId);
+
+  return (
+    <div>
+      {/* Photo upload */}
+      <div style={{ marginBottom: "14px" }}>
+        <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>
+          Upload Photo
+        </label>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {form.image ? (
+            <img
+              src={form.image}
+              alt="Preview"
+              style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: `2px solid ${C.border}`, flexShrink: 0 }}
+              onError={(e) => { e.target.style.display = "none"; }}
+            />
+          ) : (
+            <div style={{
+              width: 48, height: 48, borderRadius: "50%",
+              background: "#6366F1", color: "#fff",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 17, fontWeight: "700", flexShrink: 0,
+              border: `2px solid ${C.border}`,
+            }}>
+              {(currentUserName || "?").split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => photoInputRef.current?.click()}
+            style={{
+              padding: "7px 14px", borderRadius: "8px",
+              border: `1px solid ${C.border}`, background: C.cardBg,
+              color: C.text, fontSize: "13px", fontWeight: "600", cursor: "pointer",
+            }}
+          >
+            Choose Photo
+          </button>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = (ev) => set("image", ev.target.result);
+              reader.readAsDataURL(file);
+            }}
+          />
+        </div>
+      </div>
+      <FocusInput label="Profile Image URL" value={form.image} onChange={(v) => set("image", v)} placeholder="https://example.com/avatar.jpg" />
+      <FocusInput label="Job Title" value={form.jobTitle} onChange={(v) => set("jobTitle", v)} placeholder="e.g. Content Strategist" />
+      <FocusInput label="Email" type="email" value={form.email} onChange={(v) => set("email", v)} placeholder="you@example.com" />
+      <FocusInput label="Phone" value={form.phone} onChange={(v) => set("phone", v)} placeholder="e.g. (555) 123-4567" />
+      <div style={{ marginBottom: "14px" }}>
+        <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Org Level</label>
+        <select
+          value={form.orgLevel}
+          onChange={(e) => set("orgLevel", e.target.value)}
+          style={{ width: "100%", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: "8px", background: C.inputBg, color: form.orgLevel ? C.text : C.muted, fontSize: "14px", outline: "none", boxSizing: "border-box" }}
+        >
+          <option value="">Select org level…</option>
+          {ORG_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+        </select>
+      </div>
+      {/* Reports To */}
+      {otherMembers.length > 0 && (
+        <div style={{ marginBottom: "14px" }}>
+          <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Reports To</label>
+          <select
+            value={form.reportsTo || ""}
+            onChange={(e) => {
+              const m = otherMembers.find((m) => m.id === e.target.value);
+              set("reportsTo", e.target.value);
+              set("reportsToName", m?.name || "");
+            }}
+            style={{ width: "100%", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: "8px", background: C.inputBg, color: form.reportsTo ? C.text : C.muted, fontSize: "14px", outline: "none", boxSizing: "border-box" }}
+          >
+            <option value="">— None —</option>
+            {otherMembers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+        </div>
+      )}
+      <FocusTextarea label="Bio" value={form.bio} onChange={(v) => set("bio", v)} placeholder="Tell us about yourself…" rows={3} />
+      <FocusTextarea label="Fun Facts" value={form.funFacts} onChange={(v) => set("funFacts", v)} placeholder="Share a fun fact about yourself" hint="Share a fun fact about yourself" rows={2} />
+    </div>
+  );
+}
+
 // ─── Member Card (Directory) ──────────────────────────────────────────────────
 
 function MemberCard({ member, onClick }) {
@@ -173,6 +269,11 @@ function MemberCard({ member, onClick }) {
             <Pill label={member.profile.orgLevel} />
           </div>
         )}
+        {member.profile?.reportsToName && (
+          <div style={{ fontSize: "11px", color: C.muted, marginTop: "6px" }}>
+            Reports to: <span style={{ fontWeight: "600", color: C.text }}>{member.profile.reportsToName}</span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -180,41 +281,91 @@ function MemberCard({ member, onClick }) {
 
 // ─── Member Profile Slide-over ────────────────────────────────────────────────
 
-function MemberSlideOver({ member, onClose, token }) {
+function MemberSlideOver({ member, onClose, token, currentUser, teamMembers = [], onProfileUpdated }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    image: "", jobTitle: "", email: "", phone: "",
+    bio: "", orgLevel: "", funFacts: "", reportsTo: "", reportsToName: "",
+  });
+  const photoInputRef = useRef(null);
+  const isAdmin = currentUser?.role === "admin";
 
   useEffect(() => {
     if (!member) return;
     setLoading(true);
-    fetch(`/api/profile?userId=${member.id}`, {
-      headers: { "x-session": token },
-    })
+    setEditing(false);
+    fetch(`/api/profile?userId=${member.id}`, { headers: { "x-session": token } })
       .then((r) => r.json())
-      .then((data) => setProfile(data))
+      .then((data) => {
+        setProfile(data || {});
+        setForm({
+          image: data?.image || "",
+          jobTitle: data?.jobTitle || "",
+          email: data?.email || "",
+          phone: data?.phone || "",
+          bio: data?.bio || "",
+          orgLevel: data?.orgLevel || "",
+          funFacts: data?.funFacts || "",
+          reportsTo: data?.reportsTo || "",
+          reportsToName: data?.reportsToName || "",
+        });
+      })
       .catch(() => setProfile(null))
       .finally(() => setLoading(false));
   }, [member, token]);
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-session": token },
+        body: JSON.stringify({ ...form, targetUserId: member.id }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      const data = await res.json();
+      setProfile(data);
+      setEditing(false);
+      if (onProfileUpdated) onProfileUpdated(member.id, data);
+    } catch (e) {
+      setError("Failed to save. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setForm({
+      image: profile?.image || "",
+      jobTitle: profile?.jobTitle || "",
+      email: profile?.email || "",
+      phone: profile?.phone || "",
+      bio: profile?.bio || "",
+      orgLevel: profile?.orgLevel || "",
+      funFacts: profile?.funFacts || "",
+      reportsTo: profile?.reportsTo || "",
+      reportsToName: profile?.reportsToName || "",
+    });
+    setEditing(false);
+    setError("");
+  };
 
   if (!member) return null;
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed", inset: 0,
-          background: "rgba(15,23,42,0.4)",
-          backdropFilter: "blur(2px)",
-          zIndex: 1000,
-        }}
-      />
-      {/* Panel */}
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", backdropFilter: "blur(2px)", zIndex: 1000 }} />
       <div style={{
         position: "fixed", top: 0, right: 0, bottom: 0,
-        width: "420px", maxWidth: "100vw",
-        background: C.surface,
+        width: "440px", maxWidth: "100vw",
+        background: C.surface || C.card,
         borderLeft: `1px solid ${C.border}`,
         boxShadow: "-8px 0 32px rgba(0,0,0,0.12)",
         zIndex: 1001,
@@ -226,30 +377,51 @@ function MemberSlideOver({ member, onClose, token }) {
           padding: "20px 24px",
           borderBottom: `1px solid ${C.border}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
-          position: "sticky", top: 0, background: C.surface, zIndex: 1,
+          position: "sticky", top: 0, background: C.surface || C.card, zIndex: 1,
         }}>
-          <span style={{ fontSize: "15px", fontWeight: "700", color: C.text }}>Member Profile</span>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none", border: "none", cursor: "pointer",
-              fontSize: "20px", color: C.muted, padding: "4px",
-              lineHeight: 1,
-            }}
-          >
-            ✕
-          </button>
+          <span style={{ fontSize: "15px", fontWeight: "700", color: C.text }}>
+            {editing ? `Edit ${member.name}'s Profile` : "Member Profile"}
+          </span>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            {isAdmin && !editing && !loading && (
+              <button
+                onClick={() => setEditing(true)}
+                style={{ padding: "5px 12px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.text, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
+              >
+                ✏️ Edit
+              </button>
+            )}
+            <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "20px", color: C.muted, padding: "4px", lineHeight: 1 }}>✕</button>
+          </div>
         </div>
 
         <div style={{ padding: "24px" }}>
           {loading ? (
-            <div style={{ textAlign: "center", padding: "48px 16px", color: C.muted, fontSize: "14px" }}>
-              Loading profile…
-            </div>
+            <div style={{ textAlign: "center", padding: "48px 16px", color: C.muted, fontSize: "14px" }}>Loading profile…</div>
+          ) : editing ? (
+            <>
+              {error && (
+                <div style={{ padding: "10px 14px", borderRadius: "8px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#EF4444", fontSize: "13px", marginBottom: "16px" }}>
+                  {error}
+                </div>
+              )}
+              <ProfileEditForm form={form} set={set} currentUserName={member.name} photoInputRef={photoInputRef} teamMembers={teamMembers} hidingUserId={member.id} />
+              <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                <button onClick={handleCancel} style={{ flex: 1, padding: "9px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
+                <button onClick={handleSave} disabled={saving} style={{ flex: 2, padding: "9px", borderRadius: "8px", border: "none", background: saving ? C.muted : C.accent, color: "#fff", fontSize: "13px", fontWeight: "600", cursor: saving ? "not-allowed" : "pointer" }}>
+                  {saving ? "Saving…" : "Save Changes"}
+                </button>
+              </div>
+            </>
           ) : !profile || Object.keys(profile).length === 0 ? (
             <div style={{ textAlign: "center", padding: "48px 16px" }}>
               <div style={{ fontSize: "40px", marginBottom: "12px" }}>👤</div>
               <div style={{ fontSize: "14px", color: C.muted }}>Profile not set up yet</div>
+              {isAdmin && (
+                <button onClick={() => setEditing(true)} style={{ marginTop: "14px", padding: "8px 18px", borderRadius: "8px", border: `1px solid ${C.accent}`, background: C.accentLight, color: C.accentBright, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>
+                  + Set Up Profile
+                </button>
+              )}
             </div>
           ) : (
             <>
@@ -271,6 +443,11 @@ function MemberSlideOver({ member, onClose, token }) {
                       <Pill label={profile.orgLevel} />
                     </div>
                   )}
+                  {profile.reportsToName && (
+                    <div style={{ fontSize: "12px", color: C.muted, marginTop: "8px" }}>
+                      👤 Reports to: <span style={{ fontWeight: "600", color: C.text }}>{profile.reportsToName}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -278,28 +455,16 @@ function MemberSlideOver({ member, onClose, token }) {
               <FieldDisplay label="Phone" value={profile.phone} />
               {profile.bio && (
                 <div style={{ marginBottom: "12px" }}>
-                  <div style={{ fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>
-                    Bio
-                  </div>
-                  <div style={{
-                    fontSize: "14px", color: C.text, lineHeight: "1.6",
-                    padding: "12px", background: C.cardBg,
-                    borderRadius: "8px", border: `1px solid ${C.border}`,
-                  }}>
+                  <div style={{ fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Bio</div>
+                  <div style={{ fontSize: "14px", color: C.text, lineHeight: "1.6", padding: "12px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}` }}>
                     {profile.bio}
                   </div>
                 </div>
               )}
               {profile.funFacts && (
                 <div style={{ marginBottom: "12px" }}>
-                  <div style={{ fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>
-                    Fun Facts
-                  </div>
-                  <div style={{
-                    fontSize: "14px", color: C.text, lineHeight: "1.6",
-                    padding: "12px", background: C.cardBg,
-                    borderRadius: "8px", border: `1px solid ${C.border}`,
-                  }}>
+                  <div style={{ fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Fun Facts</div>
+                  <div style={{ fontSize: "14px", color: C.text, lineHeight: "1.6", padding: "12px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}` }}>
                     {profile.funFacts}
                   </div>
                 </div>
@@ -314,7 +479,7 @@ function MemberSlideOver({ member, onClose, token }) {
 
 // ─── My Profile Tab ───────────────────────────────────────────────────────────
 
-function MyProfileTab({ currentUser, token }) {
+function MyProfileTab({ currentUser, token, teamMembers = [] }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -322,7 +487,7 @@ function MyProfileTab({ currentUser, token }) {
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     image: "", jobTitle: "", email: "", phone: "",
-    bio: "", orgLevel: "", funFacts: "",
+    bio: "", orgLevel: "", funFacts: "", reportsTo: "", reportsToName: "",
   });
   const photoInputRef = useRef(null);
 
@@ -339,6 +504,8 @@ function MyProfileTab({ currentUser, token }) {
           bio: data?.bio || "",
           orgLevel: data?.orgLevel || "",
           funFacts: data?.funFacts || "",
+          reportsTo: data?.reportsTo || "",
+          reportsToName: data?.reportsToName || "",
         });
       })
       .catch(() => setProfile({}))
@@ -376,22 +543,19 @@ function MyProfileTab({ currentUser, token }) {
       bio: profile?.bio || "",
       orgLevel: profile?.orgLevel || "",
       funFacts: profile?.funFacts || "",
+      reportsTo: profile?.reportsTo || "",
+      reportsToName: profile?.reportsToName || "",
     });
     setEditing(false);
     setError("");
   };
 
   if (loading) {
-    return (
-      <div style={{ textAlign: "center", padding: "64px 16px", color: C.muted, fontSize: "14px" }}>
-        Loading profile…
-      </div>
-    );
+    return <div style={{ textAlign: "center", padding: "64px 16px", color: C.muted, fontSize: "14px" }}>Loading profile…</div>;
   }
 
   return (
     <div style={{ maxWidth: "640px" }}>
-      {/* Profile card */}
       <div style={{
         background: C.card, border: `1px solid ${C.border}`,
         borderRadius: "16px", padding: "24px",
@@ -405,9 +569,10 @@ function MyProfileTab({ currentUser, token }) {
               {profile?.jobTitle && (
                 <div style={{ fontSize: "13px", color: C.muted, marginTop: "3px" }}>{profile.jobTitle}</div>
               )}
-              {profile?.orgLevel && (
-                <div style={{ marginTop: "8px" }}>
-                  <Pill label={profile.orgLevel} />
+              {profile?.orgLevel && <div style={{ marginTop: "8px" }}><Pill label={profile.orgLevel} /></div>}
+              {profile?.reportsToName && (
+                <div style={{ fontSize: "12px", color: C.muted, marginTop: "6px" }}>
+                  👤 Reports to: <span style={{ fontWeight: "600", color: C.text }}>{profile.reportsToName}</span>
                 </div>
               )}
             </div>
@@ -415,44 +580,15 @@ function MyProfileTab({ currentUser, token }) {
           {!editing && (
             <button
               onClick={() => setEditing(true)}
-              style={{
-                padding: "8px 18px",
-                borderRadius: "20px",
-                border: `1px solid ${C.border}`,
-                background: C.cardBg,
-                color: C.text,
-                fontSize: "13px",
-                fontWeight: "600",
-                cursor: "pointer",
-                transition: "border-color 0.15s",
-              }}
+              style={{ padding: "8px 18px", borderRadius: "20px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.text, fontSize: "13px", fontWeight: "600", cursor: "pointer", transition: "border-color 0.15s" }}
             >
               ✏️ Edit Profile
             </button>
           )}
           {editing && (
             <div style={{ display: "flex", gap: "8px" }}>
-              <button
-                onClick={handleCancel}
-                style={{
-                  padding: "8px 16px", borderRadius: "20px",
-                  border: `1px solid ${C.border}`, background: C.cardBg,
-                  color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer",
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                style={{
-                  padding: "8px 20px", borderRadius: "20px",
-                  border: "none", background: saving ? C.muted : C.accent,
-                  color: "#fff", fontSize: "13px", fontWeight: "600",
-                  cursor: saving ? "not-allowed" : "pointer",
-                  transition: "background 0.15s",
-                }}
-              >
+              <button onClick={handleCancel} style={{ padding: "8px 16px", borderRadius: "20px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
+              <button onClick={handleSave} disabled={saving} style={{ padding: "8px 20px", borderRadius: "20px", border: "none", background: saving ? C.muted : C.accent, color: "#fff", fontSize: "13px", fontWeight: "600", cursor: saving ? "not-allowed" : "pointer", transition: "background 0.15s" }}>
                 {saving ? "Saving…" : "Save"}
               </button>
             </div>
@@ -460,135 +596,17 @@ function MyProfileTab({ currentUser, token }) {
         </div>
 
         {error && (
-          <div style={{
-            padding: "10px 14px", borderRadius: "8px",
-            background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)",
-            color: "#EF4444", fontSize: "13px", marginBottom: "16px",
-          }}>
+          <div style={{ padding: "10px 14px", borderRadius: "8px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#EF4444", fontSize: "13px", marginBottom: "16px" }}>
             {error}
           </div>
         )}
 
         {editing ? (
-          <div>
-            {/* Photo upload */}
-            <div style={{ marginBottom: "14px" }}>
-              <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>
-                Upload Photo
-              </label>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                {form.image ? (
-                  <img
-                    src={form.image}
-                    alt="Preview"
-                    style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: `2px solid ${C.border}`, flexShrink: 0 }}
-                    onError={(e) => { e.target.style.display = "none"; }}
-                  />
-                ) : (
-                  <div style={{
-                    width: 48, height: 48, borderRadius: "50%",
-                    background: "#6366F1", color: "#fff",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 17, fontWeight: "700", flexShrink: 0,
-                    border: `2px solid ${C.border}`,
-                  }}>
-                    {(currentUser?.name || "?").split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => photoInputRef.current?.click()}
-                  style={{
-                    padding: "7px 14px", borderRadius: "8px",
-                    border: `1px solid ${C.border}`, background: C.cardBg,
-                    color: C.text, fontSize: "13px", fontWeight: "600", cursor: "pointer",
-                  }}
-                >
-                  Choose Photo
-                </button>
-                <input
-                  ref={photoInputRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: "none" }}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (ev) => set("image", ev.target.result);
-                    reader.readAsDataURL(file);
-                  }}
-                />
-              </div>
-            </div>
-            <FocusInput
-              label="Profile Image URL"
-              value={form.image}
-              onChange={(v) => set("image", v)}
-              placeholder="https://example.com/avatar.jpg"
-            />
-            <FocusInput
-              label="Job Title"
-              value={form.jobTitle}
-              onChange={(v) => set("jobTitle", v)}
-              placeholder="e.g. Content Strategist"
-            />
-            <FocusInput
-              label="Email"
-              type="email"
-              value={form.email}
-              onChange={(v) => set("email", v)}
-              placeholder="you@example.com"
-            />
-            <FocusInput
-              label="Phone"
-              value={form.phone}
-              onChange={(v) => set("phone", v)}
-              placeholder="e.g. (555) 123-4567"
-            />
-            <div style={{ marginBottom: "14px" }}>
-              <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>
-                Org Level
-              </label>
-              <select
-                value={form.orgLevel}
-                onChange={(e) => set("orgLevel", e.target.value)}
-                style={{
-                  width: "100%", padding: "9px 12px",
-                  border: `1px solid ${C.border}`, borderRadius: "8px",
-                  background: C.inputBg, color: form.orgLevel ? C.text : C.muted,
-                  fontSize: "14px", outline: "none", boxSizing: "border-box",
-                }}
-              >
-                <option value="">Select org level…</option>
-                {ORG_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
-              </select>
-            </div>
-            <FocusTextarea
-              label="Bio"
-              value={form.bio}
-              onChange={(v) => set("bio", v)}
-              placeholder="Tell us about yourself…"
-              rows={3}
-            />
-            <FocusTextarea
-              label="Fun Facts"
-              value={form.funFacts}
-              onChange={(v) => set("funFacts", v)}
-              placeholder="Share a fun fact about yourself"
-              hint="Share a fun fact about yourself"
-              rows={2}
-            />
-          </div>
+          <ProfileEditForm form={form} set={set} currentUserName={currentUser?.name} photoInputRef={photoInputRef} teamMembers={teamMembers} hidingUserId={currentUser?.id} />
         ) : (
           <div>
             {!profile?.email && !profile?.phone && !profile?.bio && !profile?.funFacts ? (
-              <div style={{
-                textAlign: "center", padding: "32px 16px",
-                background: C.cardBg, borderRadius: "10px",
-                border: `1px dashed ${C.border}`,
-                color: C.muted, fontSize: "13px",
-              }}>
+              <div style={{ textAlign: "center", padding: "32px 16px", background: C.cardBg, borderRadius: "10px", border: `1px dashed ${C.border}`, color: C.muted, fontSize: "13px" }}>
                 <div style={{ fontSize: "32px", marginBottom: "8px" }}>🙂</div>
                 Your profile is empty. Click "Edit Profile" to fill it in.
               </div>
@@ -598,30 +616,14 @@ function MyProfileTab({ currentUser, token }) {
                 <FieldDisplay label="Phone" value={profile?.phone} />
                 {profile?.bio && (
                   <div style={{ gridColumn: "1 / -1", marginBottom: "12px" }}>
-                    <div style={{ fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>
-                      Bio
-                    </div>
-                    <div style={{
-                      fontSize: "14px", color: C.text, lineHeight: "1.6",
-                      padding: "12px", background: C.cardBg,
-                      borderRadius: "8px", border: `1px solid ${C.border}`,
-                    }}>
-                      {profile.bio}
-                    </div>
+                    <div style={{ fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Bio</div>
+                    <div style={{ fontSize: "14px", color: C.text, lineHeight: "1.6", padding: "12px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}` }}>{profile.bio}</div>
                   </div>
                 )}
                 {profile?.funFacts && (
                   <div style={{ gridColumn: "1 / -1", marginBottom: "12px" }}>
-                    <div style={{ fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>
-                      Fun Facts
-                    </div>
-                    <div style={{
-                      fontSize: "14px", color: C.text, lineHeight: "1.6",
-                      padding: "12px", background: C.cardBg,
-                      borderRadius: "8px", border: `1px solid ${C.border}`,
-                    }}>
-                      {profile.funFacts}
-                    </div>
+                    <div style={{ fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Fun Facts</div>
+                    <div style={{ fontSize: "14px", color: C.text, lineHeight: "1.6", padding: "12px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}` }}>{profile.funFacts}</div>
                   </div>
                 )}
               </div>
@@ -635,52 +637,65 @@ function MyProfileTab({ currentUser, token }) {
 
 // ─── Team Directory Tab ───────────────────────────────────────────────────────
 
-function TeamDirectoryTab({ teamMembers, token }) {
+function TeamDirectoryTab({ teamMembers, token, currentUser }) {
   const [selectedMember, setSelectedMember] = useState(null);
   const [profiles, setProfiles] = useState({});
+  const [search, setSearch] = useState("");
+
+  const loadProfile = (id) => {
+    fetch(`/api/profile?userId=${id}`, { headers: { "x-session": token } })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && !data.error) {
+          setProfiles((prev) => ({ ...prev, [id]: data }));
+        }
+      })
+      .catch(() => {});
+  };
 
   useEffect(() => {
     if (!teamMembers.length) return;
-    teamMembers.forEach((m) => {
-      fetch(`/api/profile?userId=${m.id}`, { headers: { "x-session": token } })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data && !data.error) {
-            setProfiles((prev) => ({ ...prev, [m.id]: data }));
-          }
-        })
-        .catch(() => {});
-    });
-  }, [teamMembers, token]);
+    teamMembers.forEach((m) => loadProfile(m.id));
+  }, [teamMembers, token]); // eslint-disable-line
+
+  const handleProfileUpdated = (userId, updatedProfile) => {
+    setProfiles((prev) => ({ ...prev, [userId]: updatedProfile }));
+  };
 
   const membersWithProfiles = teamMembers.map((m) => ({
     ...m,
     profile: profiles[m.id] || m.profile || null,
   }));
 
+  const filtered = search
+    ? membersWithProfiles.filter((m) =>
+        m.name.toLowerCase().includes(search.toLowerCase()) ||
+        (m.profile?.jobTitle || "").toLowerCase().includes(search.toLowerCase()) ||
+        (m.profile?.orgLevel || "").toLowerCase().includes(search.toLowerCase())
+      )
+    : membersWithProfiles;
+
   return (
     <div>
+      {/* Search */}
+      {teamMembers.length > 4 && (
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search team members…"
+          style={{ padding: "8px 12px", border: `1px solid ${C.border}`, borderRadius: "8px", background: C.inputBg, color: C.text, fontSize: "13px", outline: "none", width: "260px", marginBottom: "16px", boxSizing: "border-box" }}
+        />
+      )}
+
       {teamMembers.length === 0 ? (
-        <div style={{
-          textAlign: "center", padding: "64px 16px",
-          background: C.cardBg, borderRadius: "12px",
-          border: `1px dashed ${C.border}`, color: C.muted,
-        }}>
+        <div style={{ textAlign: "center", padding: "64px 16px", background: C.cardBg, borderRadius: "12px", border: `1px dashed ${C.border}`, color: C.muted }}>
           <div style={{ fontSize: "40px", marginBottom: "12px" }}>👥</div>
           <div style={{ fontSize: "14px" }}>No team members yet</div>
         </div>
       ) : (
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-          gap: "14px",
-        }}>
-          {membersWithProfiles.map((member) => (
-            <MemberCard
-              key={member.id}
-              member={member}
-              onClick={setSelectedMember}
-            />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "14px" }}>
+          {filtered.map((member) => (
+            <MemberCard key={member.id} member={member} onClick={setSelectedMember} />
           ))}
         </div>
       )}
@@ -689,7 +704,10 @@ function TeamDirectoryTab({ teamMembers, token }) {
         <MemberSlideOver
           member={selectedMember}
           token={token}
+          currentUser={currentUser}
+          teamMembers={teamMembers}
           onClose={() => setSelectedMember(null)}
+          onProfileUpdated={handleProfileUpdated}
         />
       )}
     </div>
@@ -708,21 +726,13 @@ export default function MemberProfile({ currentUser, token, teamMembers = [] }) 
 
   return (
     <div style={{ padding: "24px", maxWidth: "960px", margin: "0 auto" }}>
-      {/* Page header */}
       <div style={{ marginBottom: "24px" }}>
-        <h1 style={{ margin: "0 0 4px", fontSize: "24px", fontWeight: "800", color: C.text }}>
-          Profile
-        </h1>
-        <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>
-          Manage your profile and explore the team directory
-        </p>
+        <h1 style={{ margin: "0 0 4px", fontSize: "24px", fontWeight: "800", color: C.text }}>Profile</h1>
+        <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>Manage your profile and explore the team directory</p>
       </div>
 
       {/* Tabs */}
-      <div style={{
-        display: "flex", gap: "4px", marginBottom: "24px",
-        borderBottom: `1px solid ${C.border}`, paddingBottom: "0",
-      }}>
+      <div style={{ display: "flex", gap: "4px", marginBottom: "24px", borderBottom: `1px solid ${C.border}` }}>
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -745,12 +755,11 @@ export default function MemberProfile({ currentUser, token, teamMembers = [] }) 
         ))}
       </div>
 
-      {/* Tab content */}
       {tab === "my-profile" && (
-        <MyProfileTab currentUser={currentUser} token={token} />
+        <MyProfileTab currentUser={currentUser} token={token} teamMembers={teamMembers} />
       )}
       {tab === "directory" && (
-        <TeamDirectoryTab teamMembers={teamMembers} token={token} />
+        <TeamDirectoryTab teamMembers={teamMembers} token={token} currentUser={currentUser} />
       )}
     </div>
   );
