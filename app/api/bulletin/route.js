@@ -71,6 +71,7 @@ export async function POST(req) {
         title: body.title || "",
         content: body.content || "",
         pinned: !!body.pinned,
+        mustRead: !!body.mustRead,
         showOnWorkspace: !!body.showOnWorkspace,
         createdAt: new Date().toISOString(),
       };

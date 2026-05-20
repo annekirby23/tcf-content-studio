@@ -148,6 +148,7 @@ function NewPostForm({ token, onSave, onClose }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [pinned, setPinned] = useState(false);
+  const [mustRead, setMustRead] = useState(false);
   const [showOnWorkspace, setShowOnWorkspace] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -157,7 +158,7 @@ function NewPostForm({ token, onSave, onClose }) {
     try {
       const res = await apiFetch("/api/bulletin", {
         method: "POST",
-        body: JSON.stringify({ type: "post", title: title.trim(), content: content.trim(), pinned, showOnWorkspace }),
+        body: JSON.stringify({ type: "post", title: title.trim(), content: content.trim(), pinned, mustRead, showOnWorkspace }),
       }, token);
       const data = await res.json();
       onSave(data);
@@ -194,6 +195,10 @@ function NewPostForm({ token, onSave, onClose }) {
           <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: C.muted, cursor: "pointer" }}>
             <input type="checkbox" checked={showOnWorkspace} onChange={(e) => setShowOnWorkspace(e.target.checked)} style={{ accentColor: C.accent }} />
             🏠 Show on all workspaces
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", cursor: "pointer", fontWeight: mustRead ? "700" : "400", color: mustRead ? "#DC2626" : C.muted, background: mustRead ? "rgba(220,38,38,0.07)" : "transparent", padding: "3px 8px", borderRadius: "6px", border: mustRead ? "1px solid rgba(220,38,38,0.2)" : "1px solid transparent", transition: "all 0.15s" }}>
+            <input type="checkbox" checked={mustRead} onChange={(e) => setMustRead(e.target.checked)} style={{ accentColor: "#DC2626" }} />
+            🔥 Must Read
           </label>
         </div>
         <div style={{ display: "flex", gap: "8px" }}>
@@ -267,48 +272,81 @@ function ShoutoutForm({ token, teamMembers, currentUser, onSave, onClose }) {
 
 function AnnouncementCard({ post, canDelete, onDelete }) {
   const [hov, setHov] = useState(false);
+  const isMustRead = !!post.mustRead;
+
   return (
     <div
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        background: C.card,
-        border: `1px solid ${C.border}`,
-        borderLeft: `4px solid ${C.accent}`,
+        background: isMustRead ? "linear-gradient(135deg, rgba(220,38,38,0.05) 0%, rgba(251,146,60,0.05) 100%)" : C.card,
+        border: isMustRead ? "1.5px solid rgba(220,38,38,0.35)" : `1px solid ${C.border}`,
+        borderLeft: isMustRead ? "5px solid #DC2626" : `4px solid ${C.accent}`,
         borderRadius: "12px",
-        padding: "18px 20px",
+        padding: isMustRead ? "0" : "18px 20px",
+        overflow: "hidden",
         position: "relative",
         transition: "box-shadow 0.15s",
-        boxShadow: hov ? C.shadowMd : C.shadow,
+        boxShadow: isMustRead
+          ? hov ? "0 4px 20px rgba(220,38,38,0.18)" : "0 2px 10px rgba(220,38,38,0.1)"
+          : hov ? C.shadowMd : C.shadow,
       }}
     >
-      {post.pinned && (
-        <div style={{ position: "absolute", top: "12px", right: "14px", fontSize: "14px" }} title="Pinned">📌</div>
-      )}
-      {post.showOnWorkspace && (
-        <div style={{ position: "absolute", top: post.pinned ? "36px" : "12px", right: "14px", fontSize: "11px", color: C.accent, fontWeight: "700" }} title="Shown on all workspaces">🏠 Workspace</div>
-      )}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-        <MemberInitials name={post.authorName} size={36} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: "2px" }}>
-            <span style={{ fontSize: "13px", fontWeight: "700", color: C.text }}>{post.authorName}</span>
-            <span style={{ fontSize: "11px", color: C.muted }}>{timeAgo(post.createdAt)}</span>
-          </div>
-          {post.title && (
-            <div style={{ fontSize: "15px", fontWeight: "700", color: C.text, marginBottom: "6px" }}>{post.title}</div>
-          )}
-          <div style={{ fontSize: "13px", color: C.text, lineHeight: "1.7", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{post.content}</div>
+      {/* Must-Read top banner */}
+      {isMustRead && (
+        <div style={{
+          background: "linear-gradient(90deg, #DC2626, #EA580C)",
+          padding: "7px 20px",
+          display: "flex", alignItems: "center", gap: "8px",
+        }}>
+          <span style={{ fontSize: "14px" }}>🔥</span>
+          <span style={{ fontSize: "11px", fontWeight: "800", color: "#fff", letterSpacing: "0.1em", textTransform: "uppercase" }}>Must Read</span>
+          <span style={{ fontSize: "14px" }}>🔥</span>
         </div>
-      </div>
-      {canDelete && hov && (
-        <button
-          onClick={() => onDelete(post.id, "post")}
-          style={{ position: "absolute", bottom: "10px", right: "12px", background: "none", border: "none", cursor: "pointer", color: "#EF4444", fontSize: "11px", opacity: 0.7, padding: "2px 6px" }}
-        >
-          Delete
-        </button>
       )}
+
+      <div style={{ padding: isMustRead ? "16px 20px 18px" : "0" }}>
+        {/* Badge row for non-mustRead positioning */}
+        {!isMustRead && (
+          <>
+            {post.pinned && (
+              <div style={{ position: "absolute", top: "12px", right: "14px", fontSize: "14px" }} title="Pinned">📌</div>
+            )}
+            {post.showOnWorkspace && (
+              <div style={{ position: "absolute", top: post.pinned ? "36px" : "12px", right: "14px", fontSize: "11px", color: C.accent, fontWeight: "700" }} title="Shown on all workspaces">🏠 Workspace</div>
+            )}
+          </>
+        )}
+        {isMustRead && (
+          <div style={{ display: "flex", gap: "8px", marginBottom: "10px" }}>
+            {post.pinned && <span style={{ fontSize: "11px", color: "#DC2626", fontWeight: "700" }}>📌 Pinned</span>}
+            {post.showOnWorkspace && <span style={{ fontSize: "11px", color: "#EA580C", fontWeight: "700" }}>🏠 Workspace</span>}
+          </div>
+        )}
+
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+          <MemberInitials name={post.authorName} size={36} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: "2px" }}>
+              <span style={{ fontSize: "13px", fontWeight: "700", color: C.text }}>{post.authorName}</span>
+              <span style={{ fontSize: "11px", color: C.muted }}>{timeAgo(post.createdAt)}</span>
+            </div>
+            {post.title && (
+              <div style={{ fontSize: isMustRead ? "17px" : "15px", fontWeight: "800", color: isMustRead ? "#DC2626" : C.text, marginBottom: "6px" }}>{post.title}</div>
+            )}
+            <div style={{ fontSize: "13px", color: C.text, lineHeight: "1.7", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{post.content}</div>
+          </div>
+        </div>
+
+        {canDelete && hov && (
+          <button
+            onClick={() => onDelete(post.id, "post")}
+            style={{ position: "absolute", bottom: "10px", right: "12px", background: "none", border: "none", cursor: "pointer", color: "#EF4444", fontSize: "11px", opacity: 0.7, padding: "2px 6px" }}
+          >
+            Delete
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -403,14 +441,18 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
   const posts = data.posts || [];
   const shoutouts = data.shoutouts || [];
 
-  // Sort pinned posts first
-  const sortedPosts = [...posts].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+  // Sort: must-read first, then pinned, then rest
+  const sortedPosts = [...posts].sort((a, b) => {
+    if (b.mustRead !== a.mustRead) return (b.mustRead ? 1 : 0) - (a.mustRead ? 1 : 0);
+    return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+  });
 
-  // Build combined feed sorted by date
+  // Build combined feed: must-read → pinned → shoutouts → rest
   const allItems = [
-    ...sortedPosts.filter((p) => p.pinned).map((p) => ({ ...p, _type: "post" })),
+    ...sortedPosts.filter((p) => p.mustRead).map((p) => ({ ...p, _type: "post" })),
+    ...sortedPosts.filter((p) => p.pinned && !p.mustRead).map((p) => ({ ...p, _type: "post" })),
     ...shoutouts.map((s) => ({ ...s, _type: "shoutout" })),
-    ...sortedPosts.filter((p) => !p.pinned).map((p) => ({ ...p, _type: "post" })),
+    ...sortedPosts.filter((p) => !p.pinned && !p.mustRead).map((p) => ({ ...p, _type: "post" })),
   ];
 
   const TABS = [
