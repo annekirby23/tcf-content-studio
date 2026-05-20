@@ -16,6 +16,7 @@ const DEFAULT_INFO = {
   billingUrl: "",
   endingInfo: "",
   endingUrl: "",
+  membershipTiers: [],
   waitingList: [],
   deskRelocationList: [],
 };
@@ -26,6 +27,7 @@ export async function GET(req) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const data = (await kvGet(KEY)) || DEFAULT_INFO;
+    if (!data.membershipTiers) data.membershipTiers = [];
     if (!data.waitingList) data.waitingList = [];
     if (!data.deskRelocationList) data.deskRelocationList = [];
     return NextResponse.json(data);
@@ -66,6 +68,19 @@ export async function PUT(req) {
       if (body[field] !== undefined) {
         existing[field] = String(body[field]);
       }
+    }
+
+    if (body.membershipTiers !== undefined && Array.isArray(body.membershipTiers)) {
+      existing.membershipTiers = body.membershipTiers.map((tier) => ({
+        id: tier.id || crypto.randomBytes(8).toString("hex"),
+        name: String(tier.name || "").trim(),
+        price: String(tier.price || "").trim(),
+        billingFrequency: String(tier.billingFrequency || "monthly").trim(),
+        description: String(tier.description || "").trim(),
+        features: Array.isArray(tier.features) ? tier.features.map((f) => String(f).trim()).filter(Boolean) : [],
+        highlight: Boolean(tier.highlight),
+        color: String(tier.color || "#6366F1").trim(),
+      }));
     }
 
     if (body.waitingList !== undefined && Array.isArray(body.waitingList)) {

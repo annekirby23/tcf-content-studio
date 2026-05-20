@@ -368,6 +368,238 @@ function DeskRelocationCard({ list, isAdmin, token, onUpdate }) {
   );
 }
 
+// ── Membership Tiers ─────────────────────────────────────────────────────────
+
+const TIER_COLORS = [
+  { label: "Indigo",  value: "#6366F1" },
+  { label: "Purple",  value: "#8B5CF6" },
+  { label: "Pink",    value: "#EC4899" },
+  { label: "Teal",    value: "#14B8A6" },
+  { label: "Blue",    value: "#3B82F6" },
+  { label: "Green",   value: "#10B981" },
+  { label: "Orange",  value: "#F59E0B" },
+  { label: "Red",     value: "#EF4444" },
+];
+
+const BILLING_OPTIONS = ["monthly", "annually", "weekly", "one-time", "custom"];
+
+function TierModal({ tier, onSave, onDelete, onClose }) {
+  const isNew = !tier?.id;
+  const [name, setName] = useState(tier?.name || "");
+  const [price, setPrice] = useState(tier?.price || "");
+  const [billingFrequency, setBillingFrequency] = useState(tier?.billingFrequency || "monthly");
+  const [description, setDescription] = useState(tier?.description || "");
+  const [featuresText, setFeaturesText] = useState((tier?.features || []).join("\n"));
+  const [highlight, setHighlight] = useState(tier?.highlight || false);
+  const [color, setColor] = useState(tier?.color || "#6366F1");
+
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  function handleSave() {
+    if (!name.trim()) return;
+    const features = featuresText.split("\n").map((f) => f.trim()).filter(Boolean);
+    onSave({ id: tier?.id, name: name.trim(), price: price.trim(), billingFrequency, description: description.trim(), features, highlight, color });
+  }
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", backdropFilter: "blur(4px)", zIndex: 3000 }} />
+      <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: "520px", maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto", background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", zIndex: 3001, boxShadow: "0 20px 60px rgba(0,0,0,0.3)", padding: "28px" }}>
+        <h3 style={{ margin: "0 0 20px", fontSize: "17px", fontWeight: "800", color: C.text }}>{isNew ? "Add Membership Tier" : "Edit Membership Tier"}</h3>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          {/* Name */}
+          <div>
+            <label style={labelStyle}>Tier Name *</label>
+            <input autoFocus value={name} onChange={(e) => setName(e.target.value)} style={textInput({ width: "100%" })} placeholder="Hot Desk, Dedicated Desk, Private Office…" />
+          </div>
+
+          {/* Price + Frequency */}
+          <div style={{ display: "flex", gap: "12px" }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Price</label>
+              <input value={price} onChange={(e) => setPrice(e.target.value)} style={textInput({ width: "100%" })} placeholder="$250, $99, Free…" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Billing Frequency</label>
+              <select value={billingFrequency} onChange={(e) => setBillingFrequency(e.target.value)} style={textInput({ width: "100%", color: C.text })}>
+                {BILLING_OPTIONS.map((o) => <option key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label style={labelStyle}>Description</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} style={textInput({ width: "100%", resize: "vertical" })} placeholder="Brief description of who this tier is for…" />
+          </div>
+
+          {/* Features */}
+          <div>
+            <label style={labelStyle}>Features / Inclusions <span style={{ fontWeight: "400", textTransform: "none", fontSize: "10px" }}>(one per line)</span></label>
+            <textarea value={featuresText} onChange={(e) => setFeaturesText(e.target.value)} rows={5} style={textInput({ width: "100%", resize: "vertical", lineHeight: "1.7" })} placeholder={"24/7 access\nHigh-speed WiFi\nMail handling\nLounge access"} />
+          </div>
+
+          {/* Color + Highlight */}
+          <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Accent Color</label>
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                {TIER_COLORS.map((tc) => (
+                  <button
+                    key={tc.value}
+                    onClick={() => setColor(tc.value)}
+                    title={tc.label}
+                    style={{ width: "26px", height: "26px", borderRadius: "50%", background: tc.value, border: color === tc.value ? `3px solid ${C.text}` : `2px solid transparent`, cursor: "pointer", flexShrink: 0 }}
+                  />
+                ))}
+              </div>
+            </div>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", paddingBottom: "4px" }}>
+              <input type="checkbox" checked={highlight} onChange={(e) => setHighlight(e.target.checked)} style={{ accentColor: C.accent, width: "15px", height: "15px" }} />
+              <span style={{ fontSize: "13px", color: C.text, fontWeight: "600" }}>Mark as Popular</span>
+            </label>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "24px" }}>
+          <div>
+            {!isNew && (
+              <button onClick={() => { if (confirm("Delete this tier?")) { onDelete(tier.id); onClose(); } }} style={{ padding: "9px 16px", borderRadius: "8px", border: "1px solid #EF4444", background: "none", color: "#EF4444", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>
+                🗑 Delete
+              </button>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button onClick={onClose} style={{ padding: "9px 18px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
+            <button onClick={handleSave} disabled={!name.trim()} style={{ padding: "9px 20px", borderRadius: "8px", border: "none", background: name.trim() ? C.accent : C.border, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: name.trim() ? "pointer" : "not-allowed" }}>
+              {isNew ? "Add Tier" : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function MembershipTiersSection({ tiers, isAdmin, token, onUpdate }) {
+  const [modalTier, setModalTier] = useState(null); // null = closed, false = new, object = edit
+
+  async function saveTiers(updated) {
+    const res = await apiFetch("/api/membershipinfo", { method: "PUT", body: JSON.stringify({ membershipTiers: updated }) }, token);
+    const data = await res.json();
+    onUpdate(data);
+  }
+
+  async function handleSave(tierData) {
+    let updated;
+    if (tierData.id && tiers.some((t) => t.id === tierData.id)) {
+      updated = tiers.map((t) => t.id === tierData.id ? tierData : t);
+    } else {
+      updated = [...tiers, { ...tierData, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5) }];
+    }
+    await saveTiers(updated);
+    setModalTier(null);
+  }
+
+  async function handleDelete(id) {
+    await saveTiers(tiers.filter((t) => t.id !== id));
+  }
+
+  return (
+    <div style={{ marginBottom: "28px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+        <div>
+          <h3 style={{ margin: "0 0 4px", fontSize: "16px", fontWeight: "800", color: C.text }}>🏷️ Membership Tiers</h3>
+          <p style={{ margin: 0, fontSize: "13px", color: C.muted }}>All available membership plans and pricing.</p>
+        </div>
+        {isAdmin && (
+          <button onClick={() => setModalTier(false)} style={{ padding: "9px 18px", borderRadius: "10px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer" }}>
+            + Add Tier
+          </button>
+        )}
+      </div>
+
+      {tiers.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "40px 24px", background: C.card, borderRadius: "14px", border: `1px dashed ${C.border}`, color: C.muted }}>
+          <div style={{ fontSize: "36px", marginBottom: "10px" }}>🏷️</div>
+          <div style={{ fontSize: "14px", fontWeight: "600", marginBottom: "6px" }}>No tiers yet</div>
+          {isAdmin && <div style={{ fontSize: "13px" }}>Click &ldquo;+ Add Tier&rdquo; to create your first membership plan.</div>}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "16px" }}>
+          {tiers.map((tier) => (
+            <div
+              key={tier.id}
+              style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden", boxShadow: C.shadow, position: "relative", display: "flex", flexDirection: "column" }}
+            >
+              {/* Popular badge */}
+              {tier.highlight && (
+                <div style={{ position: "absolute", top: "12px", right: "12px", background: tier.color || C.accent, color: "#fff", fontSize: "10px", fontWeight: "800", padding: "3px 10px", borderRadius: "20px", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                  ★ Popular
+                </div>
+              )}
+
+              {/* Color top strip */}
+              <div style={{ height: "6px", background: tier.color || C.accent, flexShrink: 0 }} />
+
+              <div style={{ padding: "20px", flex: 1, display: "flex", flexDirection: "column" }}>
+                {/* Name */}
+                <div style={{ fontSize: "16px", fontWeight: "800", color: C.text, marginBottom: "6px" }}>{tier.name}</div>
+
+                {/* Price */}
+                <div style={{ display: "flex", alignItems: "baseline", gap: "6px", marginBottom: "10px" }}>
+                  <span style={{ fontSize: "26px", fontWeight: "800", color: tier.color || C.accent }}>{tier.price || "—"}</span>
+                  {tier.billingFrequency && tier.billingFrequency !== "custom" && (
+                    <span style={{ fontSize: "13px", color: C.muted, fontWeight: "500" }}>/ {tier.billingFrequency}</span>
+                  )}
+                </div>
+
+                {/* Description */}
+                {tier.description && (
+                  <p style={{ margin: "0 0 12px", fontSize: "13px", color: C.muted, lineHeight: "1.6" }}>{tier.description}</p>
+                )}
+
+                {/* Features */}
+                {tier.features && tier.features.length > 0 && (
+                  <ul style={{ margin: "0 0 16px", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
+                    {tier.features.map((f, i) => (
+                      <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px", color: C.text }}>
+                        <span style={{ color: tier.color || C.accent, fontWeight: "700", flexShrink: 0, marginTop: "1px" }}>✓</span>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {/* Admin edit button */}
+                {isAdmin && (
+                  <button onClick={() => setModalTier(tier)} style={{ marginTop: "auto", width: "100%", padding: "8px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>
+                    ✏️ Edit Tier
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {modalTier !== null && (
+        <TierModal
+          tier={modalTier || null}
+          onSave={handleSave}
+          onDelete={handleDelete}
+          onClose={() => setModalTier(null)}
+        />
+      )}
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function MembershipInfoView({ token, currentUser }) {
   const [info, setInfo] = useState(null);
@@ -431,6 +663,14 @@ export default function MembershipInfoView({ token, currentUser }) {
         <h2 style={{ margin: 0, fontSize: "22px", fontWeight: "800", color: C.text }}>Membership Information</h2>
         <p style={{ margin: "6px 0 0", fontSize: "14px", color: C.muted }}>Centralized reference for membership onboarding, billing, and management.</p>
       </div>
+
+      {/* Membership Tiers — full width */}
+      <MembershipTiersSection
+        tiers={info?.membershipTiers || []}
+        isAdmin={isAdmin}
+        token={token}
+        onUpdate={setInfo}
+      />
 
       {/* Two-column layout */}
       <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", alignItems: "flex-start" }}>
