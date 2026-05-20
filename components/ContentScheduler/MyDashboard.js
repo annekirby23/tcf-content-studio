@@ -1025,21 +1025,18 @@ function MemberInitials({ name, size = 24 }) {
   );
 }
 
-function ProjectCard({ project, onToggleTask, onAddTask, onDelete, onAddStatusUpdate, onSaveDetails, teamMembers = [] }) {
+function ProjectDetailModal({ project, token, teamMembers, onToggleTask, onAddTask, onDelete, onAddStatusUpdate, onSaveDetails, onClose }) {
+  const [activeTab, setActiveTab] = useState("overview");
   const [taskInput, setTaskInput] = useState("");
   const [selectedAssignee, setSelectedAssignee] = useState(null);
-  const [expanded, setExpanded] = useState(false);
   const [details, setDetails] = useState(project.details || "");
-  const [showDetails, setShowDetails] = useState(!!(project.details));
   const [editingDetails, setEditingDetails] = useState(false);
   const [commentInput, setCommentInput] = useState("");
   const [mentionSuggestions, setMentionSuggestions] = useState([]);
-  const [showComments, setShowComments] = useState(false);
+
   const tasks = project.tasks || [];
   const members = project.members || [];
   const statusUpdates = project.statusUpdates || [];
-
-  useEffect(() => { setDetails(project.details || ""); }, [project.details]);
 
   const submitTask = () => {
     if (!taskInput.trim()) return;
@@ -1056,9 +1053,7 @@ function ProjectCard({ project, onToggleTask, onAddTask, onDelete, onAddStatusUp
   const handleCommentChange = (val) => {
     setCommentInput(val);
     const atIdx = val.lastIndexOf("@");
-    if (atIdx !== -1 && atIdx === val.length - 1) {
-      setMentionSuggestions(teamMembers);
-    } else if (atIdx !== -1) {
+    if (atIdx !== -1) {
       const query = val.slice(atIdx + 1).toLowerCase();
       setMentionSuggestions(teamMembers.filter((m) => m.name.toLowerCase().startsWith(query)));
     } else {
@@ -1077,263 +1072,345 @@ function ProjectCard({ project, onToggleTask, onAddTask, onDelete, onAddStatusUp
     onAddStatusUpdate(project.id, commentInput.trim());
     setCommentInput("");
     setMentionSuggestions([]);
-    setShowComments(true);
   };
 
+  const doneTasks = tasks.filter((t) => t.done).length;
+  const pct = tasks.length > 0 ? Math.round((doneTasks / tasks.length) * 100) : 0;
+  const cfg = PROJECT_STATUSES.find((s) => s.id === project.status) || PROJECT_STATUSES[0];
+
+  const TABS = [
+    { id: "overview", label: "📋 Overview" },
+    { id: "tasks", label: `✅ Tasks (${tasks.length})` },
+    { id: "comments", label: `💬 Comments (${statusUpdates.length})` },
+  ];
+
   return (
-    <div style={{
-      background: C.card,
-      border: `1px solid ${C.border}`,
-      borderLeft: `4px solid ${project.color || C.accent}`,
-      borderRadius: "12px",
-      padding: "16px",
-      boxShadow: C.shadow,
-    }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "8px", gap: "8px" }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "4px" }}>{project.name}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-            <StatusPill status={project.status} />
-            {project.createdBy && (
-              <span style={{ fontSize: "10px", color: C.muted, padding: "1px 6px", borderRadius: "10px", background: C.cardBg, border: `1px solid ${C.border}` }}>
-                Owner: {project.createdBy}
-              </span>
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", backdropFilter: "blur(4px)", zIndex: 3000 }} />
+      <div style={{
+        position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+        background: C.card, border: `1px solid ${C.border}`,
+        borderTop: `4px solid ${project.color || C.accent}`,
+        borderRadius: "18px", width: "760px", maxWidth: "95vw",
+        maxHeight: "85vh", display: "flex", flexDirection: "column",
+        zIndex: 3001, boxShadow: "0 24px 64px rgba(0,0,0,0.35)",
+      }}>
+        {/* Header */}
+        <div style={{ padding: "24px 28px 16px", borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", marginBottom: "12px" }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                <div style={{ width: "14px", height: "14px", borderRadius: "50%", background: project.color || C.accent, flexShrink: 0 }} />
+                <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: C.text }}>{project.name}</h2>
+                <span style={{ padding: "2px 10px", borderRadius: "20px", background: cfg.bg, color: cfg.color, fontSize: "12px", fontWeight: "700" }}>{cfg.label}</span>
+              </div>
+              {project.description && (
+                <p style={{ margin: "0 0 0 24px", fontSize: "13px", color: C.muted, lineHeight: "1.5" }}>{project.description}</p>
+              )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+              {project.link && (
+                <a href={project.link} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "12px", color: C.accent, textDecoration: "none", padding: "5px 12px", borderRadius: "20px", border: `1px solid ${C.accent}`, background: C.accentLight, fontWeight: "600" }}>
+                  🔗 Open Resource
+                </a>
+              )}
+              <button onClick={() => { onDelete(project.id); onClose(); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "13px", padding: "4px 8px", borderRadius: "6px", fontWeight: "600" }}>Delete</button>
+              <button onClick={onClose} style={{ background: C.cardBg, border: `1px solid ${C.border}`, cursor: "pointer", color: C.muted, fontSize: "16px", width: "32px", height: "32px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            </div>
+          </div>
+
+          {/* Members + progress */}
+          <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+            {members.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <div style={{ display: "flex" }}>
+                  {members.slice(0, 6).map((m, i) => (
+                    <div key={m.id} style={{ marginLeft: i > 0 ? "-8px" : 0 }} title={m.name}>
+                      <MemberInitials name={m.name} size={26} />
+                    </div>
+                  ))}
+                </div>
+                <span style={{ fontSize: "11px", color: C.muted }}>{members.length} member{members.length !== 1 ? "s" : ""}</span>
+              </div>
+            )}
+            {tasks.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: "200px" }}>
+                <div style={{ flex: 1, height: "6px", borderRadius: "3px", background: C.border, overflow: "hidden" }}>
+                  <div style={{ width: `${pct}%`, height: "100%", background: project.color || C.accent, borderRadius: "3px", transition: "width 0.3s" }} />
+                </div>
+                <span style={{ fontSize: "11px", color: C.muted, flexShrink: 0 }}>{doneTasks}/{tasks.length} tasks ({pct}%)</span>
+              </div>
             )}
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-          {members.length > 0 && (
-            <div style={{ display: "flex" }}>
-              {members.slice(0,4).map((m, i) => (
-                <div key={m.id} style={{ marginLeft: i > 0 ? "-8px" : 0 }} title={m.name}>
-                  <MemberInitials name={m.name} size={24} />
+
+        {/* Tabs */}
+        <div style={{ display: "flex", gap: "4px", padding: "0 24px", borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: "10px 16px", border: "none", background: "none", cursor: "pointer",
+                fontSize: "13px", fontWeight: "600",
+                color: activeTab === tab.id ? C.accent : C.muted,
+                borderBottom: `2px solid ${activeTab === tab.id ? C.accent : "transparent"}`,
+                marginBottom: "-1px", transition: "color 0.12s",
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px" }}>
+
+          {/* Overview tab */}
+          {activeTab === "overview" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div>
+                <div style={{ fontSize: "11px", color: C.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>📌 What We're Working On</div>
+                {editingDetails ? (
+                  <div>
+                    <textarea
+                      autoFocus
+                      value={details}
+                      onChange={(e) => setDetails(e.target.value)}
+                      rows={5}
+                      onBlur={saveDetails}
+                      style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.6", fontSize: "13px" }) }}
+                      placeholder="Current focus, who is working on what, goals, blockers…"
+                    />
+                    <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
+                      <button onClick={saveDetails} style={{ padding: "5px 14px", borderRadius: "6px", border: "none", background: project.color || C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>Save</button>
+                      <button onClick={() => { setEditingDetails(false); setDetails(project.details || ""); }} style={{ padding: "5px 10px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", cursor: "pointer" }}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => setEditingDetails(true)}
+                    title="Click to edit"
+                    style={{ fontSize: "13px", color: details ? C.text : C.muted, lineHeight: "1.7", padding: "12px 14px", background: C.cardBg, borderRadius: "10px", border: `1px solid ${C.border}`, cursor: "pointer", minHeight: "60px", whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+                  >
+                    {details || <em>Click to describe what the team is currently working on…</em>}
+                  </div>
+                )}
+              </div>
+
+              {members.length > 0 && (
+                <div>
+                  <div style={{ fontSize: "11px", color: C.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>👥 Team Members</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                    {members.map((m) => (
+                      <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "5px 12px", borderRadius: "20px", background: C.cardBg, border: `1px solid ${C.border}` }}>
+                        <MemberInitials name={m.name} size={20} />
+                        <span style={{ fontSize: "12px", color: C.text, fontWeight: "500" }}>{m.name}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-              {members.length > 4 && (
-                <div style={{ width:24, height:24, borderRadius:"50%", background:C.cardBg, border:`2px solid ${C.border}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"9px", color:C.muted, fontWeight:"700", marginLeft:"-8px" }}>
-                  +{members.length-4}
-                </div>
+              )}
+
+              {project.createdBy && (
+                <div style={{ fontSize: "12px", color: C.muted }}>Created by <strong>{project.createdBy}</strong></div>
               )}
             </div>
           )}
-          <button onClick={() => onDelete(project.id)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "14px", padding: "2px 4px", opacity: 0.5, flexShrink: 0 }}>✕</button>
+
+          {/* Tasks tab */}
+          {activeTab === "tasks" && (
+            <div>
+              {tasks.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "24px", color: C.muted, fontSize: "13px", background: C.cardBg, borderRadius: "10px", border: `1px dashed ${C.border}`, marginBottom: "14px" }}>
+                  No tasks yet. Add the first one below.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "14px" }}>
+                  {tasks.map((task) => (
+                    <div key={task.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px", background: task.done ? `${project.color || C.accent}08` : C.cardBg, borderRadius: "10px", border: `1px solid ${task.done ? `${project.color || C.accent}25` : C.border}`, transition: "all 0.15s" }}>
+                      <button
+                        onClick={() => onToggleTask(project.id, task)}
+                        style={{
+                          width: "20px", height: "20px", borderRadius: "6px", flexShrink: 0,
+                          border: `2px solid ${task.done ? project.color || C.accent : C.border}`,
+                          background: task.done ? (project.color || C.accent) : "transparent",
+                          cursor: "pointer", padding: 0,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}
+                      >
+                        {task.done && <span style={{ color: "#fff", fontSize: "11px" }}>✓</span>}
+                      </button>
+                      <span style={{ flex: 1, fontSize: "13px", color: task.done ? C.muted : C.text, textDecoration: task.done ? "line-through" : "none" }}>{task.text}</span>
+                      {task.assignedTo && (
+                        <div title={task.assignedTo.name || task.assignedTo}>
+                          <MemberInitials name={task.assignedTo.name || task.assignedTo} size={22} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: "flex", gap: "6px" }}>
+                <input
+                  value={taskInput}
+                  onChange={(e) => setTaskInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && submitTask()}
+                  placeholder="+ Add task…"
+                  style={{ ...textInput({ flex: 1, fontSize: "13px" }) }}
+                />
+                {teamMembers.length > 0 && (
+                  <select
+                    value={selectedAssignee?.id || ""}
+                    onChange={(e) => setSelectedAssignee(teamMembers.find((m) => m.id === e.target.value) || null)}
+                    style={{ ...textInput({ maxWidth: "130px", fontSize: "12px", color: selectedAssignee ? C.text : C.muted }) }}
+                  >
+                    <option value="">Assign…</option>
+                    {teamMembers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                )}
+                <button onClick={submitTask} disabled={!taskInput.trim()} style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: taskInput.trim() ? (project.color || C.accent) : C.border, color: "#fff", fontSize: "13px", fontWeight: "600", cursor: taskInput.trim() ? "pointer" : "not-allowed" }}>
+                  Add
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Comments tab */}
+          {activeTab === "comments" && (
+            <div>
+              {statusUpdates.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "24px", color: C.muted, fontSize: "13px", background: C.cardBg, borderRadius: "10px", border: `1px dashed ${C.border}`, marginBottom: "14px" }}>
+                  No comments yet. Add a status update below.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "14px" }}>
+                  {statusUpdates.map((u, i) => (
+                    <div key={u.id || i} style={{ padding: "10px 14px", background: C.cardBg, borderRadius: "10px", border: `1px solid ${C.border}` }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: "4px" }}>
+                        <MemberInitials name={u.authorName} size={22} />
+                        <span style={{ fontSize: "12px", fontWeight: "700", color: C.accent }}>{u.authorName}</span>
+                        <span style={{ fontSize: "10px", color: C.muted }}>{u.createdAt ? new Date(u.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""}</span>
+                      </div>
+                      <div style={{ fontSize: "13px", color: C.text, lineHeight: "1.5", paddingLeft: "30px" }}>
+                        {u.text.split(/(@\w[\w\s]*)/g).map((part, j) =>
+                          part.startsWith("@") ? <strong key={j} style={{ color: C.accent }}>{part}</strong> : part
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ position: "relative" }}>
+                <textarea
+                  value={commentInput}
+                  onChange={(e) => handleCommentChange(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitComment(); } }}
+                  rows={3}
+                  placeholder="Add a status update… (use @ to mention someone)"
+                  style={{ ...textInput({ width: "100%", resize: "vertical", lineHeight: "1.5", fontSize: "13px" }) }}
+                />
+                {mentionSuggestions.length > 0 && (
+                  <div style={{ position: "absolute", bottom: "calc(100% + 4px)", left: 0, background: C.card, border: `1px solid ${C.border}`, borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.15)", zIndex: 100, minWidth: "180px", overflow: "hidden" }}>
+                    {mentionSuggestions.map((m) => (
+                      <button key={m.id} onMouseDown={(e) => { e.preventDefault(); insertMention(m); }} style={{ width: "100%", textAlign: "left", padding: "8px 12px", border: "none", background: "transparent", cursor: "pointer", fontSize: "13px", color: C.text, display: "flex", alignItems: "center", gap: "8px" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                      >
+                        <MemberInitials name={m.name} size={20} />
+                        {m.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "8px" }}>
+                <button onClick={submitComment} disabled={!commentInput.trim()} style={{ padding: "8px 18px", borderRadius: "8px", border: "none", background: commentInput.trim() ? C.accent : C.border, color: "#fff", fontSize: "13px", fontWeight: "600", cursor: commentInput.trim() ? "pointer" : "not-allowed" }}>
+                  Post Update
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function ProjectCard({ project, onToggleTask, onAddTask, onDelete, onAddStatusUpdate, onSaveDetails, teamMembers = [], onOpen }) {
+  const [hov, setHov] = useState(false);
+  const tasks = project.tasks || [];
+  const members = project.members || [];
+  const statusUpdates = project.statusUpdates || [];
+
+  const doneTasks = tasks.filter((t) => t.done).length;
+  const pct = tasks.length > 0 ? Math.round((doneTasks / tasks.length) * 100) : 0;
+
+  return (
+    <div
+      onClick={onOpen}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        background: C.card,
+        border: `1px solid ${hov ? project.color || C.accent : C.border}`,
+        borderLeft: `4px solid ${project.color || C.accent}`,
+        borderRadius: "12px",
+        padding: "16px",
+        boxShadow: hov ? C.shadowMd : C.shadow,
+        cursor: "pointer",
+        transition: "all 0.15s",
+        transform: hov ? "translateY(-1px)" : "none",
+      }}
+    >
+      {/* Title row */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "8px", gap: "8px" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "5px" }}>{project.name}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+            <StatusPill status={project.status} />
+            {tasks.length > 0 && (
+              <span style={{ fontSize: "10px", color: C.muted, padding: "1px 6px", borderRadius: "10px", background: C.cardBg, border: `1px solid ${C.border}` }}>
+                {doneTasks}/{tasks.length} tasks
+              </span>
+            )}
+            {statusUpdates.length > 0 && (
+              <span style={{ fontSize: "10px", color: C.muted }}>💬 {statusUpdates.length}</span>
+            )}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+          {members.slice(0, 4).map((m, i) => (
+            <div key={m.id} style={{ marginLeft: i > 0 ? "-8px" : 0 }} title={m.name}>
+              <MemberInitials name={m.name} size={24} />
+            </div>
+          ))}
+          {members.length > 4 && (
+            <div style={{ width: 24, height: 24, borderRadius: "50%", background: C.cardBg, border: `2px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", color: C.muted, fontWeight: "700", marginLeft: "-8px" }}>
+              +{members.length - 4}
+            </div>
+          )}
         </div>
       </div>
 
       {project.description && (
-        <div style={{ fontSize: "12px", color: C.muted, marginBottom: "10px", lineHeight: "1.4" }}>{project.description}</div>
-      )}
-
-      {project.link && (
-        <div style={{ marginBottom: "10px" }}>
-          <a
-            href={project.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "inline-flex", alignItems: "center", gap: "5px",
-              fontSize: "12px", color: C.accent, textDecoration: "none",
-              padding: "4px 10px", borderRadius: "20px",
-              border: `1px solid ${C.accent}`, background: C.accentLight,
-              fontWeight: "500", transition: "opacity 0.12s",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.75")}
-            onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-          >
-            🔗 Open Resource
-          </a>
+        <div style={{ fontSize: "12px", color: C.muted, marginBottom: "10px", lineHeight: "1.4", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          {project.description}
         </div>
       )}
 
-      {/* What we're working on — collapsible details */}
-      <div style={{ marginBottom: "10px" }}>
-        <button
-          onClick={() => setShowDetails((v) => !v)}
-          style={{ fontSize: "11px", color: showDetails ? C.accent : C.muted, background: "none", border: "none", cursor: "pointer", padding: "0", fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}
-        >
-          <span style={{ fontSize: "9px", transform: showDetails ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block", transition: "transform 0.12s" }}>▶</span>
-          What we're working on
-        </button>
-        {showDetails && (
-          <div style={{ marginTop: "8px" }}>
-            {editingDetails ? (
-              <div>
-                <textarea
-                  value={details}
-                  onChange={(e) => setDetails(e.target.value)}
-                  rows={4}
-                  autoFocus
-                  onBlur={saveDetails}
-                  style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.5", fontSize: "12px" }) }}
-                  placeholder="Current focus, who is working on what, goals, blockers…"
-                />
-                <div style={{ display: "flex", gap: "6px", marginTop: "6px" }}>
-                  <button onClick={saveDetails} style={{ padding: "4px 10px", borderRadius: "6px", border: "none", background: project.color || C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>Save</button>
-                  <button onClick={() => { setEditingDetails(false); setDetails(project.details || ""); }} style={{ padding: "4px 8px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", cursor: "pointer" }}>Cancel</button>
-                </div>
-              </div>
-            ) : (
-              <div
-                onClick={() => setEditingDetails(true)}
-                style={{ fontSize: "12px", color: details ? C.text : C.muted, lineHeight: "1.6", padding: "8px 10px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}`, cursor: "pointer", minHeight: "40px", whiteSpace: "pre-wrap", wordBreak: "break-word" }}
-                title="Click to edit"
-              >
-                {details || <em>Click to describe what the team is currently working on…</em>}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {statusUpdates.length > 0 && (
-        <div style={{ marginBottom: "10px" }}>
-          <button
-            onClick={() => setShowComments((v) => !v)}
-            style={{ fontSize: "11px", color: C.muted, background: "none", border: "none", cursor: "pointer", padding: "0", fontWeight: "600", display: "flex", alignItems: "center", gap: "4px" }}
-          >
-            <span style={{ fontSize: "9px", transform: showComments ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block", transition: "transform 0.12s" }}>▶</span>
-            {statusUpdates.length} comment{statusUpdates.length !== 1 ? "s" : ""}
-          </button>
-          {showComments && (
-            <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "6px" }}>
-              {statusUpdates.map((u, i) => (
-                <div key={u.id || i} style={{ padding: "6px 10px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}` }}>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: "6px", marginBottom: "2px" }}>
-                    <span style={{ fontSize: "11px", fontWeight: "700", color: C.accent }}>{u.authorName}</span>
-                    <span style={{ fontSize: "10px", color: C.muted }}>{u.createdAt ? new Date(u.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""}</span>
-                  </div>
-                  <div style={{ fontSize: "12px", color: C.text, lineHeight: "1.5" }}>
-                    {u.text.split(/(@\w[\w\s]*)/g).map((part, j) =>
-                      part.startsWith("@") ? <strong key={j} style={{ color: C.accent }}>{part}</strong> : part
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
+      {/* Progress bar */}
       {tasks.length > 0 && (
-        <div style={{ marginBottom: "12px" }}>
-          <ProjectProgressBar tasks={tasks} />
-        </div>
-      )}
-
-      {tasks.length > 0 && (
-        <button onClick={() => setExpanded((e) => !e)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "12px", color: C.muted, fontWeight: "600", padding: "0 0 8px", display: "flex", alignItems: "center", gap: "4px" }}>
-          <span style={{ fontSize: "9px", transform: expanded ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block", transition: "transform 0.12s" }}>▶</span>
-          {expanded ? "Hide" : "Show"} tasks ({tasks.length})
-        </button>
-      )}
-
-      {expanded && tasks.length > 0 && (
-        <div style={{ marginBottom: "10px" }}>
-          {tasks.map((task) => (
-            <div key={task.id} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "5px 0" }}>
-              <button
-                onClick={() => onToggleTask(project.id, task)}
-                style={{
-                  width: "16px", height: "16px", borderRadius: "4px", flexShrink: 0,
-                  border: `2px solid ${task.done ? project.color || C.accent : C.border}`,
-                  background: task.done ? (project.color || C.accent) : "transparent",
-                  cursor: "pointer", padding: 0,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}
-              >
-                {task.done && <span style={{ color: "#fff", fontSize: "10px" }}>✓</span>}
-              </button>
-              <span style={{ fontSize: "13px", color: task.done ? C.muted : C.text, textDecoration: task.done ? "line-through" : "none", flex: 1 }}>
-                {task.text}
-              </span>
-              {task.assignedTo && (
-                <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }} title={task.assignedTo.name || task.assignedTo}>
-                  <MemberInitials name={task.assignedTo.name || task.assignedTo} size={18} />
-                  <span style={{ fontSize: "10px", color: C.muted, whiteSpace: "nowrap" }}>{task.assignedTo.name || task.assignedTo}</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Comment / @mention thread */}
-      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "10px", marginTop: "8px", position: "relative" }}>
-        <div style={{ fontSize: "10px", color: C.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>
-          Comments
-        </div>
-        <div style={{ position: "relative" }}>
-          <div style={{ display: "flex", gap: "6px" }}>
-            <input
-              value={commentInput}
-              onChange={(e) => handleCommentChange(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitComment(); } }}
-              placeholder="Comment or @mention a teammate…"
-              style={{ ...textInput({ flex: 1, fontSize: "12px", padding: "6px 8px" }) }}
-            />
-            {commentInput.trim() && (
-              <button
-                onClick={submitComment}
-                style={{ padding: "5px 12px", borderRadius: "6px", border: "none", background: project.color || C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer", flexShrink: 0 }}
-              >
-                Post
-              </button>
-            )}
+        <div>
+          <div style={{ height: "4px", background: C.cardBg, borderRadius: "2px", overflow: "hidden", border: `1px solid ${C.border}` }}>
+            <div style={{ height: "100%", width: `${pct}%`, background: project.color || C.accent, borderRadius: "2px", transition: "width 0.3s" }} />
           </div>
-          {mentionSuggestions.length > 0 && (
-            <div style={{ position: "absolute", bottom: "calc(100% + 4px)", left: 0, background: C.card, border: `1px solid ${C.border}`, borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.15)", zIndex: 100, minWidth: "180px", overflow: "hidden" }}>
-              {mentionSuggestions.map((m) => (
-                <button
-                  key={m.id}
-                  onMouseDown={(e) => { e.preventDefault(); insertMention(m); }}
-                  style={{ width: "100%", textAlign: "left", padding: "8px 12px", border: "none", background: "transparent", cursor: "pointer", fontSize: "13px", color: C.text, display: "flex", alignItems: "center", gap: "8px" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  <MemberInitials name={m.name} size={20} />
-                  {m.name}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
-      </div>
+      )}
 
-      <div style={{ marginTop: "10px" }}>
-        <div style={{ display: "flex", gap: "6px" }}>
-          <input
-            value={taskInput}
-            onChange={(e) => setTaskInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && submitTask()}
-            placeholder="+ Add task…"
-            style={{ ...textInput({ flex: 1, fontSize: "12px", padding: "6px 8px" }) }}
-          />
-          {teamMembers.length > 0 && (
-            <select
-              value={selectedAssignee?.id || ""}
-              onChange={(e) => {
-                const m = teamMembers.find((m) => m.id === e.target.value);
-                setSelectedAssignee(m || null);
-              }}
-              style={{ ...textInput({ maxWidth: "110px", fontSize: "11px", padding: "5px 6px", color: selectedAssignee ? C.text : C.muted }) }}
-            >
-              <option value="">Assign…</option>
-              {teamMembers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-          )}
-          {taskInput.trim() && (
-            <button onClick={submitTask} style={{ padding: "6px 10px", borderRadius: "6px", border: "none", background: project.color || C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer", flexShrink: 0 }}>
-              Add
-            </button>
-          )}
-        </div>
-        {selectedAssignee && (
-          <div style={{ fontSize: "10px", color: C.accent, marginTop: "4px", display: "flex", alignItems: "center", gap: "4px" }}>
-            <MemberInitials name={selectedAssignee.name} size={14} />
-            Assigning to {selectedAssignee.name}
-            <button onClick={() => setSelectedAssignee(null)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "10px", padding: "0 2px" }}>✕</button>
-          </div>
-        )}
+      {/* Open hint */}
+      <div style={{ marginTop: "10px", fontSize: "11px", color: hov ? C.accent : C.muted, fontWeight: "600", display: "flex", alignItems: "center", gap: "4px", transition: "color 0.12s" }}>
+        {hov ? "Click to open →" : "View details"}
       </div>
     </div>
   );
@@ -1343,6 +1420,7 @@ function ProjectsSection({ token, sectionTitle, onSaveTitle, teamMembers = [] })
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -1447,6 +1525,7 @@ function ProjectsSection({ token, sectionTitle, onSaveTitle, teamMembers = [] })
               onAddStatusUpdate={handleAddStatusUpdate}
               onSaveDetails={handleSaveDetails}
               teamMembers={teamMembers}
+              onOpen={() => setSelectedProjectId(p.id)}
             />
           ))}
         </div>
@@ -1455,6 +1534,23 @@ function ProjectsSection({ token, sectionTitle, onSaveTitle, teamMembers = [] })
       {showModal && (
         <NewProjectModal onSave={handleCreate} onClose={() => setShowModal(false)} teamMembers={teamMembers} />
       )}
+
+      {selectedProjectId && (() => {
+        const proj = projects.find((p) => p.id === selectedProjectId);
+        return proj ? (
+          <ProjectDetailModal
+            project={proj}
+            token={token}
+            teamMembers={teamMembers}
+            onToggleTask={(pid, task) => { handleToggleTask(pid, task); setProjects((prev) => prev.map((p) => p.id === pid ? { ...p, tasks: (p.tasks || []).map((t) => t.id === task.id ? { ...t, done: !t.done } : t) } : p)); }}
+            onAddTask={handleAddTask}
+            onDelete={handleDelete}
+            onAddStatusUpdate={(pid, text) => { handleAddStatusUpdate(pid, text); }}
+            onSaveDetails={handleSaveDetails}
+            onClose={() => setSelectedProjectId(null)}
+          />
+        ) : null;
+      })()}
     </div>
   );
 }

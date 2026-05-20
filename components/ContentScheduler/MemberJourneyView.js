@@ -74,13 +74,82 @@ function EditableText({ value, onSave, multiline = false, placeholder = "Click t
   );
 }
 
+// ─── Editable Bullet Step ────────────────────────────────────────────────────
+
+function BulletStep({ step, stageColor, stepIndex, onEdit, onDelete }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(step.text || "");
+  const [hov, setHov] = useState(false);
+
+  useEffect(() => { setDraft(step.text || ""); }, [step.text]);
+
+  const save = () => {
+    setEditing(false);
+    if (draft.trim() && draft !== step.text) onEdit(step.id, draft.trim());
+    else setDraft(step.text || "");
+  };
+
+  return (
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        display: "flex", alignItems: "flex-start", gap: "10px",
+        padding: "8px 12px",
+        background: hov ? `${stageColor}08` : C.cardBg,
+        borderRadius: "10px",
+        border: `1px solid ${hov ? `${stageColor}25` : C.border}`,
+        transition: "all 0.15s",
+      }}
+    >
+      {/* Bullet */}
+      <div style={{
+        width: "8px", height: "8px", borderRadius: "50%", flexShrink: 0,
+        background: stageColor, marginTop: "5px",
+      }} />
+
+      {/* Number */}
+      <div style={{ fontSize: "9px", fontWeight: "800", color: C.muted, flexShrink: 0, minWidth: "14px", marginTop: "3px" }}>{stepIndex + 1}.</div>
+
+      {/* Text */}
+      {editing ? (
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") { setDraft(step.text || ""); setEditing(false); } }}
+          style={{ ...textInput({ flex: 1, fontSize: "13px", padding: "2px 6px" }) }}
+        />
+      ) : (
+        <span
+          onClick={() => setEditing(true)}
+          title="Click to edit"
+          style={{ flex: 1, fontSize: "13px", color: C.text, lineHeight: "1.5", cursor: "text", padding: "1px 0", wordBreak: "break-word" }}
+        >
+          {step.text}
+        </span>
+      )}
+
+      {/* Delete */}
+      {hov && !editing && (
+        <button
+          onClick={() => onDelete(step.id)}
+          style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "12px", opacity: 0.5, padding: "1px 3px", flexShrink: 0, marginTop: "1px" }}
+        >
+          ✕
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── Stage Pipeline Card ──────────────────────────────────────────────────────
 
 function StageCard({ stage, isSelected, onClick, stageIndex, totalStages }) {
   const [hov, setHov] = useState(false);
-  const doneCount = (stage.steps || []).filter((s) => s.done).length;
-  const totalCount = (stage.steps || []).length;
-  const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+  const assignedMembers = stage.assignedMembers || [];
+  const stepCount = (stage.steps || []).length;
 
   return (
     <div style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
@@ -121,23 +190,24 @@ function StageCard({ stage, isSelected, onClick, stageIndex, totalStages }) {
           {stage.tagline}
         </div>
 
-        {/* Progress bar */}
-        {totalCount > 0 && (
+        {/* Step count */}
+        {stepCount > 0 && (
           <div style={{ marginBottom: "8px" }}>
-            <div style={{ height: "3px", borderRadius: "2px", background: isSelected ? "rgba(255,255,255,0.25)" : C.border, overflow: "hidden" }}>
-              <div style={{ width: `${pct}%`, height: "100%", background: isSelected ? "#fff" : stage.color, borderRadius: "2px", transition: "width 0.3s" }} />
-            </div>
-            <div style={{ fontSize: "9px", color: isSelected ? "rgba(255,255,255,0.7)" : C.muted, marginTop: "3px" }}>{doneCount}/{totalCount} steps</div>
+            <div style={{ fontSize: "9px", color: isSelected ? "rgba(255,255,255,0.7)" : C.muted }}>{stepCount} step{stepCount !== 1 ? "s" : ""}</div>
           </div>
         )}
 
-        {/* Assignee */}
-        {stage.assignedMemberName && (
-          <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-            <MemberInitials name={stage.assignedMemberName} size={18} />
-            <span style={{ fontSize: "10px", color: isSelected ? "rgba(255,255,255,0.8)" : C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {stage.assignedMemberName}
-            </span>
+        {/* Assigned members */}
+        {assignedMembers.length > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
+            {assignedMembers.slice(0, 3).map((m) => (
+              <div key={m.id} title={m.name}>
+                <MemberInitials name={m.name} size={18} />
+              </div>
+            ))}
+            {assignedMembers.length > 3 && (
+              <div style={{ fontSize: "9px", color: isSelected ? "rgba(255,255,255,0.8)" : C.muted, fontWeight: "700" }}>+{assignedMembers.length - 3}</div>
+            )}
           </div>
         )}
 
@@ -177,10 +247,7 @@ function StageDetail({ stage, token, teamMembers, onUpdate }) {
   const patch = async (body) => {
     setSaving(true);
     try {
-      const res = await apiFetch("/api/memberjourney", {
-        method: "PUT",
-        body: JSON.stringify(body),
-      }, token);
+      const res = await apiFetch("/api/memberjourney", { method: "PUT", body: JSON.stringify(body) }, token);
       const updated = await res.json();
       onUpdate(updated);
     } finally { setSaving(false); }
@@ -194,7 +261,7 @@ function StageDetail({ stage, token, teamMembers, onUpdate }) {
     setNewStep("");
   };
 
-  const toggleStep = (stepId) => patch({ stageAction: "toggleStep", stageId: stage.id, stepId });
+  const editStep = (stepId, text) => patch({ stageAction: "editStep", stageId: stage.id, stepId, text });
   const deleteStep = (stepId) => patch({ stageAction: "deleteStep", stageId: stage.id, stepId });
 
   const addResource = async () => {
@@ -205,18 +272,18 @@ function StageDetail({ stage, token, teamMembers, onUpdate }) {
 
   const deleteResource = (resourceId) => patch({ stageAction: "deleteResource", stageId: stage.id, resourceId });
 
-  const handleAssign = (memberId) => {
-    const member = teamMembers.find((m) => m.id === memberId);
-    patch({ stageAction: "updateStage", stageId: stage.id, patch: {
-      assignedMemberId: member?.id || null,
-      assignedMemberName: member?.name || null,
-    }});
+  // Multi-assignee toggle
+  const assignedMembers = stage.assignedMembers || [];
+  const toggleAssignee = (member) => {
+    const exists = assignedMembers.find((m) => m.id === member.id);
+    const updated = exists
+      ? assignedMembers.filter((m) => m.id !== member.id)
+      : [...assignedMembers, { id: member.id, name: member.name }];
+    patch({ stageAction: "updateStage", stageId: stage.id, patch: { assignedMembers: updated } });
   };
 
   const steps = stage.steps || [];
   const resources = stage.resources || [];
-  const doneCount = steps.filter((s) => s.done).length;
-  const pct = steps.length > 0 ? Math.round((doneCount / steps.length) * 100) : 0;
 
   return (
     <div style={{
@@ -247,40 +314,51 @@ function StageDetail({ stage, token, teamMembers, onUpdate }) {
           />
         </div>
 
-        {/* Assign member + progress */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px", flexShrink: 0 }}>
-          {steps.length > 0 && (
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: "22px", fontWeight: "800", color: stage.color }}>{pct}%</div>
-              <div style={{ fontSize: "10px", color: C.muted }}>{doneCount}/{steps.length} complete</div>
+        {/* Multi-assign members */}
+        {teamMembers.length > 0 && (
+          <div style={{ flexShrink: 0 }}>
+            <div style={{ fontSize: "10px", color: C.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Assigned To</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", maxWidth: "240px" }}>
+              {teamMembers.map((m) => {
+                const assigned = assignedMembers.find((a) => a.id === m.id);
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => toggleAssignee(m)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: "5px",
+                      padding: "4px 9px", borderRadius: "20px", border: "none", cursor: "pointer",
+                      background: assigned ? `${stage.color}20` : C.cardBg,
+                      border: `1px solid ${assigned ? stage.color : C.border}`,
+                      fontSize: "11px", fontWeight: "600",
+                      color: assigned ? stage.color : C.muted,
+                      transition: "all 0.12s",
+                    }}
+                  >
+                    <MemberInitials name={m.name} size={16} />
+                    {m.name.split(" ")[0]}
+                  </button>
+                );
+              })}
             </div>
-          )}
-          {teamMembers.length > 0 && (
-            <div>
-              <div style={{ fontSize: "10px", color: C.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "4px" }}>Assigned To</div>
-              <select
-                value={stage.assignedMemberId || ""}
-                onChange={(e) => handleAssign(e.target.value)}
-                style={{ ...textInput({ fontSize: "12px", color: C.text, minWidth: "160px" }) }}
-              >
-                <option value="">— Unassigned —</option>
-                {teamMembers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
-              {stage.assignedMemberName && (
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px" }}>
-                  <MemberInitials name={stage.assignedMemberName} size={22} />
-                  <span style={{ fontSize: "12px", color: C.text, fontWeight: "600" }}>{stage.assignedMemberName}</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+            {assignedMembers.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "8px", flexWrap: "wrap" }}>
+                {assignedMembers.map((m) => (
+                  <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                    <MemberInitials name={m.name} size={20} />
+                    <span style={{ fontSize: "11px", color: C.text, fontWeight: "500" }}>{m.name.split(" ")[0]}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Two-column body */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
 
-        {/* Left: Description + Why It Matters */}
+        {/* Left: Description + Why It Matters + Notes + Resources */}
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           <div>
             <div style={{ fontSize: "11px", color: C.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
@@ -357,11 +435,11 @@ function StageDetail({ stage, token, teamMembers, onUpdate }) {
           </div>
         </div>
 
-        {/* Right: Process Checklist */}
+        {/* Right: Process Steps (bullet points) */}
         <div>
           <div style={{ fontSize: "11px", color: C.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-            <span style={{ color: stage.color }}>✓</span> The Process
-            <span style={{ marginLeft: "auto", fontSize: "10px", fontWeight: "400", color: C.muted }}>{doneCount}/{steps.length} done</span>
+            <span style={{ color: stage.color }}>●</span> Process Steps
+            <span style={{ marginLeft: "auto", fontSize: "10px", fontWeight: "400", color: C.muted }}>{steps.length} step{steps.length !== 1 ? "s" : ""}</span>
           </div>
 
           {steps.length === 0 ? (
@@ -371,40 +449,14 @@ function StageDetail({ stage, token, teamMembers, onUpdate }) {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "12px" }}>
               {steps.map((step, i) => (
-                <div
+                <BulletStep
                   key={step.id}
-                  style={{
-                    display: "flex", alignItems: "center", gap: "10px",
-                    padding: "10px 12px",
-                    background: step.done ? `${stage.color}0A` : C.cardBg,
-                    borderRadius: "10px",
-                    border: `1px solid ${step.done ? `${stage.color}30` : C.border}`,
-                    transition: "all 0.15s",
-                  }}
-                >
-                  <div style={{ fontSize: "9px", fontWeight: "800", color: C.muted, width: "16px", flexShrink: 0, textAlign: "right" }}>{i + 1}</div>
-                  <button
-                    onClick={() => toggleStep(step.id)}
-                    style={{
-                      width: "20px", height: "20px", borderRadius: "6px", flexShrink: 0,
-                      border: `2px solid ${step.done ? stage.color : C.border}`,
-                      background: step.done ? stage.color : "transparent",
-                      cursor: "pointer", padding: 0,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                    }}
-                  >
-                    {step.done && <span style={{ color: "#fff", fontSize: "11px", fontWeight: "800" }}>✓</span>}
-                  </button>
-                  <span style={{ flex: 1, fontSize: "13px", color: step.done ? C.muted : C.text, textDecoration: step.done ? "line-through" : "none", lineHeight: "1.4" }}>
-                    {step.text}
-                  </span>
-                  <button
-                    onClick={() => deleteStep(step.id)}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "12px", opacity: 0.4, padding: "2px 4px", flexShrink: 0 }}
-                  >
-                    ✕
-                  </button>
-                </div>
+                  step={step}
+                  stageColor={stage.color}
+                  stepIndex={i}
+                  onEdit={editStep}
+                  onDelete={deleteStep}
+                />
               ))}
             </div>
           )}
@@ -426,19 +478,6 @@ function StageDetail({ stage, token, teamMembers, onUpdate }) {
               Add
             </button>
           </div>
-
-          {/* Stage completion summary */}
-          {steps.length > 0 && (
-            <div style={{ marginTop: "16px", padding: "12px 16px", background: `${stage.color}10`, borderRadius: "10px", border: `1px solid ${stage.color}25` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                <span style={{ fontSize: "12px", fontWeight: "600", color: stage.color }}>Stage Completion</span>
-                <span style={{ fontSize: "14px", fontWeight: "800", color: stage.color }}>{pct}%</span>
-              </div>
-              <div style={{ height: "6px", borderRadius: "3px", background: `${stage.color}25`, overflow: "hidden" }}>
-                <div style={{ width: `${pct}%`, height: "100%", background: stage.color, borderRadius: "3px", transition: "width 0.4s" }} />
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -449,15 +488,14 @@ function StageDetail({ stage, token, teamMembers, onUpdate }) {
 
 function JourneyStats({ stages }) {
   const totalSteps = stages.reduce((a, s) => a + (s.steps || []).length, 0);
-  const doneSteps = stages.reduce((a, s) => a + (s.steps || []).filter((st) => st.done).length, 0);
-  const assignedStages = stages.filter((s) => s.assignedMemberId).length;
-  const overallPct = totalSteps > 0 ? Math.round((doneSteps / totalSteps) * 100) : 0;
+  const assignedStages = stages.filter((s) => (s.assignedMembers || []).length > 0).length;
+  const totalAssigned = stages.reduce((a, s) => a + (s.assignedMembers || []).length, 0);
 
   const stats = [
     { label: "Journey Stages", value: stages.length, color: "#6366F1" },
     { label: "Total Process Steps", value: totalSteps, color: "#8B5CF6" },
     { label: "Stages with Owners", value: `${assignedStages}/${stages.length}`, color: "#10B981" },
-    { label: "Overall Completion", value: `${overallPct}%`, color: "#F59E0B" },
+    { label: "Team Assignments", value: totalAssigned, color: "#F59E0B" },
   ];
 
   return (

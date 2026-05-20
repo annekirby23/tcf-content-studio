@@ -21,6 +21,8 @@ import TrainingView from "./TrainingView";
 import EventsView from "./EventsView";
 import TCFInfoView from "./TCFInfoView";
 import LocationsView from "./LocationsView";
+import MemberJourneyView from "./MemberJourneyView";
+import BulletinBoardView from "./BulletinBoardView";
 
 const TOKEN_KEY = "tcf_session";
 
@@ -29,7 +31,6 @@ const CONTENT_VIEWS = [
   { id: "calendar", label: "Calendar", icon: "📅" },
   { id: "pipeline", label: "Pipeline", icon: "⬛" },
   { id: "list", label: "List", icon: "☰" },
-  { id: "slack", label: "Slack", icon: "💬" },
   { id: "links", label: "Quick Links", icon: "🔗" },
   { id: "assets", label: "Assets", icon: "📦" },
 ];
@@ -873,7 +874,6 @@ function InternalView({ token }) {
   const tabs = [
     { id: "hrInfo", label: "HR Info", icon: "🏢" },
     { id: "contacts", label: "Important Contacts", icon: "📞" },
-    { id: "membership", label: "Membership Details", icon: "🏛" },
     { id: "pto", label: "PTO / Vacation 🗓", icon: "" },
   ];
 
@@ -881,7 +881,7 @@ function InternalView({ token }) {
     <div>
       <div style={{ marginBottom: "20px" }}>
         <h1 style={{ margin: "0 0 4px", fontSize: "24px", fontWeight: "800", color: C.text }}>Internal</h1>
-        <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>Internal resources — HR info, contacts, membership details, inventory, and PTO</p>
+        <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>Internal resources — HR info, contacts, and PTO</p>
       </div>
 
       {/* Tab bar */}
@@ -906,7 +906,6 @@ function InternalView({ token }) {
 
       {activeTab === "hrInfo" && <HRInfoTab token={token} />}
       {activeTab === "contacts" && <ContactsTab token={token} />}
-      {activeTab === "membership" && <MembershipsTab token={token} />}
       {activeTab === "pto" && <PTOEmbedTab token={token} />}
     </div>
   );
@@ -1100,7 +1099,9 @@ export default function ContentScheduler() {
     } catch { return null; }
   });
   const dragIndexRef = useRef(null);
+  const viewAreaRef = useRef(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [teamMembersCollapsed, setTeamMembersCollapsed] = useState(false);
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -1269,9 +1270,20 @@ export default function ContentScheduler() {
     }
   };
 
+  const scrollToTop = () => {
+    if (viewAreaRef.current) viewAreaRef.current.scrollTop = 0;
+  };
+
   const handleNavigate = (targetView, filters = {}) => {
     setView(targetView);
     setListFilters(filters);
+    scrollToTop();
+  };
+
+  const navigate = (targetView) => {
+    setView(targetView);
+    setViewingUserId(null);
+    scrollToTop();
   };
 
   const handleGoalsUpdate = (updated) => setGoals(updated);
@@ -1365,13 +1377,17 @@ export default function ContentScheduler() {
   // Top bar title
   const ALL_VIEWS = [
     ...CONTENT_VIEWS,
+    { id: "slack", label: "Slack" },
     INTERNAL_VIEW,
     { id: "inventory", label: "Inventory" },
+    { id: "memberships", label: "Memberships" },
     { id: "teamtasks", label: "Task Tracker" },
     { id: "training", label: "Training" },
-    { id: "events", label: "Events" },
+    { id: "events", label: "Event Planning" },
     { id: "tcfinfo", label: "About TCF" },
+    { id: "memberjourney", label: "Member Journey" },
     { id: "locations", label: "Locations" },
+    { id: "bulletin", label: "Bulletin Board" },
   ];
   const topBarTitle = view === "mydash"
     ? workspaceTitle
@@ -1448,9 +1464,9 @@ export default function ContentScheduler() {
           {/* ── TEAM section ── */}
           <SidebarSectionLabel label="Team" visible={sidebarOpen} />
 
-          {/* Current user → own workspace */}
+          {/* Current user → own workspace (always visible) */}
           <button
-            onClick={() => { setView("mydash"); setViewingUserId(null); }}
+            onClick={() => { navigate("mydash"); }}
             title={!sidebarOpen ? `${currentUser.name} (My Workspace)` : undefined}
             style={{
               width: "100%", display: "flex", alignItems: "center", gap: "10px",
@@ -1466,35 +1482,69 @@ export default function ContentScheduler() {
           >
             <UserAvatar name={currentUser.name} size={24} />
             {sidebarOpen && (
-              <div style={{ minWidth: 0 }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: "13px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentUser.name}</div>
-                {sidebarOpen && <div style={{ fontSize: "10px", color: C.muted, textTransform: "capitalize" }}>{currentUser.role}</div>}
+                <div style={{ fontSize: "10px", color: C.muted, textTransform: "capitalize" }}>{currentUser.role}</div>
               </div>
             )}
           </button>
 
-          {/* Other team members */}
-          {otherMembers.map((member) => {
+          {/* Other team members — collapsible */}
+          {otherMembers.length > 0 && sidebarOpen && (
+            <div style={{ marginBottom: "2px" }}>
+              <button
+                onClick={() => setTeamMembersCollapsed((v) => !v)}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: "6px", padding: "4px 10px", borderRadius: "6px", border: "none", background: "transparent", color: C.muted, fontSize: "10px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em", cursor: "pointer", textAlign: "left" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                <span style={{ fontSize: "8px", display: "inline-block", transform: teamMembersCollapsed ? "rotate(-90deg)" : "rotate(0deg)", transition: "transform 0.15s" }}>▼</span>
+                Team ({otherMembers.length})
+              </button>
+              {!teamMembersCollapsed && otherMembers.map((member) => {
+                const isMemberActive = view === "mydash" && viewingUserId === member.id;
+                return (
+                  <button
+                    key={member.id}
+                    onClick={() => { setView("mydash"); setViewingUserId(member.id); scrollToTop(); }}
+                    style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: "10px",
+                      padding: "7px 10px 7px 22px", borderRadius: "8px", border: "none",
+                      background: isMemberActive ? C.accentLight : "transparent",
+                      color: isMemberActive ? C.accentBright : C.muted,
+                      fontSize: "13px", fontWeight: isMemberActive ? "600" : "400",
+                      cursor: "pointer", transition: "all 0.15s", textAlign: "left",
+                      marginBottom: "2px", whiteSpace: "nowrap", overflow: "hidden",
+                    }}
+                    onMouseEnter={(e) => { if (!isMemberActive) e.currentTarget.style.background = C.hover; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = isMemberActive ? C.accentLight : "transparent"; }}
+                  >
+                    <UserAvatar name={member.name} size={20} />
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{member.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Other team members when sidebar is collapsed */}
+          {!sidebarOpen && otherMembers.map((member) => {
             const isMemberActive = view === "mydash" && viewingUserId === member.id;
             return (
               <button
                 key={member.id}
-                onClick={() => { setView("mydash"); setViewingUserId(member.id); }}
-                title={!sidebarOpen ? member.name : undefined}
+                onClick={() => { setView("mydash"); setViewingUserId(member.id); scrollToTop(); }}
+                title={member.name}
                 style={{
-                  width: "100%", display: "flex", alignItems: "center", gap: "10px",
-                  padding: "8px 10px", borderRadius: "8px", border: "none",
+                  width: "100%", display: "flex", alignItems: "center", justifyContent: "center",
+                  padding: "7px 4px", borderRadius: "8px", border: "none",
                   background: isMemberActive ? C.accentLight : "transparent",
-                  color: isMemberActive ? C.accentBright : C.muted,
-                  fontSize: "13px", fontWeight: isMemberActive ? "600" : "400",
-                  cursor: "pointer", transition: "all 0.15s", textAlign: "left",
-                  marginBottom: "2px", whiteSpace: "nowrap", overflow: "hidden",
+                  cursor: "pointer", transition: "all 0.15s", marginBottom: "2px",
                 }}
                 onMouseEnter={(e) => { if (!isMemberActive) e.currentTarget.style.background = C.hover; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = isMemberActive ? C.accentLight : "transparent"; }}
               >
-                <UserAvatar name={member.name} size={24} />
-                {sidebarOpen && <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{member.name}</span>}
+                <UserAvatar name={member.name} size={20} />
               </button>
             );
           })}
@@ -1504,24 +1554,50 @@ export default function ContentScheduler() {
             icon="👤"
             label="Profile"
             active={view === "profile"}
-            onClick={() => { setView("profile"); setViewingUserId(null); }}
+            onClick={() => navigate("profile")}
             sidebarOpen={sidebarOpen}
           />
 
-          {/* ── ABOUT TCF + EVENTS (before Content) ── */}
+          {/* ── TCF HUB section ── */}
+          <SidebarSectionLabel label="TCF Hub" visible={sidebarOpen} />
+
           <NavBtn
             icon="🏫"
             label="About TCF"
             active={view === "tcfinfo"}
-            onClick={() => { setView("tcfinfo"); setViewingUserId(null); }}
+            onClick={() => navigate("tcfinfo")}
+            sidebarOpen={sidebarOpen}
+          />
+
+          <NavBtn
+            icon="🗺️"
+            label="Member Journey"
+            active={view === "memberjourney"}
+            onClick={() => navigate("memberjourney")}
             sidebarOpen={sidebarOpen}
           />
 
           <NavBtn
             icon="📅"
-            label="Events"
+            label="Event Planning"
             active={view === "events"}
-            onClick={() => { setView("events"); setViewingUserId(null); }}
+            onClick={() => navigate("events")}
+            sidebarOpen={sidebarOpen}
+          />
+
+          <NavBtn
+            icon="💬"
+            label="Slack"
+            active={view === "slack"}
+            onClick={() => navigate("slack")}
+            sidebarOpen={sidebarOpen}
+          />
+
+          <NavBtn
+            icon="📋"
+            label="Bulletin Board"
+            active={view === "bulletin"}
+            onClick={() => navigate("bulletin")}
             sidebarOpen={sidebarOpen}
           />
 
@@ -1537,7 +1613,7 @@ export default function ContentScheduler() {
               sidebarOpen={sidebarOpen}
               dragIndexRef={dragIndexRef}
               orderedContentViews={orderedContentViews}
-              onNavigate={() => { setView(v.id); setViewingUserId(null); }}
+              onNavigate={() => { navigate(v.id); }}
               onReorder={(ids) => {
                 setContentViewOrder(ids);
                 try { localStorage.setItem("tcf_nav_order", JSON.stringify(ids)); } catch {}
@@ -1545,22 +1621,19 @@ export default function ContentScheduler() {
             />
           ))}
 
-          {/* New Campaign button — above campaign tags */}
-          <button
-            onClick={() => setCampaignModalOpen(true)}
-            title={!sidebarOpen ? "New Campaign" : undefined}
-            style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "9px 10px", borderRadius: "8px", border: "none", background: "transparent", color: C.muted, fontSize: "13px", cursor: "pointer", transition: "all 0.15s", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-          >
-            <span style={{ fontSize: "16px", flexShrink: 0 }}>🎯</span>
-            {sidebarOpen && "New Campaign"}
-          </button>
-
-          {/* Campaigns list */}
-          {sidebarOpen && campaigns.length > 0 && (
-            <div style={{ padding: "0 4px", marginTop: "2px" }}>
-              <div style={{ fontSize: "10px", color: C.muted, fontWeight: "600", letterSpacing: "0.08em", textTransform: "uppercase", padding: "4px 6px", marginBottom: "4px" }}>Campaigns</div>
+          {/* Campaigns header + New Campaign button */}
+          {sidebarOpen ? (
+            <div style={{ padding: "0 4px", marginTop: "6px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 6px", marginBottom: "2px" }}>
+                <div style={{ fontSize: "10px", color: C.muted, fontWeight: "700", letterSpacing: "0.08em", textTransform: "uppercase" }}>Campaigns</div>
+                <button
+                  onClick={() => setCampaignModalOpen(true)}
+                  style={{ fontSize: "11px", color: C.accent, background: "none", border: "none", cursor: "pointer", fontWeight: "700", padding: "0 2px" }}
+                  title="New Campaign"
+                >
+                  + New
+                </button>
+              </div>
               {campaigns.slice(0, 8).map((c) => (
                 <button
                   key={c.id}
@@ -1572,7 +1645,27 @@ export default function ContentScheduler() {
                   🎯 {c.name}
                 </button>
               ))}
+              {campaigns.length === 0 && (
+                <button
+                  onClick={() => setCampaignModalOpen(true)}
+                  style={{ width: "100%", textAlign: "left", fontSize: "12px", color: C.muted, padding: "5px 8px", borderRadius: "6px", cursor: "pointer", border: "none", background: "transparent", fontStyle: "italic" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  + New Campaign
+                </button>
+              )}
             </div>
+          ) : (
+            <button
+              onClick={() => setCampaignModalOpen(true)}
+              title="New Campaign"
+              style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "9px 4px", borderRadius: "8px", border: "none", background: "transparent", color: C.muted, fontSize: "16px", cursor: "pointer", transition: "all 0.15s" }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            >
+              🎯
+            </button>
           )}
 
           {/* ── INTERNAL section ── */}
@@ -1582,7 +1675,15 @@ export default function ContentScheduler() {
             icon={INTERNAL_VIEW.icon}
             label={INTERNAL_VIEW.label}
             active={view === "internal"}
-            onClick={() => { setView("internal"); setViewingUserId(null); }}
+            onClick={() => navigate("internal")}
+            sidebarOpen={sidebarOpen}
+          />
+
+          <NavBtn
+            icon="🏛"
+            label="Memberships"
+            active={view === "memberships"}
+            onClick={() => navigate("memberships")}
             sidebarOpen={sidebarOpen}
           />
 
@@ -1590,7 +1691,7 @@ export default function ContentScheduler() {
             icon="📍"
             label="Locations"
             active={view === "locations"}
-            onClick={() => { setView("locations"); setViewingUserId(null); }}
+            onClick={() => navigate("locations")}
             sidebarOpen={sidebarOpen}
           />
 
@@ -1598,7 +1699,7 @@ export default function ContentScheduler() {
             icon="📦"
             label="Inventory"
             active={view === "inventory"}
-            onClick={() => { setView("inventory"); setViewingUserId(null); }}
+            onClick={() => navigate("inventory")}
             sidebarOpen={sidebarOpen}
           />
 
@@ -1606,7 +1707,7 @@ export default function ContentScheduler() {
             icon="✅"
             label="Task Tracker"
             active={view === "teamtasks"}
-            onClick={() => { setView("teamtasks"); setViewingUserId(null); }}
+            onClick={() => navigate("teamtasks")}
             sidebarOpen={sidebarOpen}
           />
 
@@ -1614,7 +1715,7 @@ export default function ContentScheduler() {
             icon="🎓"
             label="Training"
             active={view === "training"}
-            onClick={() => { setView("training"); setViewingUserId(null); }}
+            onClick={() => navigate("training")}
             sidebarOpen={sidebarOpen}
           />
 
@@ -1765,7 +1866,7 @@ export default function ContentScheduler() {
         </div>
 
         {/* View area */}
-        <div className="tcf-view-area" style={{ flex: 1, overflow: "auto", padding: "28px" }}>
+        <div ref={viewAreaRef} className="tcf-view-area" style={{ flex: 1, overflow: "auto", padding: "28px" }}>
           {loading ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "300px" }}>
               <div style={{ width: "32px", height: "32px", border: `3px solid ${C.border}`, borderTopColor: C.accent, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
@@ -1777,6 +1878,7 @@ export default function ContentScheduler() {
               {view === "pipeline" && <Pipeline posts={posts} onEdit={openEdit} onNewPost={(date, status) => openNew(date, status || "draft")} onStatusChange={handleStatusChange} currentUser={currentUser} />}
               {view === "list" && <ListView key={JSON.stringify(listFilters)} posts={posts} campaigns={campaigns} onEdit={openEdit} onNewPost={() => openNew()} initialFilters={listFilters} />}
               {view === "slack" && <SlackPlanner currentUser={currentUser} token={authToken} onMakePost={handleMakePost} teamMembers={teamMembers} />}
+              {view === "bulletin" && <BulletinBoardView token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
               {view === "links" && <QuickLinks currentUser={currentUser} token={authToken} />}
               {view === "assets" && <AssetTracker currentUser={currentUser} token={authToken} teamMembers={teamMembers} />}
               {view === "mydash" && (
@@ -1815,6 +1917,24 @@ export default function ContentScheduler() {
               {view === "training" && <TrainingView token={authToken} currentUser={currentUser} />}
               {view === "events" && <EventsView token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
               {view === "tcfinfo" && <TCFInfoView token={authToken} teamMembers={teamMembers} />}
+              {view === "memberjourney" && (
+                <div style={{ padding: "24px", maxWidth: "980px", margin: "0 auto" }}>
+                  <div style={{ marginBottom: "20px" }}>
+                    <h1 style={{ margin: "0 0 6px", fontSize: "24px", fontWeight: "800", color: C.text }}>🗺️ Member Journey</h1>
+                    <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>The full process from discovery to becoming a connected, lifelong TCF member.</p>
+                  </div>
+                  <MemberJourneyView token={authToken} teamMembers={teamMembers} />
+                </div>
+              )}
+              {view === "memberships" && (
+                <div style={{ padding: "24px", maxWidth: "860px", margin: "0 auto" }}>
+                  <div style={{ marginBottom: "20px" }}>
+                    <h1 style={{ margin: "0 0 6px", fontSize: "24px", fontWeight: "800", color: C.text }}>🏛 Memberships</h1>
+                    <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>Track memberships, subscriptions, and recurring costs.</p>
+                  </div>
+                  <MembershipsTab token={authToken} />
+                </div>
+              )}
               {view === "locations" && <LocationsView token={authToken} teamMembers={teamMembers} />}
             </>
           )}

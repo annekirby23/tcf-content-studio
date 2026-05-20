@@ -19,8 +19,7 @@ const DEFAULT_STAGES = [
       { id: "d3", text: "Initial response sent within 24 hours", done: false },
       { id: "d4", text: "Tour scheduled", done: false },
     ],
-    assignedMemberId: null,
-    assignedMemberName: null,
+    assignedMembers: [],
     notes: "",
     resources: [],
   },
@@ -40,8 +39,7 @@ const DEFAULT_STAGES = [
       { id: "t5", text: "Share membership options and pricing", done: false },
       { id: "t6", text: "Follow-up within 24 hours", done: false },
     ],
-    assignedMemberId: null,
-    assignedMemberName: null,
+    assignedMembers: [],
     notes: "",
     resources: [],
   },
@@ -61,8 +59,7 @@ const DEFAULT_STAGES = [
       { id: "s5", text: "Welcome email sent with next steps", done: false },
       { id: "s6", text: "Onboarding session scheduled", done: false },
     ],
-    assignedMemberId: null,
-    assignedMemberName: null,
+    assignedMembers: [],
     notes: "",
     resources: [],
   },
@@ -83,8 +80,7 @@ const DEFAULT_STAGES = [
       { id: "o6", text: "First class or session scheduled", done: false },
       { id: "o7", text: "Photo taken for member wall (if applicable)", done: false },
     ],
-    assignedMemberId: null,
-    assignedMemberName: null,
+    assignedMembers: [],
     notes: "",
     resources: [],
   },
@@ -104,8 +100,7 @@ const DEFAULT_STAGES = [
       { id: "se5", text: "Any issues addressed proactively", done: false },
       { id: "se6", text: "Celebrate a win or milestone with them", done: false },
     ],
-    assignedMemberId: null,
-    assignedMemberName: null,
+    assignedMembers: [],
     notes: "",
     resources: [],
   },
@@ -125,8 +120,7 @@ const DEFAULT_STAGES = [
       { id: "c5", text: "Engaged with TCF on social media", done: false },
       { id: "c6", text: "Recognized as a community leader or ambassador", done: false },
     ],
-    assignedMemberId: null,
-    assignedMemberName: null,
+    assignedMembers: [],
     notes: "",
     resources: [],
   },
@@ -168,6 +162,12 @@ export async function PUT(req) {
       current.stages = (current.stages || []).map((s) => {
         if (s.id !== stageId) return s;
         return { ...s, steps: (s.steps || []).map((st) => st.id === stepId ? { ...st, done: !st.done } : st) };
+      });
+    } else if (body.stageAction === "editStep") {
+      const { stageId, stepId, text } = body;
+      current.stages = (current.stages || []).map((s) => {
+        if (s.id !== stageId) return s;
+        return { ...s, steps: (s.steps || []).map((st) => st.id === stepId ? { ...st, text } : st) };
       });
     } else if (body.stageAction === "deleteStep") {
       const { stageId, stepId } = body;
