@@ -599,57 +599,131 @@ function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSave
 
 // ─── DAILY ROUTINES ───────────────────────────────────────────────────────────
 
-function DailyTaskItem({ task, onToggle, onDelete, readOnly, isDone }) {
+const DAY_OPTIONS = [
+  { id: "mon", label: "Mon", color: "#6366F1", bg: "rgba(99,102,241,0.12)" },
+  { id: "tue", label: "Tue", color: "#8B5CF6", bg: "rgba(139,92,246,0.12)" },
+  { id: "wed", label: "Wed", color: "#EC4899", bg: "rgba(236,72,153,0.12)" },
+  { id: "thu", label: "Thu", color: "#F59E0B", bg: "rgba(245,158,11,0.12)" },
+  { id: "fri", label: "Fri", color: "#10B981", bg: "rgba(16,185,129,0.12)" },
+  { id: "sat", label: "Sat", color: "#3B82F6", bg: "rgba(59,130,246,0.12)" },
+  { id: "sun", label: "Sun", color: "#EF4444", bg: "rgba(239,68,68,0.12)" },
+];
+
+function DailyTaskItem({ task, onToggle, onDelete, onEdit, readOnly, isDone }) {
   const [hov, setHov] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(task.text || "");
+  const [editDays, setEditDays] = useState(task.days || ["mon","tue","wed","thu","fri"]);
+
+  const activeDays = task.days && task.days.length > 0 ? task.days : ["mon","tue","wed","thu","fri"];
+  const todayId = todayDayId();
+  const isToday = activeDays.includes(todayId);
+
+  const saveEdit = () => {
+    if (!editText.trim()) return;
+    onEdit(task.id, editText.trim(), editDays);
+    setEditing(false);
+  };
+
+  const toggleEditDay = (id) => setEditDays((prev) => prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]);
+
+  if (editing) {
+    return (
+      <div style={{ background: C.card, border: `1.5px solid ${C.accent}`, borderRadius: "10px", padding: "10px 12px", marginBottom: "0" }}>
+        <input
+          autoFocus
+          value={editText}
+          onChange={(e) => setEditText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditing(false); }}
+          style={{ ...textInput({ width: "100%", fontSize: "13px", marginBottom: "8px" }), display: "block", marginBottom: "8px" }}
+        />
+        <div style={{ display: "flex", gap: "3px", flexWrap: "wrap", marginBottom: "8px" }}>
+          {DAY_OPTIONS.map((d) => (
+            <button
+              key={d.id}
+              onClick={() => toggleEditDay(d.id)}
+              style={{
+                padding: "2px 8px", borderRadius: "20px", fontSize: "10px", fontWeight: "700",
+                border: `1px solid ${editDays.includes(d.id) ? d.color : C.border}`,
+                background: editDays.includes(d.id) ? d.bg : "transparent",
+                color: editDays.includes(d.id) ? d.color : C.muted,
+                cursor: "pointer",
+              }}
+            >{d.label}</button>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: "6px" }}>
+          <button onClick={saveEdit} disabled={!editText.trim()} style={{ padding: "4px 12px", borderRadius: "6px", border: "none", background: editText.trim() ? C.accent : C.border, color: "#fff", fontSize: "11px", fontWeight: "600", cursor: editText.trim() ? "pointer" : "not-allowed" }}>Save</button>
+          <button onClick={() => setEditing(false)} style={{ padding: "4px 10px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "11px", cursor: "pointer" }}>Cancel</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        display: "flex", alignItems: "center", gap: "10px",
-        padding: "8px 10px", borderRadius: "8px",
-        background: hov ? C.hover : "transparent",
-        transition: "background 0.12s",
+        background: isDone ? "transparent" : hov ? C.hover : C.card,
+        border: `1px solid ${isDone ? C.border : isToday ? "rgba(99,102,241,0.2)" : C.border}`,
+        borderLeft: `3px solid ${isDone ? C.border : isToday ? C.accent : activeDays.length > 0 ? DAY_OPTIONS.find(d => d.id === activeDays[0])?.color || C.border : C.border}`,
+        borderRadius: "10px",
+        padding: "10px 12px",
+        transition: "all 0.12s",
+        opacity: isDone ? 0.6 : 1,
       }}
     >
-      <button
-        onClick={() => !readOnly && onToggle(task)}
-        style={{
-          width: "18px", height: "18px", borderRadius: "5px", flexShrink: 0,
-          border: `2px solid ${isDone ? "#10B981" : C.border}`,
-          background: isDone ? "#10B981" : "transparent",
-          cursor: readOnly ? "default" : "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          padding: 0, transition: "all 0.12s",
-        }}
-      >
-        {isDone && <span style={{ color: "#fff", fontSize: "11px" }}>✓</span>}
-      </button>
-      <span style={{
-        flex: 1, fontSize: "13px", fontWeight: "500",
-        color: isDone ? C.muted : C.text,
-        textDecoration: isDone ? "line-through" : "none",
-      }}>
-        {task.text}
-      </span>
-      {hov && !readOnly && (
-        <button onClick={() => onDelete(task.id)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "13px", padding: "1px 4px", opacity: 0.6 }}>
-          ✕
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "9px" }}>
+        {/* Checkbox */}
+        <button
+          onClick={() => !readOnly && onToggle(task)}
+          style={{
+            width: "17px", height: "17px", borderRadius: "5px", flexShrink: 0, marginTop: "1px",
+            border: `2px solid ${isDone ? "#10B981" : C.border}`,
+            background: isDone ? "#10B981" : "transparent",
+            cursor: readOnly ? "default" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 0, transition: "all 0.12s",
+          }}
+        >
+          {isDone && <span style={{ color: "#fff", fontSize: "10px", lineHeight: 1 }}>✓</span>}
         </button>
-      )}
+
+        {/* Text + day dots */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "13px", fontWeight: "500", color: isDone ? C.muted : C.text, textDecoration: isDone ? "line-through" : "none", lineHeight: "1.4", wordBreak: "break-word" }}>
+            {task.text}
+          </div>
+          {/* Day pills */}
+          {activeDays.length < 7 && (
+            <div style={{ display: "flex", gap: "3px", flexWrap: "wrap", marginTop: "5px" }}>
+              {DAY_OPTIONS.filter((d) => activeDays.includes(d.id)).map((d) => (
+                <span
+                  key={d.id}
+                  style={{
+                    fontSize: "9px", fontWeight: "700", padding: "1px 6px", borderRadius: "20px",
+                    background: d.id === todayId ? d.bg : "transparent",
+                    color: d.id === todayId ? d.color : C.muted,
+                    border: `1px solid ${d.id === todayId ? d.color : C.border}`,
+                  }}
+                >{d.label}</span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        {hov && !readOnly && (
+          <div style={{ display: "flex", gap: "2px", flexShrink: 0 }}>
+            <button onClick={() => { setEditText(task.text); setEditDays(task.days || ["mon","tue","wed","thu","fri"]); setEditing(true); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "12px", padding: "1px 4px", opacity: 0.7 }} title="Edit">✏️</button>
+            <button onClick={() => onDelete(task.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#EF4444", fontSize: "12px", padding: "1px 4px", opacity: 0.6 }} title="Delete">✕</button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
-
-const DAY_OPTIONS = [
-  { id: "mon", label: "Mon" },
-  { id: "tue", label: "Tue" },
-  { id: "wed", label: "Wed" },
-  { id: "thu", label: "Thu" },
-  { id: "fri", label: "Fri" },
-  { id: "sat", label: "Sat" },
-  { id: "sun", label: "Sun" },
-];
 
 function todayDayId() {
   const days = ["sun","mon","tue","wed","thu","fri","sat"];
@@ -726,6 +800,13 @@ function DailyRoutinesSection({ token, viewingUserId, currentUserId, sectionTitl
     }
   };
 
+  const handleEdit = async (id, text, days) => {
+    setTasks((ts) => ts.map((t) => t.id === id ? { ...t, text, days } : t));
+    try {
+      await apiFetch(`/api/dailytasks/${id}`, { method: "PUT", body: JSON.stringify({ text, days }) }, token);
+    } catch {}
+  };
+
   const toggleNewDay = (dayId) => {
     setNewDays((prev) => prev.includes(dayId) ? prev.filter((d) => d !== dayId) : [...prev, dayId]);
   };
@@ -739,26 +820,26 @@ function DailyRoutinesSection({ token, viewingUserId, currentUserId, sectionTitl
         return d.length === 0 || d.includes(selectedDay);
       });
 
+  const selectedDayCfg = DAY_OPTIONS.find((d) => d.id === selectedDay);
+
   return (
     <div style={{ marginBottom: "16px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
         <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={readOnly} />
       </div>
 
-      {/* Day filter tabs */}
-      <div style={{ display: "flex", gap: "4px", marginBottom: "10px", flexWrap: "wrap" }}>
+      {/* Day filter tabs — color-coded */}
+      <div style={{ display: "flex", gap: "4px", marginBottom: "14px", flexWrap: "wrap" }}>
         <button
           onClick={() => setSelectedDay("all")}
           style={{
-            padding: "3px 9px", borderRadius: "20px", border: "none",
-            background: selectedDay === "all" ? C.accent : C.cardBg,
+            padding: "4px 12px", borderRadius: "20px",
+            border: selectedDay === "all" ? "none" : `1px solid ${C.border}`,
+            background: selectedDay === "all" ? C.accent : "transparent",
             color: selectedDay === "all" ? "#fff" : C.muted,
-            fontSize: "11px", fontWeight: "600", cursor: "pointer",
-            transition: "all 0.12s",
+            fontSize: "11px", fontWeight: "700", cursor: "pointer", transition: "all 0.12s",
           }}
-        >
-          All
-        </button>
+        >All</button>
         {DAY_OPTIONS.map((d) => {
           const isToday = d.id === currentDayId;
           const isActive = selectedDay === d.id;
@@ -767,19 +848,28 @@ function DailyRoutinesSection({ token, viewingUserId, currentUserId, sectionTitl
               key={d.id}
               onClick={() => setSelectedDay(d.id)}
               style={{
-                padding: "3px 9px", borderRadius: "20px",
-                border: isToday ? `2px solid ${C.accent}` : "none",
-                background: isActive ? C.accent : C.cardBg,
-                color: isActive ? "#fff" : isToday ? C.accent : C.muted,
-                fontSize: "11px", fontWeight: isToday || isActive ? "700" : "600",
+                padding: "4px 12px", borderRadius: "20px",
+                border: `1px solid ${isActive || isToday ? d.color : C.border}`,
+                background: isActive ? d.bg : isToday ? d.bg : "transparent",
+                color: isActive || isToday ? d.color : C.muted,
+                fontSize: "11px", fontWeight: isActive || isToday ? "700" : "600",
                 cursor: "pointer", transition: "all 0.12s",
+                boxShadow: isToday && !isActive ? `0 0 0 1.5px ${d.color}` : "none",
               }}
             >
-              {d.label}
+              {d.label}{isToday ? " •" : ""}
             </button>
           );
         })}
       </div>
+
+      {/* Section label when filtered */}
+      {selectedDay !== "all" && selectedDayCfg && (
+        <div style={{ fontSize: "11px", fontWeight: "700", color: selectedDayCfg.color, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
+          <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: selectedDayCfg.color }} />
+          {selectedDayCfg.label} Routines — {filteredTasks.length} task{filteredTasks.length !== 1 ? "s" : ""}
+        </div>
+      )}
 
       {loading ? (
         <div style={{ color: C.muted, fontSize: "13px", padding: "8px 0" }}>Loading…</div>
@@ -788,19 +878,17 @@ function DailyRoutinesSection({ token, viewingUserId, currentUserId, sectionTitl
       ) : filteredTasks.length === 0 ? (
         <div style={{ fontSize: "12px", color: C.muted, padding: "8px 4px" }}>No routines for this day.</div>
       ) : (
-        <div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
           {filteredTasks.map((t) => (
-            <div key={t.id}>
-              <DailyTaskItem task={t} onToggle={handleToggle} onDelete={handleDelete} readOnly={readOnly} isDone={isDoneThisWeek(t)} />
-              {/* Day badges */}
-              {(t.days && t.days.length > 0 && t.days.length < 7) && (
-                <div style={{ display: "flex", gap: "3px", paddingLeft: "36px", marginBottom: "2px", flexWrap: "wrap" }}>
-                  {DAY_OPTIONS.filter((d) => (t.days || []).includes(d.id)).map((d) => (
-                    <span key={d.id} style={{ fontSize: "9px", padding: "1px 5px", borderRadius: "10px", background: C.cardBg, border: `1px solid ${C.border}`, color: C.muted, fontWeight: "600" }}>{d.label}</span>
-                  ))}
-                </div>
-              )}
-            </div>
+            <DailyTaskItem
+              key={t.id}
+              task={t}
+              onToggle={handleToggle}
+              onDelete={handleDelete}
+              onEdit={handleEdit}
+              readOnly={readOnly}
+              isDone={isDoneThisWeek(t)}
+            />
           ))}
         </div>
       )}
@@ -833,10 +921,10 @@ function DailyRoutinesSection({ token, viewingUserId, currentUserId, sectionTitl
                       type="button"
                       onClick={() => toggleNewDay(d.id)}
                       style={{
-                        padding: "2px 8px", borderRadius: "20px", fontSize: "10px", fontWeight: "600",
-                        border: `1px solid ${newDays.includes(d.id) ? C.accent : C.border}`,
-                        background: newDays.includes(d.id) ? C.accentLight : "transparent",
-                        color: newDays.includes(d.id) ? C.accent : C.muted,
+                        padding: "2px 8px", borderRadius: "20px", fontSize: "10px", fontWeight: "700",
+                        border: `1px solid ${newDays.includes(d.id) ? d.color : C.border}`,
+                        background: newDays.includes(d.id) ? d.bg : "transparent",
+                        color: newDays.includes(d.id) ? d.color : C.muted,
                         cursor: "pointer",
                       }}
                     >
