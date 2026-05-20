@@ -1978,6 +1978,15 @@ const BLOCK_COLORS = [
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DAY_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
+const RECUR_PRESETS = [
+  { label: "This day only", days: null }, // computed from primary day
+  { label: "Every weekday", days: [0, 1, 2, 3, 4] },
+  { label: "Mon / Wed / Fri", days: [0, 2, 4] },
+  { label: "Tue / Thu", days: [1, 3] },
+  { label: "Every day", days: [0, 1, 2, 3, 4, 5, 6] },
+  { label: "Weekends", days: [5, 6] },
+];
+
 function timeToMinutes(t) {
   if (!t) return 0;
   const [h, m] = t.split(":").map(Number);
@@ -1998,10 +2007,17 @@ function formatBlockTime(t) {
   return `${h12}${m > 0 ? `:${String(m).padStart(2, "0")}` : ""}${suffix}`;
 }
 
+// Normalise a block's days array (backfill old blocks that only have `day`)
+function blockDays(b) {
+  if (Array.isArray(b.days) && b.days.length > 0) return b.days;
+  return [Number(b.day ?? 0)];
+}
+
 function BlockModal({ block, onClose, onSave, onDelete }) {
   const isNew = !block?.id;
+  const primaryDay = block?.day ?? (Array.isArray(block?.days) ? block.days[0] : 0);
   const [label, setLabel] = useState(block?.label || "");
-  const [day, setDay] = useState(block?.day ?? 0);
+  const [days, setDays] = useState(blockDays(block || { day: primaryDay }));
   const [startTime, setStartTime] = useState(block?.startTime || "09:00");
   const [endTime, setEndTime] = useState(block?.endTime || "10:00");
   const [color, setColor] = useState(block?.color || "#6366F1");
@@ -2012,9 +2028,18 @@ function BlockModal({ block, onClose, onSave, onDelete }) {
     return () => document.removeEventListener("keydown", h);
   }, [onClose]);
 
+  const toggleDay = (di) => {
+    setDays((prev) => prev.includes(di) ? (prev.length > 1 ? prev.filter((d) => d !== di) : prev) : [...prev, di].sort((a, b) => a - b));
+  };
+
+  const applyPreset = (preset) => {
+    setDays(preset.days ?? [primaryDay]);
+  };
+
   const handleSave = () => {
     if (!label.trim()) return;
-    onSave({ id: block?.id || Date.now().toString(), label: label.trim(), day: Number(day), startTime, endTime, color });
+    const primaryD = days[0] ?? 0;
+    onSave({ id: block?.id || Date.now().toString(), label: label.trim(), day: primaryD, days, startTime, endTime, color });
     onClose();
   };
 
@@ -2023,7 +2048,7 @@ function BlockModal({ block, onClose, onSave, onDelete }) {
   return (
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", backdropFilter: "blur(3px)", zIndex: 3000 }} />
-      <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "22px", width: "420px", maxWidth: "92vw", zIndex: 3001, boxShadow: C.shadowMd }}>
+      <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "22px", width: "440px", maxWidth: "92vw", zIndex: 3001, boxShadow: C.shadowMd, maxHeight: "90vh", overflow: "auto" }}>
         <h3 style={{ margin: "0 0 16px", fontSize: "15px", fontWeight: "700", color: C.text }}>{isNew ? "Add Time Block" : "Edit Time Block"}</h3>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -2032,11 +2057,28 @@ function BlockModal({ block, onClose, onSave, onDelete }) {
             <input autoFocus value={label} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSave()} style={{ ...textInput({ width: "100%" }) }} placeholder="Deep Work, Team Standup, Lunch Break…" />
           </div>
 
+          {/* Recurrence presets */}
           <div>
-            <label style={lbl}>Day</label>
-            <select value={day} onChange={(e) => setDay(e.target.value)} style={{ ...textInput({ width: "100%" }), color: C.text }}>
-              {DAY_FULL.map((d, i) => <option key={i} value={i}>{d}</option>)}
-            </select>
+            <label style={lbl}>Repeats on</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginBottom: "8px" }}>
+              {RECUR_PRESETS.map((p) => {
+                const pDays = p.days ?? [primaryDay];
+                const active = pDays.length === days.length && pDays.every((d) => days.includes(d));
+                return (
+                  <button key={p.label} onClick={() => applyPreset(p)} style={{ padding: "4px 10px", borderRadius: "20px", border: `1px solid ${active ? C.accent : C.border}`, background: active ? C.accentLight : "none", color: active ? C.accentBright : C.muted, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}>
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Individual day toggles */}
+            <div style={{ display: "flex", gap: "4px" }}>
+              {DAYS.map((d, i) => (
+                <button key={i} onClick={() => toggleDay(i)} style={{ flex: 1, padding: "5px 0", borderRadius: "6px", border: `1px solid ${days.includes(i) ? C.accent : C.border}`, background: days.includes(i) ? C.accent : C.cardBg, color: days.includes(i) ? "#fff" : C.muted, fontSize: "10px", fontWeight: "700", cursor: "pointer", transition: "all 0.1s" }}>
+                  {d}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
@@ -2078,156 +2120,282 @@ function BlockModal({ block, onClose, onSave, onDelete }) {
   );
 }
 
+const GRID_START   = 7 * 60;   // 7 am
+const GRID_END     = 18 * 60;  // 6 pm
+const GRID_TOTAL   = GRID_END - GRID_START;
+const HOUR_HEIGHT  = 52;       // px per hour
+const GRID_HEIGHT  = (GRID_TOTAL / 60) * HOUR_HEIGHT;
+const SNAP_MINS    = 15;
+
 function BlockScheduleSection({ token, viewingUserId, currentUserId, sectionTitle, onSaveTitle }) {
   const [blocks, setBlocks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editBlock, setEditBlock] = useState(null); // null=closed, false=new, obj=edit
-  const [newBlockDay, setNewBlockDay] = useState(null);
+  const [editBlock, setEditBlock] = useState(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const [showWeekends, setShowWeekends] = useState(true);
+  // drag state: stored in ref for stable access in event listeners, mirrored to state for rendering
+  const dragRef = useRef(null);
+  const [dragBlock, setDragBlock] = useState(null); // live preview during drag
+  const colsRef = useRef(null);
   const readOnly = viewingUserId !== currentUserId;
-  const GRID_START = 7 * 60;  // 7am
-  const GRID_END   = 20 * 60; // 8pm
-  const GRID_TOTAL = GRID_END - GRID_START;
-  const HOUR_HEIGHT = 48; // px per hour
-  const GRID_HEIGHT = (GRID_TOTAL / 60) * HOUR_HEIGHT;
 
-  const fetchUrl = `/api/blockschedule?userId=${viewingUserId}`;
+  const visibleDayIndices = showWeekends ? [0, 1, 2, 3, 4, 5, 6] : [0, 1, 2, 3, 4];
 
   useEffect(() => {
     setLoading(true);
-    apiFetch(fetchUrl, {}, token)
+    apiFetch(`/api/blockschedule?userId=${viewingUserId}`, {}, token)
       .then((r) => r.json())
       .then((d) => setBlocks(Array.isArray(d?.blocks) ? d.blocks : []))
       .catch(() => setBlocks([]))
       .finally(() => setLoading(false));
   }, [viewingUserId]);
 
-  const save = async (newBlocks) => {
+  const persist = async (newBlocks) => {
     setBlocks(newBlocks);
     await apiFetch("/api/blockschedule", { method: "PUT", body: JSON.stringify({ blocks: newBlocks }) }, token);
   };
 
   const handleSaveBlock = (b) => {
-    const existing = blocks.find((x) => x.id === b.id);
-    const updated = existing ? blocks.map((x) => x.id === b.id ? b : x) : [...blocks, b];
-    save(updated);
+    const exists = blocks.find((x) => x.id === b.id);
+    persist(exists ? blocks.map((x) => x.id === b.id ? b : x) : [...blocks, b]);
+  };
+  const handleDeleteBlock = (id) => persist(blocks.filter((b) => b.id !== id));
+
+  const yFor = (t) => ((timeToMinutes(t) - GRID_START) / 60) * HOUR_HEIGHT;
+  const heightFor = (s, e) => Math.max(((timeToMinutes(e) - timeToMinutes(s)) / 60) * HOUR_HEIGHT, 20);
+
+  // ── Drag handlers ──────────────────────────────────────────────────────────
+  const startDrag = (e, b, mode) => {
+    if (readOnly) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragRef.current = { blockId: b.id, origBlock: b, mode, startX: e.clientX, startY: e.clientY };
+    setDragBlock({ ...b });
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = mode === "resize" ? "ns-resize" : "grabbing";
   };
 
-  const handleDeleteBlock = (id) => save(blocks.filter((b) => b.id !== id));
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!dragRef.current) return;
+      const { origBlock, mode, startX, startY } = dragRef.current;
+      const deltaY = e.clientY - startY;
+      const deltaX = e.clientX - startX;
+      const pxPerMin = GRID_HEIGHT / GRID_TOTAL;
+      const rawDeltaMins = deltaY / pxPerMin;
+      const deltaMins = Math.round(rawDeltaMins / SNAP_MINS) * SNAP_MINS;
+      const origStart = timeToMinutes(origBlock.startTime);
+      const origEnd = timeToMinutes(origBlock.endTime);
+      const duration = origEnd - origStart;
 
-  const openNew = (day) => { setNewBlockDay(day ?? 0); setEditBlock(false); };
+      let newBlock = { ...origBlock };
 
-  // Hours to render on y-axis
+      if (mode === "move") {
+        const newStart = Math.max(GRID_START, Math.min(GRID_END - duration, origStart + deltaMins));
+        newBlock.startTime = minutesToTime(newStart);
+        newBlock.endTime = minutesToTime(newStart + duration);
+        // Compute day from x position if single-day block
+        if (blockDays(origBlock).length === 1 && colsRef.current) {
+          const rect = colsRef.current.getBoundingClientRect();
+          const colW = rect.width / visibleDayIndices.length;
+          const colIdx = Math.max(0, Math.min(visibleDayIndices.length - 1, Math.floor((e.clientX - rect.left) / colW)));
+          const newDayIdx = visibleDayIndices[colIdx];
+          newBlock.day = newDayIdx;
+          newBlock.days = [newDayIdx];
+        }
+      } else if (mode === "resize") {
+        const newEnd = Math.max(origStart + SNAP_MINS, Math.min(GRID_END, origEnd + deltaMins));
+        newBlock.endTime = minutesToTime(newEnd);
+      }
+
+      dragRef.current.currentBlock = newBlock;
+      setDragBlock(newBlock);
+    };
+
+    const onUp = () => {
+      if (!dragRef.current) return;
+      const { currentBlock } = dragRef.current;
+      if (currentBlock) handleSaveBlock(currentBlock);
+      dragRef.current = null;
+      setDragBlock(null);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+  }, [blocks, visibleDayIndices]);
+
+  // ── Block renderer (for a single day column) ────────────────────────────────
+  const renderBlock = (b, di) => {
+    const live = dragBlock && dragBlock.id === b.id;
+    const display = live ? dragBlock : b;
+    // For single-day blocks being dragged, only show in the target day column
+    if (live && blockDays(origBlockForDrag(b)) .length === 1 && display.day !== di) return null;
+    const top = yFor(display.startTime);
+    const height = heightFor(display.startTime, display.endTime);
+    if (top < 0 || top > GRID_HEIGHT) return null;
+
+    return (
+      <div
+        key={b.id}
+        onMouseDown={(e) => { if (e.button !== 0) return; const isHandle = e.target.dataset.resize; if (isHandle) { startDrag(e, b, "resize"); } else { startDrag(e, b, "move"); } }}
+        onClick={(e) => { if (!live && !dragRef.current) { e.stopPropagation(); setEditBlock(b); } }}
+        title={`${b.label}\n${formatBlockTime(b.startTime)} – ${formatBlockTime(b.endTime)}`}
+        style={{
+          position: "absolute", top: `${top}px`, left: "2px", right: "2px",
+          height: `${height}px`, background: display.color, borderRadius: "5px",
+          padding: "3px 4px 0", overflow: "hidden",
+          cursor: live ? (dragRef.current?.mode === "resize" ? "ns-resize" : "grabbing") : "grab",
+          boxShadow: live ? "0 4px 12px rgba(0,0,0,0.35)" : "0 1px 3px rgba(0,0,0,0.2)",
+          opacity: live ? 0.9 : 1,
+          transition: live ? "none" : "box-shadow 0.1s",
+          zIndex: live ? 10 : 1,
+          userSelect: "none",
+        }}
+      >
+        <div style={{ fontSize: "9px", fontWeight: "700", color: "#fff", lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{display.label}</div>
+        {height > 32 && (
+          <div style={{ fontSize: "8px", color: "rgba(255,255,255,0.85)", lineHeight: 1.2 }}>
+            {formatBlockTime(display.startTime)}–{formatBlockTime(display.endTime)}
+          </div>
+        )}
+        {/* Resize handle */}
+        {!readOnly && (
+          <div
+            data-resize="1"
+            onMouseDown={(e) => { e.stopPropagation(); startDrag(e, b, "resize"); }}
+            style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "7px", cursor: "ns-resize", background: "rgba(0,0,0,0.15)", borderBottomLeftRadius: "5px", borderBottomRightRadius: "5px" }}
+          />
+        )}
+      </div>
+    );
+  };
+
+  // Helper: get original block from blocks array (for drag single-day check)
+  function origBlockForDrag(b) {
+    return blocks.find((x) => x.id === b.id) || b;
+  }
+
   const hours = [];
-  for (let h = 7; h <= 20; h++) hours.push(h);
-
-  // px offset from GRID_START for a given time string
-  const yFor = (t) => ((timeToMinutes(t) - GRID_START) / 60) * HOUR_HEIGHT;
-  const heightFor = (s, e) => Math.max(((timeToMinutes(e) - timeToMinutes(s)) / 60) * HOUR_HEIGHT, 18);
+  for (let h = Math.floor(GRID_START / 60); h <= Math.floor(GRID_END / 60); h++) hours.push(h);
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-        <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={readOnly} />
-        {!readOnly && (
-          <AddBtn onClick={() => openNew(0)} label="+ Add Block" />
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: collapsed ? 0 : "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: 1 }}>
+          <button onClick={() => setCollapsed((v) => !v)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "12px", padding: "2px 4px", borderRadius: "4px", lineHeight: 1 }} title={collapsed ? "Expand" : "Collapse"}>
+            {collapsed ? "▼" : "▲"}
+          </button>
+          <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={readOnly} />
+        </div>
+        {!collapsed && !readOnly && (
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <button
+              onClick={() => setShowWeekends((v) => !v)}
+              style={{ padding: "4px 10px", borderRadius: "20px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}
+              title={showWeekends ? "Hide weekends" : "Show weekends"}
+            >
+              {showWeekends ? "Hide weekends" : "Show weekends"}
+            </button>
+            <AddBtn onClick={() => setEditBlock(false)} label="+ Add Block" />
+          </div>
         )}
       </div>
 
-      {loading ? (
-        <div style={{ textAlign: "center", padding: "24px", color: C.muted, fontSize: "12px" }}>Loading…</div>
-      ) : (
-        <div style={{ overflowX: "auto" }}>
-          <div style={{ display: "flex", minWidth: "420px" }}>
-            {/* Time axis */}
-            <div style={{ flexShrink: 0, width: "36px", paddingTop: "20px" }}>
-              {hours.map((h) => (
-                <div key={h} style={{ height: `${HOUR_HEIGHT}px`, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", paddingRight: "6px" }}>
-                  <span style={{ fontSize: "9px", color: C.muted, fontWeight: "600", lineHeight: 1, marginTop: "-1px" }}>{h > 12 ? `${h-12}p` : h === 12 ? "12p" : `${h}a`}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Day columns */}
-            <div style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "3px" }}>
-              {DAYS.map((day, di) => {
-                const dayBlocks = blocks.filter((b) => Number(b.day) === di);
-                return (
-                  <div key={di} style={{ display: "flex", flexDirection: "column" }}>
-                    {/* Day header */}
-                    <div
-                      onClick={() => !readOnly && openNew(di)}
-                      style={{ textAlign: "center", fontSize: "10px", fontWeight: "700", color: C.muted, marginBottom: "4px", height: "20px", lineHeight: "20px", cursor: readOnly ? "default" : "pointer", borderRadius: "4px", transition: "background 0.1s" }}
-                      onMouseEnter={(e) => { if (!readOnly) e.currentTarget.style.background = C.hover; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                    >
-                      {day}
-                    </div>
-
-                    {/* Block grid */}
-                    <div
-                      style={{ position: "relative", height: `${GRID_HEIGHT}px`, background: C.cardBg, borderRadius: "6px", border: `1px solid ${C.border}`, overflow: "hidden", cursor: readOnly ? "default" : "pointer" }}
-                      onClick={(e) => {
-                        if (readOnly || e.target !== e.currentTarget) return;
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const clickY = e.clientY - rect.top;
-                        const mins = GRID_START + Math.round((clickY / GRID_HEIGHT) * GRID_TOTAL / 30) * 30;
-                        const snapped = minutesToTime(Math.min(Math.max(mins, GRID_START), GRID_END - 60));
-                        setNewBlockDay(di);
-                        setEditBlock({ day: di, startTime: snapped, endTime: minutesToTime(timeToMinutes(snapped) + 60), color: "#6366F1" });
-                      }}
-                    >
-                      {/* Hour grid lines */}
-                      {hours.slice(0, -1).map((h) => (
-                        <div key={h} style={{ position: "absolute", top: `${(h - 7) * HOUR_HEIGHT}px`, left: 0, right: 0, borderTop: `1px solid ${C.border}`, opacity: 0.4, pointerEvents: "none" }} />
-                      ))}
-
-                      {/* Blocks */}
-                      {dayBlocks.map((b) => {
-                        const top = yFor(b.startTime);
-                        const height = heightFor(b.startTime, b.endTime);
-                        if (top < 0 || top > GRID_HEIGHT) return null;
-                        return (
-                          <div
-                            key={b.id}
-                            onClick={(e) => { e.stopPropagation(); if (!readOnly) setEditBlock(b); }}
-                            title={`${b.label}\n${formatBlockTime(b.startTime)} – ${formatBlockTime(b.endTime)}`}
-                            style={{
-                              position: "absolute", top: `${top}px`, left: "2px", right: "2px",
-                              height: `${height}px`, background: b.color, borderRadius: "4px",
-                              padding: "2px 4px", overflow: "hidden", cursor: readOnly ? "default" : "pointer",
-                              boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "opacity 0.1s",
-                            }}
-                            onMouseEnter={(e) => { if (!readOnly) e.currentTarget.style.opacity = "0.85"; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
-                          >
-                            <div style={{ fontSize: "9px", fontWeight: "700", color: "#fff", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.label}</div>
-                            {height > 30 && (
-                              <div style={{ fontSize: "8px", color: "rgba(255,255,255,0.85)", lineHeight: 1.2 }}>
-                                {formatBlockTime(b.startTime)}–{formatBlockTime(b.endTime)}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+      {!collapsed && (
+        loading ? (
+          <div style={{ textAlign: "center", padding: "24px", color: C.muted, fontSize: "12px" }}>Loading…</div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <div style={{ display: "flex", minWidth: "360px" }}>
+              {/* Time axis */}
+              <div style={{ flexShrink: 0, width: "32px", paddingTop: "22px" }}>
+                {hours.map((h) => (
+                  <div key={h} style={{ height: `${HOUR_HEIGHT}px`, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", paddingRight: "5px" }}>
+                    <span style={{ fontSize: "9px", color: C.muted, fontWeight: "600", lineHeight: 1 }}>
+                      {h === 12 ? "12p" : h > 12 ? `${h - 12}p` : `${h}a`}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          </div>
+                ))}
+              </div>
 
-          {blocks.length === 0 && !readOnly && (
-            <div style={{ textAlign: "center", padding: "12px 0 4px", fontSize: "12px", color: C.muted }}>
-              Click on a day column or + Add Block to get started.
+              {/* Day columns */}
+              <div
+                ref={colsRef}
+                style={{ flex: 1, display: "grid", gridTemplateColumns: `repeat(${visibleDayIndices.length}, 1fr)`, gap: "3px" }}
+              >
+                {visibleDayIndices.map((di) => {
+                  const dayBlocksForCol = blocks.filter((b) => {
+                    const bd = blockDays(b);
+                    if (dragBlock?.id === b.id && bd.length === 1) return dragBlock.day === di;
+                    return bd.includes(di);
+                  });
+
+                  return (
+                    <div key={di} style={{ display: "flex", flexDirection: "column" }}>
+                      {/* Day header */}
+                      <div
+                        onClick={() => {
+                          if (readOnly) return;
+                          setEditBlock({ day: di, days: [di], startTime: "09:00", endTime: "10:00", color: "#6366F1" });
+                        }}
+                        style={{ textAlign: "center", fontSize: "10px", fontWeight: "700", color: di >= 5 ? C.accent : C.muted, marginBottom: "4px", height: "18px", lineHeight: "18px", cursor: readOnly ? "default" : "pointer", borderRadius: "4px", transition: "background 0.1s" }}
+                        onMouseEnter={(e) => { if (!readOnly) e.currentTarget.style.background = C.hover; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                      >
+                        {DAYS[di]}
+                      </div>
+
+                      {/* Column body */}
+                      <div
+                        style={{ position: "relative", height: `${GRID_HEIGHT}px`, background: di >= 5 ? `${C.cardBg}cc` : C.cardBg, borderRadius: "6px", border: `1px solid ${C.border}`, overflow: "hidden" }}
+                        onClick={(e) => {
+                          if (readOnly || e.target !== e.currentTarget || dragRef.current) return;
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const clickY = e.clientY - rect.top;
+                          const rawMins = GRID_START + (clickY / GRID_HEIGHT) * GRID_TOTAL;
+                          const snapped = Math.round(rawMins / SNAP_MINS) * SNAP_MINS;
+                          const start = minutesToTime(Math.max(GRID_START, Math.min(GRID_END - 60, snapped)));
+                          setEditBlock({ day: di, days: [di], startTime: start, endTime: minutesToTime(timeToMinutes(start) + 60), color: "#6366F1" });
+                        }}
+                      >
+                        {/* Hour lines */}
+                        {hours.slice(0, -1).map((h) => (
+                          <div key={h} style={{ position: "absolute", top: `${(h - GRID_START / 60) * HOUR_HEIGHT}px`, left: 0, right: 0, borderTop: `1px solid ${C.border}`, opacity: 0.35, pointerEvents: "none" }} />
+                        ))}
+                        {/* Half-hour lines */}
+                        {hours.slice(0, -1).map((h) => (
+                          <div key={`h${h}`} style={{ position: "absolute", top: `${(h - GRID_START / 60) * HOUR_HEIGHT + HOUR_HEIGHT / 2}px`, left: 0, right: 0, borderTop: `1px dashed ${C.border}`, opacity: 0.2, pointerEvents: "none" }} />
+                        ))}
+
+                        {/* Blocks */}
+                        {dayBlocksForCol.map((b) => renderBlock(b, di))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          )}
-        </div>
+
+            {blocks.length === 0 && !readOnly && (
+              <div style={{ textAlign: "center", padding: "10px 0 2px", fontSize: "11px", color: C.muted }}>
+                Click on a day column or use + Add Block to create your first time block.
+              </div>
+            )}
+          </div>
+        )
       )}
 
-      {editBlock !== null && (
+      {editBlock !== null && !readOnly && (
         <BlockModal
-          block={editBlock || (newBlockDay !== null ? { day: newBlockDay, startTime: "09:00", endTime: "10:00", color: "#6366F1" } : null)}
-          onClose={() => { setEditBlock(null); setNewBlockDay(null); }}
+          block={editBlock || null}
+          onClose={() => setEditBlock(null)}
           onSave={handleSaveBlock}
           onDelete={handleDeleteBlock}
         />
