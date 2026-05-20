@@ -16,7 +16,7 @@ export async function PUT(req, { params }) {
     if (index === -1) return Response.json({ error: "Room not found" }, { status: 404 });
 
     const room = { ...rooms[index] };
-    const fields = ["name", "location", "capacity", "pricing", "amenities", "bookingContact", "bookingUrl", "details", "image"];
+    const fields = ["name", "location", "capacity", "pricing", "amenities", "bookingContact", "bookingUrl", "skeddaUrl", "honeyBookUrl", "linkedLocationId", "linkedLocationName", "details", "image"];
     for (const f of fields) {
       if (body[f] !== undefined) room[f] = body[f];
     }

@@ -27,6 +27,7 @@ import ReportingView from "./ReportingView";
 import BugReportsView from "./BugReportsView";
 import InventoryView from "./InventoryView";
 import ConfRoomsView from "./ConfRoomsView";
+import CirclesView from "./CirclesView";
 import LeadershipView from "./LeadershipView";
 
 const TOKEN_KEY = "tcf_session";
@@ -56,6 +57,7 @@ const DEFAULT_INTERNAL_VIEWS = [
   { id: "memberships", icon: "🏛",  label: "Memberships" },
   { id: "locations",   icon: "📍", label: "Locations" },
   { id: "confrooms",   icon: "🏢", label: "Conf Rooms" },
+  { id: "circles",     icon: "⭕", label: "TCF Circles" },
   { id: "inventory",   icon: "📦", label: "Inventory" },
   { id: "teamtasks",   icon: "✅", label: "Task Tracker" },
   { id: "training",    icon: "🎓", label: "Training" },
@@ -1464,6 +1466,7 @@ export default function ContentScheduler() {
     { id: "memberjourney", label: "Member Journey" },
     { id: "locations", label: "Locations" },
     { id: "confrooms", label: "Conf Rooms" },
+    { id: "circles", label: "TCF Circles" },
     { id: "bulletin", label: "Bulletin Board" },
     { id: "reporting", label: "Reports" },
     { id: "leadership", label: "Leadership Hub" },
@@ -1989,7 +1992,8 @@ export default function ContentScheduler() {
                 </div>
               )}
               {view === "locations" && <LocationsView token={authToken} teamMembers={teamMembers} />}
-              {view === "confrooms" && <ConfRoomsView token={authToken} />}
+              {view === "confrooms" && <ConfRoomsView token={authToken} currentUser={currentUser} />}
+              {view === "circles" && <CirclesView token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
               {view === "leadership" && <LeadershipView token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
             </>
           )}

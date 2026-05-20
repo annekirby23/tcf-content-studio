@@ -16,12 +16,9 @@ export async function PUT(req, { params }) {
     if (index === -1) return Response.json({ error: "Location not found" }, { status: 404 });
 
     const location = { ...locations[index] };
-    if (body.name !== undefined) location.name = body.name;
-    if (body.details !== undefined) location.details = body.details;
-    if (body.image !== undefined) location.image = body.image;
-    if (body.address !== undefined) location.address = body.address;
-    if (body.responsibleMemberId !== undefined) location.responsibleMemberId = body.responsibleMemberId;
-    if (body.responsibleMemberName !== undefined) location.responsibleMemberName = body.responsibleMemberName;
+    const fields = ["name","details","image","address","responsibleMemberId","responsibleMemberName",
+                    "parkingDetails","parkingMapUrl","parkingInstructionsData","parkingInstructionsName"];
+    for (const f of fields) { if (body[f] !== undefined) location[f] = body[f]; }
     location.updatedAt = new Date().toISOString();
 
     locations[index] = location;
