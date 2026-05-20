@@ -84,7 +84,7 @@ Use plain text, no markdown headers. Separate the two parts with a blank line. K
       const { question, userName, history = [] } = body;
 
       // Gather all platform data as context
-      const [tcfInfo, events, teamTasks, memberJourney, training, locations, inventory, bulletin] =
+      const [tcfInfo, events, teamTasks, memberJourney, training, locations, inventory, bulletin, internalData] =
         await Promise.all([
           kvGet("tcf:tcfinfo"),
           kvGet("tcf:events"),
@@ -94,6 +94,7 @@ Use plain text, no markdown headers. Separate the two parts with a blank line. K
           kvGet("tcf:locations"),
           kvGet("tcf:inventory"),
           kvGet("tcf:bulletin"),
+          kvGet("tcf:internal"),
         ]);
 
       const infoChunks = [];
@@ -106,6 +107,21 @@ Motto: ${tcfInfo.motto || "N/A"}
 History: ${tcfInfo.history || "N/A"}
 Our Why: ${tcfInfo.ourWhy || "N/A"}
 Website: ${tcfInfo.website || "N/A"}`);
+      }
+
+      // Internal data: memberships, HR info, contacts
+      if (internalData) {
+        if (internalData.membership) {
+          infoChunks.push(`## Membership Info\n${internalData.membership}`);
+        }
+        if (Array.isArray(internalData.memberships) && internalData.memberships.length) {
+          const lines = internalData.memberships.map((m) =>
+            `- ${m.name}: $${m.cost} ${m.billingCycle}${m.details ? ` — ${m.details}` : ""}`
+          ).join("\n");
+          infoChunks.push(`## Memberships & Subscriptions\n${lines}`);
+        }
+        if (internalData.hrInfo) infoChunks.push(`## HR Info\n${internalData.hrInfo}`);
+        if (internalData.contacts) infoChunks.push(`## Key Contacts\n${internalData.contacts}`);
       }
 
       if (events?.length) {

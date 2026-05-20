@@ -56,15 +56,24 @@ function ChatBubble({ role, content }) {
 
 // ─── Main widget ──────────────────────────────────────────────────────────────
 
+function todayKey() {
+  return new Date().toISOString().split("T")[0];
+}
+
 export default function WorkspaceAISummary({ token, currentUser, viewingUserId, ownerName }) {
-  const STORAGE_KEY = `tcf_ai_open_${viewingUserId}`;
+  const OPEN_KEY    = `tcf_ai_open_${viewingUserId}`;
+  const CACHE_KEY   = `tcf_ai_summary_${viewingUserId}_${todayKey()}`;
+
+  // Load cached summary for today (if any)
+  const cachedSummary = (() => { try { return localStorage.getItem(CACHE_KEY) || ""; } catch { return ""; } })();
 
   const [open, setOpen] = useState(() => {
-    try { return localStorage.getItem(STORAGE_KEY) !== "false"; } catch { return true; }
+    try { return localStorage.getItem(OPEN_KEY) !== "false"; } catch { return true; }
   });
-  const [summary, setSummary] = useState("");
+  const [summary, setSummary] = useState(cachedSummary);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState("");
+  const [summaryDate] = useState(todayKey());
 
   const [chatHistory, setChatHistory] = useState([]);
   const [question, setQuestion] = useState("");
@@ -83,12 +92,12 @@ export default function WorkspaceAISummary({ token, currentUser, viewingUserId, 
   const toggleOpen = () => {
     const next = !open;
     setOpen(next);
-    try { localStorage.setItem(STORAGE_KEY, next ? "true" : "false"); } catch {}
+    try { localStorage.setItem(OPEN_KEY, next ? "true" : "false"); } catch {}
   };
 
-  // Auto-generate summary when panel opens and no summary yet
+  // Auto-generate ONLY if no cached summary exists for today
   useEffect(() => {
-    if (open && !summary && !summaryLoading) generateSummary();
+    if (open && !cachedSummary && !summaryLoading) generateSummary();
   }, [open, viewingUserId]); // eslint-disable-line
 
   const generateSummary = async () => {
@@ -102,7 +111,9 @@ export default function WorkspaceAISummary({ token, currentUser, viewingUserId, 
       const data = await res.json();
       if (data.error) { setSummaryError(data.error); return; }
       setSummary(data.result);
-    } catch (e) {
+      // Cache for today so it doesn't regenerate on every visit
+      try { localStorage.setItem(CACHE_KEY, data.result); } catch {}
+    } catch {
       setSummaryError("Couldn't generate summary — try again.");
     } finally {
       setSummaryLoading(false);
@@ -229,22 +240,27 @@ export default function WorkspaceAISummary({ token, currentUser, viewingUserId, 
               </div>
             ) : null}
 
-            {/* Refresh button */}
-            <button
-              onClick={generateSummary}
-              disabled={summaryLoading}
-              style={{
-                display: "flex", alignItems: "center", gap: "6px",
-                padding: "7px 14px", borderRadius: "8px",
-                border: `1px solid ${C.border}`, background: C.card,
-                color: summaryLoading ? C.muted : C.accent,
-                fontSize: "12px", fontWeight: "600", cursor: summaryLoading ? "not-allowed" : "pointer",
-                transition: "all 0.15s",
-              }}
-            >
-              <span style={{ fontSize: "14px" }}>✨</span>
-              {summaryLoading ? "Generating…" : summary ? "Refresh Briefing" : "Generate Briefing"}
-            </button>
+            {/* Refresh / generate button */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              <button
+                onClick={generateSummary}
+                disabled={summaryLoading}
+                style={{
+                  display: "flex", alignItems: "center", gap: "6px",
+                  padding: "7px 14px", borderRadius: "8px",
+                  border: `1px solid ${C.border}`, background: C.card,
+                  color: summaryLoading ? C.muted : C.accent,
+                  fontSize: "12px", fontWeight: "600", cursor: summaryLoading ? "not-allowed" : "pointer",
+                  transition: "all 0.15s",
+                }}
+              >
+                <span style={{ fontSize: "14px" }}>✨</span>
+                {summaryLoading ? "Generating…" : summary ? "Refresh Briefing" : "Generate Briefing"}
+              </button>
+              {summary && !summaryLoading && (
+                <span style={{ fontSize: "11px", color: C.muted }}>Generated {summaryDate === todayKey() ? "today" : summaryDate} · auto-refreshes daily</span>
+              )}
+            </div>
           </div>
 
           {/* ── Divider ── */}

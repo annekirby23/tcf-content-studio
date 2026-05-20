@@ -2236,7 +2236,13 @@ function LocationAndEventTasksBar({ token, userId, onNavigate }) {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {eventTasks.map((task) => (
-              <div key={task.id} style={{ display: "flex", alignItems: "flex-start", gap: "8px", padding: "8px 10px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}`, borderLeft: `3px solid ${task.eventColor || C.accent}` }}>
+              <div
+                key={task.id}
+                onClick={() => onNavigate && onNavigate("events")}
+                style={{ display: "flex", alignItems: "flex-start", gap: "8px", padding: "8px 10px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}`, borderLeft: `3px solid ${task.eventColor || C.accent}`, cursor: onNavigate ? "pointer" : "default", transition: "background 0.12s" }}
+                onMouseEnter={(e) => e.currentTarget.style.background = C.hover}
+                onMouseLeave={(e) => e.currentTarget.style.background = C.cardBg}
+              >
                 <div style={{ width: "14px", height: "14px", borderRadius: "3px", border: `2px solid ${task.done ? (task.eventColor || C.accent) : C.border}`, background: task.done ? (task.eventColor || C.accent) : "transparent", flexShrink: 0, marginTop: "1px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {task.done && <span style={{ color: "#fff", fontSize: "9px" }}>✓</span>}
                 </div>
@@ -2300,7 +2306,13 @@ function LocationAndEventTasksBar({ token, userId, onNavigate }) {
               const total = (stage.steps || []).length;
               const pct = total > 0 ? Math.round((done / total) * 100) : 0;
               return (
-                <div key={stage.id} style={{ padding: "10px 12px", background: C.cardBg, borderRadius: "10px", border: `1px solid ${C.border}`, borderLeft: `4px solid ${stage.color || C.accent}` }}>
+                <div
+                  key={stage.id}
+                  onClick={() => onNavigate && onNavigate("memberjourney")}
+                  style={{ padding: "10px 12px", background: C.cardBg, borderRadius: "10px", border: `1px solid ${C.border}`, borderLeft: `4px solid ${stage.color || C.accent}`, cursor: onNavigate ? "pointer" : "default", transition: "background 0.12s" }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = C.hover}
+                  onMouseLeave={(e) => e.currentTarget.style.background = C.cardBg}
+                >
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
                     <span style={{ fontSize: "16px" }}>{stage.icon}</span>
                     <div>
