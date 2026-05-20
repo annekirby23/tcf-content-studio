@@ -77,6 +77,8 @@ export async function PUT(req, { params }) {
       if (body.resourceLinks !== undefined) event.resourceLinks = body.resourceLinks;
       if (body.members !== undefined) event.members = body.members;
       if (body.notes !== undefined) event.notes = body.notes;
+      if (body.club !== undefined) event.club = body.club;
+      if (body.slackChannel !== undefined) event.slackChannel = body.slackChannel;
     }
 
     event.updatedAt = new Date().toISOString();

@@ -19,6 +19,8 @@ import MyDashboard from "./MyDashboard";
 import TeamTaskTracker from "./TeamTaskTracker";
 import TrainingView from "./TrainingView";
 import EventsView from "./EventsView";
+import TCFInfoView from "./TCFInfoView";
+import LocationsView from "./LocationsView";
 
 const TOKEN_KEY = "tcf_session";
 
@@ -129,6 +131,10 @@ function InventoryTab({ token, currentUser }) {
   const NEEDED_WHEN_OPTIONS = ["Next Amazon Order", "Wish List", "Weekly Order", "Next Trip", "ASAP"];
   const ORDER_STATUS_OPTIONS = ["Not Started", "Ordered", "In Progress", "Received", "Cancelled"];
   const LOCATION_OPTIONS = ["321", "342", "812"];
+  const ORDER_TYPE_OPTIONS = [
+    { value: "recurring", label: "🔁 Regular Supply Order", desc: "Weekly / monthly food & supply orders" },
+    { value: "purchase", label: "🛒 One-Time Purchase", desc: "Buy new equipment, furniture, or anything else" },
+  ];
 
   const NEEDED_COLORS = {
     "Next Amazon Order": { color: "#3B82F6", bg: "rgba(59,130,246,0.12)" },
@@ -154,7 +160,7 @@ function InventoryTab({ token, currentUser }) {
   const [filterNeeded, setFilterNeeded] = useState("");
   const [filterLocation, setFilterLocation] = useState("");
 
-  const emptyForm = { itemName: "", neededWhen: "", forWhat: "", orderStatus: "Not Started", location: "", notes: "", url: "" };
+  const emptyForm = { itemName: "", neededWhen: "", forWhat: "", orderStatus: "Not Started", location: "", notes: "", url: "", orderType: "recurring" };
   const [addForm, setAddForm] = useState(emptyForm);
   const [editForm, setEditForm] = useState({});
 
@@ -172,6 +178,8 @@ function InventoryTab({ token, currentUser }) {
     if (filterLocation && item.location !== filterLocation) return false;
     return true;
   });
+  const recurringItems = filtered.filter((item) => item.orderType !== "purchase");
+  const purchaseItems = filtered.filter((item) => item.orderType === "purchase");
 
   const saveAdd = async () => {
     if (!addForm.itemName.trim()) return;
@@ -271,68 +279,87 @@ function InventoryTab({ token, currentUser }) {
 
       {/* Add form */}
       {showAdd && (
-        <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:"12px", padding:"16px", marginBottom:"16px", display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(180px, 1fr))", gap:"10px" }}>
-          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>Item Name *</label>
-            <input value={addForm.itemName} onChange={(e)=>setAddForm((f)=>({...f,itemName:e.target.value}))} style={{ ...inputS, width:"100%" }} placeholder="What's needed?" /></div>
-          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>Needed When</label>
-            <select value={addForm.neededWhen} onChange={(e)=>setAddForm((f)=>({...f,neededWhen:e.target.value}))} style={{ ...inputS, width:"100%" }}>
-              <option value="">Select…</option>
-              {NEEDED_WHEN_OPTIONS.map((n)=><option key={n} value={n}>{n}</option>)}
-            </select></div>
-          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>For What</label>
-            <input value={addForm.forWhat} onChange={(e)=>setAddForm((f)=>({...f,forWhat:e.target.value}))} style={{ ...inputS, width:"100%" }} placeholder="Purpose…" /></div>
-          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>Status</label>
-            <select value={addForm.orderStatus} onChange={(e)=>setAddForm((f)=>({...f,orderStatus:e.target.value}))} style={{ ...inputS, width:"100%" }}>
-              {ORDER_STATUS_OPTIONS.map((s)=><option key={s} value={s}>{s}</option>)}
-            </select></div>
-          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>Location</label>
-            <select value={addForm.location} onChange={(e)=>setAddForm((f)=>({...f,location:e.target.value}))} style={{ ...inputS, width:"100%" }}>
-              <option value="">—</option>
-              {LOCATION_OPTIONS.map((l)=><option key={l} value={l}>{l}</option>)}
-            </select></div>
-          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>URL</label>
-            <input value={addForm.url} onChange={(e)=>setAddForm((f)=>({...f,url:e.target.value}))} style={{ ...inputS, width:"100%" }} placeholder="https://…" /></div>
-          <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>Notes</label>
-            <input value={addForm.notes} onChange={(e)=>setAddForm((f)=>({...f,notes:e.target.value}))} style={{ ...inputS, width:"100%" }} placeholder="Notes…" /></div>
-          <div style={{ display:"flex", alignItems:"flex-end", gap:"8px" }}>
-            <button onClick={saveAdd} style={{ padding:"8px 18px", borderRadius:"8px", border:"none", background:C.accent, color:"#fff", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>Save</button>
-            <button onClick={()=>setShowAdd(false)} style={{ padding:"8px 14px", borderRadius:"8px", border:`1px solid ${C.border}`, background:"none", color:C.muted, fontSize:"13px", cursor:"pointer" }}>Cancel</button>
+        <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:"12px", padding:"16px", marginBottom:"16px" }}>
+          {/* Type selector */}
+          <div style={{ display:"flex", gap:"8px", marginBottom:"14px" }}>
+            {ORDER_TYPE_OPTIONS.map((opt) => (
+              <button key={opt.value} onClick={()=>setAddForm((f)=>({...f,orderType:opt.value}))} style={{ flex:1, padding:"10px 12px", borderRadius:"10px", border:`2px solid ${addForm.orderType===opt.value ? C.accent : C.border}`, background:addForm.orderType===opt.value ? C.accentLight : C.cardBg, color:addForm.orderType===opt.value ? C.accent : C.muted, fontSize:"12px", fontWeight:"700", cursor:"pointer", textAlign:"left", transition:"all 0.12s" }}>
+                <div>{opt.label}</div>
+                <div style={{ fontSize:"11px", fontWeight:"400", marginTop:"2px", opacity:0.75 }}>{opt.desc}</div>
+              </button>
+            ))}
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(180px, 1fr))", gap:"10px" }}>
+            <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>Item Name *</label>
+              <input value={addForm.itemName} onChange={(e)=>setAddForm((f)=>({...f,itemName:e.target.value}))} style={{ ...inputS, width:"100%" }} placeholder="What's needed?" /></div>
+            <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>Needed When</label>
+              <select value={addForm.neededWhen} onChange={(e)=>setAddForm((f)=>({...f,neededWhen:e.target.value}))} style={{ ...inputS, width:"100%" }}>
+                <option value="">Select…</option>
+                {NEEDED_WHEN_OPTIONS.map((n)=><option key={n} value={n}>{n}</option>)}
+              </select></div>
+            <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>For What / Purpose</label>
+              <input value={addForm.forWhat} onChange={(e)=>setAddForm((f)=>({...f,forWhat:e.target.value}))} style={{ ...inputS, width:"100%" }} placeholder="Purpose…" /></div>
+            <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>Status</label>
+              <select value={addForm.orderStatus} onChange={(e)=>setAddForm((f)=>({...f,orderStatus:e.target.value}))} style={{ ...inputS, width:"100%" }}>
+                {ORDER_STATUS_OPTIONS.map((s)=><option key={s} value={s}>{s}</option>)}
+              </select></div>
+            <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>Location</label>
+              <select value={addForm.location} onChange={(e)=>setAddForm((f)=>({...f,location:e.target.value}))} style={{ ...inputS, width:"100%" }}>
+                <option value="">—</option>
+                {LOCATION_OPTIONS.map((l)=><option key={l} value={l}>{l}</option>)}
+              </select></div>
+            <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>URL / Link</label>
+              <input value={addForm.url} onChange={(e)=>setAddForm((f)=>({...f,url:e.target.value}))} style={{ ...inputS, width:"100%" }} placeholder="https://…" /></div>
+            <div><label style={{ fontSize:"11px", color:C.muted, fontWeight:"600", display:"block", marginBottom:"4px", textTransform:"uppercase" }}>Notes</label>
+              <input value={addForm.notes} onChange={(e)=>setAddForm((f)=>({...f,notes:e.target.value}))} style={{ ...inputS, width:"100%" }} placeholder="Notes…" /></div>
+            <div style={{ display:"flex", alignItems:"flex-end", gap:"8px" }}>
+              <button onClick={saveAdd} style={{ padding:"8px 18px", borderRadius:"8px", border:"none", background:C.accent, color:"#fff", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>Save</button>
+              <button onClick={()=>setShowAdd(false)} style={{ padding:"8px 14px", borderRadius:"8px", border:`1px solid ${C.border}`, background:"none", color:C.muted, fontSize:"13px", cursor:"pointer" }}>Cancel</button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Table */}
-      <div style={{ border:`1px solid ${C.border}`, borderRadius:"12px", overflow:"hidden" }}>
-        <div style={{ display:"grid", gridTemplateColumns:"2fr 90px 130px 1fr 130px 70px 1fr 60px 60px", background:C.cardBg, borderBottom:`1px solid ${C.border}`, padding:"0 8px" }}>
-          {["Item Needed","Date","Needed When","For What","Status","Location","Notes","Person","Link"].map((h,i)=>(
-            <div key={i} style={{ padding:"10px 8px", fontSize:"11px", fontWeight:"700", textTransform:"uppercase", letterSpacing:"0.05em", color:C.muted }}>{h}</div>
-          ))}
-        </div>
-        {filtered.length === 0 ? (
-          <div style={{ textAlign:"center", padding:"48px", color:C.muted, fontSize:"14px" }}>No inventory items yet</div>
-        ) : filtered.map((item, i) => (
-          <InventoryRow
-            key={item.id}
-            item={item}
-            isEditing={editingId === item.id}
-            isLast={i === filtered.length - 1}
-            editForm={editForm}
-            setEditForm={setEditForm}
-            onSaveEdit={()=>saveEdit(item.id)}
-            onCancelEdit={()=>setEditingId(null)}
-            onStartEdit={()=>{ setEditingId(item.id); setEditForm({ itemName:item.itemName, neededWhen:item.neededWhen, forWhat:item.forWhat, orderStatus:item.orderStatus, location:item.location||"", notes:item.notes, url:item.url }); }}
-            onDelete={()=>handleDelete(item.id)}
-            onStatusChange={handleStatusChange}
-            NEEDED_COLORS={NEEDED_COLORS}
-            STATUS_COLORS={STATUS_COLORS}
-            NEEDED_WHEN_OPTIONS={NEEDED_WHEN_OPTIONS}
-            ORDER_STATUS_OPTIONS={ORDER_STATUS_OPTIONS}
-            LOCATION_OPTIONS={LOCATION_OPTIONS}
-            AvatarSmall={AvatarSmall}
-            inputS={inputS}
-          />
-        ))}
-      </div>
+      {/* Table — helper */}
+      {(() => {
+        const tableHeaders = ["Item Needed","Date","Needed When","For What","Status","Location","Notes","Person","Link"];
+        const renderSection = (label, emoji, sectionItems, accentColor) => {
+          if (sectionItems.length === 0) return null;
+          return (
+            <div style={{ marginBottom:"20px" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px" }}>
+                <span style={{ fontSize:"16px" }}>{emoji}</span>
+                <span style={{ fontSize:"13px", fontWeight:"700", color: C.text }}>{label}</span>
+                <span style={{ fontSize:"11px", color:C.muted, padding:"1px 8px", borderRadius:"10px", background:C.cardBg, border:`1px solid ${C.border}` }}>{sectionItems.length} item{sectionItems.length!==1?"s":""}</span>
+              </div>
+              <div style={{ border:`1px solid ${C.border}`, borderRadius:"12px", overflow:"hidden", borderTop:`3px solid ${accentColor}` }}>
+                <div style={{ display:"grid", gridTemplateColumns:"2fr 90px 130px 1fr 130px 70px 1fr 60px 60px", background:C.cardBg, borderBottom:`1px solid ${C.border}`, padding:"0 8px" }}>
+                  {tableHeaders.map((h,i)=>(<div key={i} style={{ padding:"10px 8px", fontSize:"11px", fontWeight:"700", textTransform:"uppercase", letterSpacing:"0.05em", color:C.muted }}>{h}</div>))}
+                </div>
+                {sectionItems.map((item,i)=>(
+                  <InventoryRow
+                    key={item.id} item={item} isEditing={editingId===item.id} isLast={i===sectionItems.length-1}
+                    editForm={editForm} setEditForm={setEditForm}
+                    onSaveEdit={()=>saveEdit(item.id)} onCancelEdit={()=>setEditingId(null)}
+                    onStartEdit={()=>{setEditingId(item.id);setEditForm({itemName:item.itemName,neededWhen:item.neededWhen,forWhat:item.forWhat,orderStatus:item.orderStatus,location:item.location||"",notes:item.notes,url:item.url});}}
+                    onDelete={()=>handleDelete(item.id)} onStatusChange={handleStatusChange}
+                    NEEDED_COLORS={NEEDED_COLORS} STATUS_COLORS={STATUS_COLORS}
+                    NEEDED_WHEN_OPTIONS={NEEDED_WHEN_OPTIONS} ORDER_STATUS_OPTIONS={ORDER_STATUS_OPTIONS}
+                    LOCATION_OPTIONS={LOCATION_OPTIONS} AvatarSmall={AvatarSmall} inputS={inputS}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        };
+        if (filtered.length === 0) return <div style={{ textAlign:"center", padding:"48px", color:C.muted, fontSize:"14px" }}>No inventory items yet — add one above.</div>;
+        return (
+          <>
+            {renderSection("Regular Supply Orders", "🔁", recurringItems, "#10B981")}
+            {renderSection("One-Time Purchases", "🛒", purchaseItems, "#F59E0B")}
+          </>
+        );
+      })()}
     </div>
   );
 }
@@ -1343,6 +1370,8 @@ export default function ContentScheduler() {
     { id: "teamtasks", label: "Task Tracker" },
     { id: "training", label: "Training" },
     { id: "events", label: "Events" },
+    { id: "tcfinfo", label: "About TCF" },
+    { id: "locations", label: "Locations" },
   ];
   const topBarTitle = view === "mydash"
     ? workspaceTitle
@@ -1479,8 +1508,17 @@ export default function ContentScheduler() {
             sidebarOpen={sidebarOpen}
           />
 
+          {/* ── ABOUT TCF (before Content) ── */}
+          <NavBtn
+            icon="🏫"
+            label="About TCF"
+            active={view === "tcfinfo"}
+            onClick={() => { setView("tcfinfo"); setViewingUserId(null); }}
+            sidebarOpen={sidebarOpen}
+          />
+
           {/* ── CONTENT section ── */}
-          <SidebarSectionLabel label="Content" visible={sidebarOpen} />
+          <SidebarSectionLabel label="Content & Marketing" visible={sidebarOpen} />
 
           {orderedContentViews.map((v, idx) => (
             <DraggableNavItem
@@ -1537,6 +1575,14 @@ export default function ContentScheduler() {
             label={INTERNAL_VIEW.label}
             active={view === "internal"}
             onClick={() => { setView("internal"); setViewingUserId(null); }}
+            sidebarOpen={sidebarOpen}
+          />
+
+          <NavBtn
+            icon="📍"
+            label="Locations"
+            active={view === "locations"}
+            onClick={() => { setView("locations"); setViewingUserId(null); }}
             sidebarOpen={sidebarOpen}
           />
 
@@ -1727,7 +1773,7 @@ export default function ContentScheduler() {
           ) : (
             <>
               {view === "dashboard" && <Dashboard posts={posts} campaigns={campaigns} goals={goals} currentUser={currentUser} ideas={ideas} onEdit={openEdit} onNewPost={() => openNew()} onNavigate={handleNavigate} onGoalsUpdate={handleGoalsUpdate} onIdeasUpdate={setIdeas} onMakePost={handleMakePost} token={authToken} />}
-              {view === "calendar" && <CalendarView posts={posts} onEdit={openEdit} onNewPost={(date) => openNew(date)} onDateChange={handleDateChange} />}
+              {view === "calendar" && <CalendarView posts={posts} onEdit={openEdit} onNewPost={(date) => openNew(date)} onDateChange={handleDateChange} token={authToken} />}
               {view === "pipeline" && <Pipeline posts={posts} onEdit={openEdit} onNewPost={(date, status) => openNew(date, status || "draft")} onStatusChange={handleStatusChange} currentUser={currentUser} />}
               {view === "list" && <ListView key={JSON.stringify(listFilters)} posts={posts} campaigns={campaigns} onEdit={openEdit} onNewPost={() => openNew()} initialFilters={listFilters} />}
               {view === "slack" && <SlackPlanner currentUser={currentUser} token={authToken} onMakePost={handleMakePost} teamMembers={teamMembers} />}
@@ -1768,6 +1814,8 @@ export default function ContentScheduler() {
               {view === "teamtasks" && <TeamTaskTracker token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
               {view === "training" && <TrainingView token={authToken} currentUser={currentUser} />}
               {view === "events" && <EventsView token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
+              {view === "tcfinfo" && <TCFInfoView token={authToken} />}
+              {view === "locations" && <LocationsView token={authToken} teamMembers={teamMembers} />}
             </>
           )}
         </div>

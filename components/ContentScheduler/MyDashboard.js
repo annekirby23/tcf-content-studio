@@ -1946,6 +1946,105 @@ const DEFAULT_SECTION_TITLES = {
   assignedContent: "Assigned to Me",
 };
 
+// ─── Location + Event Tasks bar ───────────────────────────────────────────────
+
+function LocationAndEventTasksBar({ token, userId }) {
+  const [myLocation, setMyLocation] = useState(null);
+  const [eventTasks, setEventTasks] = useState([]);
+  const [teamTasks, setTeamTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId) { setLoading(false); return; }
+    Promise.all([
+      apiFetch("/api/locations", {}, token).then((r) => r.json()).catch(() => []),
+      apiFetch("/api/events", {}, token).then((r) => r.json()).catch(() => []),
+      apiFetch("/api/teamtasks", {}, token).then((r) => r.json()).catch(() => []),
+    ]).then(([locations, events, teamTasksData]) => {
+      // Find location user is responsible for
+      const loc = Array.isArray(locations) ? locations.find((l) => l.responsibleMemberId === userId) : null;
+      setMyLocation(loc || null);
+
+      // Event checklist items assigned to this user
+      const tasks = [];
+      if (Array.isArray(events)) {
+        events.forEach((ev) => {
+          (ev.items || []).forEach((item) => {
+            if (item.assignedTo?.id === userId || item.assignedTo === userId) {
+              tasks.push({ ...item, eventTitle: ev.title, eventId: ev.id, eventColor: ev.color });
+            }
+          });
+        });
+      }
+      setEventTasks(tasks);
+
+      // Team tasks for user's location
+      if (loc && Array.isArray(teamTasksData)) {
+        const locTasks = teamTasksData.filter((t) =>
+          (t.locations || []).includes(loc.name) && t.status !== "done"
+        );
+        setTeamTasks(locTasks);
+      }
+    }).finally(() => setLoading(false));
+  }, [token, userId]);
+
+  const hasContent = myLocation || eventTasks.length > 0;
+  if (loading || !hasContent) return null;
+
+  return (
+    <div style={{ display: "flex", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
+      {/* My Location */}
+      {myLocation && (
+        <div style={{ flex: "1 1 280px", minWidth: "260px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px 20px", boxShadow: C.shadow }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px" }}>📍 My Location</div>
+          <div style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
+            {myLocation.image && (
+              <img src={myLocation.image} alt={myLocation.name} style={{ width: "64px", height: "52px", objectFit: "cover", borderRadius: "8px", border: `1px solid ${C.border}`, flexShrink: 0 }} />
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "4px" }}>{myLocation.name}</div>
+              {myLocation.address && <div style={{ fontSize: "11px", color: C.muted, marginBottom: "6px" }}>📍 {myLocation.address}</div>}
+              {myLocation.details && <div style={{ fontSize: "12px", color: C.muted, lineHeight: "1.5", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{myLocation.details}</div>}
+            </div>
+          </div>
+          {teamTasks.length > 0 && (
+            <div style={{ marginTop: "12px", borderTop: `1px solid ${C.border}`, paddingTop: "10px" }}>
+              <div style={{ fontSize: "11px", fontWeight: "600", color: C.muted, marginBottom: "6px" }}>Open Tasks for this Location</div>
+              {teamTasks.slice(0, 3).map((t) => (
+                <div key={t.id} style={{ fontSize: "12px", color: C.text, padding: "4px 0", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.accent, flexShrink: 0 }} />
+                  {t.text}
+                </div>
+              ))}
+              {teamTasks.length > 3 && <div style={{ fontSize: "11px", color: C.muted, marginTop: "4px" }}>+{teamTasks.length - 3} more</div>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Event Tasks assigned to me */}
+      {eventTasks.length > 0 && (
+        <div style={{ flex: "1 1 280px", minWidth: "260px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px 20px", boxShadow: C.shadow }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px" }}>📅 My Event Tasks</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {eventTasks.map((task) => (
+              <div key={task.id} style={{ display: "flex", alignItems: "flex-start", gap: "8px", padding: "8px 10px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}`, borderLeft: `3px solid ${task.eventColor || C.accent}` }}>
+                <div style={{ width: "14px", height: "14px", borderRadius: "3px", border: `2px solid ${task.done ? (task.eventColor || C.accent) : C.border}`, background: task.done ? (task.eventColor || C.accent) : "transparent", flexShrink: 0, marginTop: "1px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {task.done && <span style={{ color: "#fff", fontSize: "9px" }}>✓</span>}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "12px", color: task.done ? C.muted : C.text, textDecoration: task.done ? "line-through" : "none", wordBreak: "break-word" }}>{task.text}</div>
+                  <div style={{ fontSize: "10px", color: C.muted, marginTop: "2px" }}>📅 {task.eventTitle} {task.category && task.category !== "General" ? `· ${task.category}` : ""}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MyDashboard({ currentUser, token, viewingUserId, teamMembers = [], assignedPosts = [], assignedAssets = [], assignedSlackChannels = [], onOpenPost, onOpenAsset, onOpenSlack }) {
   const currentUserId = currentUser?.id;
   const effectiveViewingUserId = viewingUserId || currentUserId;
@@ -2163,6 +2262,9 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
           onSaveTitle={(v) => saveSectionTitle("tasks", v)}
         />
       </div>
+
+      {/* My Location + Event Tasks */}
+      <LocationAndEventTasksBar token={token} userId={effectiveViewingUserId} />
 
       {/* 2-column layout */}
       <div className="workspace-2col" style={{ display: "flex", gap: "20px", alignItems: "flex-start" }}>

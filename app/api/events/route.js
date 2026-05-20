@@ -21,7 +21,7 @@ export async function POST(req) {
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
-    const { title, description, status, date, color, driveFolderUrl, resourceLinks, members, notes } = body;
+    const { title, description, status, date, color, driveFolderUrl, resourceLinks, members, notes, club, slackChannel } = body;
 
     const event = {
       id: crypto.randomBytes(8).toString("hex"),
@@ -36,6 +36,8 @@ export async function POST(req) {
       items: [],
       notes: notes || "",
       comments: [],
+      club: club || "",
+      slackChannel: slackChannel || "",
       createdBy: user.name,
       createdById: user.id,
       createdAt: new Date().toISOString(),

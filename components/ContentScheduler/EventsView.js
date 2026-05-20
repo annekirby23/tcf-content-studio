@@ -82,7 +82,7 @@ function ProgressBar({ items }) {
 
 // ─── Event Detail Modal ───────────────────────────────────────────────────────
 
-function EventModal({ event, token, currentUser, teamMembers, onClose, onUpdate, onDelete }) {
+function EventModal({ event, token, currentUser, teamMembers, clubs, slackChannels, onClose, onUpdate, onDelete }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [editField, setEditField] = useState(null);
   const [fieldVal, setFieldVal] = useState("");
@@ -253,6 +253,22 @@ function EventModal({ event, token, currentUser, teamMembers, onClose, onUpdate,
                     onChange={(e) => patch({ date: e.target.value || null })}
                     style={{ ...textInput({ width: "100%", color: C.text }) }}
                   />
+                </div>
+                {/* Club */}
+                <div>
+                  <div style={{ fontSize: "10px", color: C.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Club</div>
+                  <select value={event.club || ""} onChange={(e) => patch({ club: e.target.value })} style={{ ...textInput({ width: "100%", color: C.text }) }}>
+                    <option value="">— Select Club —</option>
+                    {clubs.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                {/* Slack Channel */}
+                <div>
+                  <div style={{ fontSize: "10px", color: C.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Slack Channel</div>
+                  <select value={event.slackChannel || ""} onChange={(e) => patch({ slackChannel: e.target.value })} style={{ ...textInput({ width: "100%", color: C.text }) }}>
+                    <option value="">— Select Channel —</option>
+                    {slackChannels.map((ch) => <option key={ch} value={ch}>{ch}</option>)}
+                  </select>
                 </div>
               </div>
 
@@ -597,13 +613,15 @@ function MembersEditor({ members, teamMembers, onSave }) {
 
 // ─── New Event Modal ──────────────────────────────────────────────────────────
 
-function NewEventModal({ onSave, onClose, teamMembers = [] }) {
+function NewEventModal({ onSave, onClose, teamMembers = [], clubs = [], slackChannels = [] }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState("idea");
   const [date, setDate] = useState("");
   const [color, setColor] = useState(EVENT_COLORS[0]);
   const [driveFolderUrl, setDriveFolderUrl] = useState("");
+  const [club, setClub] = useState("");
+  const [slackChannel, setSlackChannel] = useState("");
   const [selectedMembers, setSelectedMembers] = useState([]);
 
   const toggleMember = (m) => {
@@ -612,7 +630,7 @@ function NewEventModal({ onSave, onClose, teamMembers = [] }) {
 
   const submit = () => {
     if (!title.trim()) return;
-    onSave({ title: title.trim(), description, status, date: date || null, color, driveFolderUrl: driveFolderUrl.trim(), members: selectedMembers });
+    onSave({ title: title.trim(), description, status, date: date || null, color, driveFolderUrl: driveFolderUrl.trim(), club, slackChannel, members: selectedMembers });
   };
 
   return (
@@ -648,6 +666,29 @@ function NewEventModal({ onSave, onClose, teamMembers = [] }) {
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ ...textInput({ width: "100%", color: C.text }) }} />
           </div>
         </div>
+
+        {(clubs.length > 0 || slackChannels.length > 0) && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+            {clubs.length > 0 && (
+              <div>
+                <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Club</label>
+                <select value={club} onChange={(e) => setClub(e.target.value)} style={{ ...textInput({ width: "100%", color: C.text }) }}>
+                  <option value="">— Select —</option>
+                  {clubs.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            )}
+            {slackChannels.length > 0 && (
+              <div>
+                <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Slack Channel</label>
+                <select value={slackChannel} onChange={(e) => setSlackChannel(e.target.value)} style={{ ...textInput({ width: "100%", color: C.text }) }}>
+                  <option value="">— Select —</option>
+                  {slackChannels.map((ch) => <option key={ch} value={ch}>{ch}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
 
         <div style={{ marginBottom: "14px" }}>
           <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Google Drive Folder URL</label>
@@ -758,11 +799,81 @@ function EventCard({ event, onClick }) {
             )}
           </div>
         ) : <div />}
-        {event.driveFolderUrl && (
-          <span style={{ fontSize: "10px", color: C.muted }}>📂 Drive</span>
-        )}
+        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+          {event.club && <span style={{ fontSize: "10px", color: C.muted, padding: "1px 6px", borderRadius: "10px", background: C.cardBg, border: `1px solid ${C.border}` }}>{event.club}</span>}
+          {event.slackChannel && <span style={{ fontSize: "10px", color: "#4A154B" }}>💬 {event.slackChannel}</span>}
+          {event.driveFolderUrl && <span style={{ fontSize: "10px", color: C.muted }}>📂</span>}
+        </div>
       </div>
     </div>
+  );
+}
+
+// ─── Main EventsView ──────────────────────────────────────────────────────────
+
+// ─── Settings Modal (clubs + slack channels) ──────────────────────────────────
+
+function SettingsModal({ settings, onSave, onClose }) {
+  const [clubs, setClubs] = useState([...settings.clubs]);
+  const [channels, setChannels] = useState([...settings.slackChannels]);
+  const [newClub, setNewClub] = useState("");
+  const [newChannel, setNewChannel] = useState("");
+
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const addClub = () => { if (newClub.trim() && !clubs.includes(newClub.trim())) { setClubs([...clubs, newClub.trim()]); setNewClub(""); } };
+  const removeClub = (c) => setClubs(clubs.filter((x) => x !== c));
+  const addChannel = () => { const ch = newChannel.trim().startsWith("#") ? newChannel.trim() : `#${newChannel.trim()}`; if (newChannel.trim() && !channels.includes(ch)) { setChannels([...channels, ch]); setNewChannel(""); } };
+  const removeChannel = (c) => setChannels(channels.filter((x) => x !== c));
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", backdropFilter: "blur(3px)", zIndex: 3000 }} />
+      <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: "440px", maxWidth: "94vw", background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "24px", zIndex: 3001, boxShadow: "0 16px 48px rgba(0,0,0,0.28)", maxHeight: "90vh", overflowY: "auto" }}>
+        <h3 style={{ margin: "0 0 20px", fontSize: "16px", fontWeight: "700", color: C.text }}>⚙️ Event Settings</h3>
+
+        <div style={{ marginBottom: "20px" }}>
+          <div style={{ fontSize: "11px", color: C.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "10px" }}>Clubs</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
+            {clubs.map((c) => (
+              <span key={c} style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "3px 10px", borderRadius: "20px", background: C.cardBg, border: `1px solid ${C.border}`, fontSize: "12px", color: C.text }}>
+                {c}
+                <button onClick={() => removeClub(c)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "11px", padding: "0 1px" }}>✕</button>
+              </span>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <input value={newClub} onChange={(e) => setNewClub(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addClub()} placeholder="Add club…" style={{ ...textInput({ flex: 1, fontSize: "12px" }) }} />
+            <button onClick={addClub} style={{ padding: "7px 12px", borderRadius: "7px", border: "none", background: C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>+ Add</button>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: "24px" }}>
+          <div style={{ fontSize: "11px", color: C.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "10px" }}>Slack Channels</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
+            {channels.map((c) => (
+              <span key={c} style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "3px 10px", borderRadius: "20px", background: "rgba(74,21,75,0.08)", border: "1px solid rgba(74,21,75,0.2)", fontSize: "12px", color: "#4A154B" }}>
+                {c}
+                <button onClick={() => removeChannel(c)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "11px", padding: "0 1px" }}>✕</button>
+              </span>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <input value={newChannel} onChange={(e) => setNewChannel(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addChannel()} placeholder="#channel-name" style={{ ...textInput({ flex: 1, fontSize: "12px" }) }} />
+            <button onClick={addChannel} style={{ padding: "7px 12px", borderRadius: "7px", border: "none", background: C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>+ Add</button>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+          <button onClick={onClose} style={{ padding: "8px 16px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
+          <button onClick={() => { onSave({ clubs, slackChannels: channels }); onClose(); }} style={{ padding: "8px 18px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Save Settings</button>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -772,17 +883,29 @@ export default function EventsView({ token, currentUser, teamMembers = [] }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [filterStatus, setFilterStatus] = useState("all");
+  const [settings, setSettings] = useState({ clubs: [], slackChannels: [] });
 
   useEffect(() => {
     setLoading(true);
-    apiFetch("/api/events", {}, token)
-      .then((r) => r.json())
-      .then((data) => setEvents(Array.isArray(data) ? data : []))
+    Promise.all([
+      apiFetch("/api/events", {}, token).then((r) => r.json()),
+      apiFetch("/api/eventsettings", {}, token).then((r) => r.json()),
+    ])
+      .then(([eventsData, settingsData]) => {
+        setEvents(Array.isArray(eventsData) ? eventsData : []);
+        setSettings(settingsData || { clubs: [], slackChannels: [] });
+      })
       .catch(() => setEvents([]))
       .finally(() => setLoading(false));
   }, [token]);
+
+  const handleSaveSettings = async (data) => {
+    setSettings(data);
+    try { await apiFetch("/api/eventsettings", { method: "PUT", body: JSON.stringify(data) }, token); } catch {}
+  };
 
   const handleCreate = async (data) => {
     setShowModal(false);
@@ -821,12 +944,21 @@ export default function EventsView({ token, currentUser, teamMembers = [] }) {
           <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: C.text }}>📅 Events</h1>
           <p style={{ margin: "4px 0 0", fontSize: "13px", color: C.muted }}>Plan and track upcoming events for the whole team.</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          style={{ padding: "10px 20px", borderRadius: "10px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", boxShadow: "0 2px 8px rgba(99,102,241,0.3)" }}
-        >
-          + New Event
-        </button>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button
+            onClick={() => setShowSettings(true)}
+            style={{ padding: "10px 14px", borderRadius: "10px", border: `1px solid ${C.border}`, background: C.card, color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}
+            title="Manage clubs and Slack channels"
+          >
+            ⚙️
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            style={{ padding: "10px 20px", borderRadius: "10px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", boxShadow: "0 2px 8px rgba(99,102,241,0.3)" }}
+          >
+            + New Event
+          </button>
+        </div>
       </div>
 
       {/* Status filters */}
@@ -875,8 +1007,18 @@ export default function EventsView({ token, currentUser, teamMembers = [] }) {
       )}
 
       {/* Modals */}
+      {showSettings && (
+        <SettingsModal settings={settings} onSave={handleSaveSettings} onClose={() => setShowSettings(false)} />
+      )}
+
       {showModal && (
-        <NewEventModal onSave={handleCreate} onClose={() => setShowModal(false)} teamMembers={teamMembers} />
+        <NewEventModal
+          onSave={handleCreate}
+          onClose={() => setShowModal(false)}
+          teamMembers={teamMembers}
+          clubs={settings.clubs}
+          slackChannels={settings.slackChannels}
+        />
       )}
 
       {selectedEvent && (
@@ -885,6 +1027,8 @@ export default function EventsView({ token, currentUser, teamMembers = [] }) {
           token={token}
           currentUser={currentUser}
           teamMembers={teamMembers}
+          clubs={settings.clubs}
+          slackChannels={settings.slackChannels}
           onClose={() => setSelectedEvent(null)}
           onUpdate={handleUpdate}
           onDelete={handleDelete}

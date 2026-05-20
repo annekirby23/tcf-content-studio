@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PLATFORM_MAP, STATUS_MAP, THEME_MAP, AUDIENCE_MAP, C } from "./constants";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -358,10 +358,11 @@ function NavBtn({ onClick, children }) {
 
 // ─── Month view ───────────────────────────────────────────────────────────────
 
-function MonthView({ posts, onEdit, onNewPost, onDateChange, viewYear, viewMonth, today }) {
+function MonthView({ posts, events = [], onEdit, onNewPost, onDateChange, viewYear, viewMonth, today }) {
   const [selectedDate, setSelectedDate] = useState(null);
   const [draggedPostId, setDraggedPostId] = useState(null);
   const [dropTargetDate, setDropTargetDate] = useState(null);
+  const [selectedEvent, setSelectedEventLocal] = useState(null);
 
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const firstDow = getFirstDayOfWeek(viewYear, viewMonth);
@@ -376,6 +377,19 @@ function MonthView({ posts, onEdit, onNewPost, onDateChange, viewYear, viewMonth
     if (y === viewYear && m === viewMonth + 1) {
       if (!postsByDay[d]) postsByDay[d] = [];
       postsByDay[d].push(p);
+    }
+  });
+
+  const eventsByDay = {};
+  events.forEach((ev) => {
+    if (!ev.date) return;
+    const parts = ev.date.split("-");
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const d = parseInt(parts[2], 10);
+    if (y === viewYear && m === viewMonth + 1) {
+      if (!eventsByDay[d]) eventsByDay[d] = [];
+      eventsByDay[d].push(ev);
     }
   });
 
@@ -440,6 +454,7 @@ function MonthView({ posts, onEdit, onNewPost, onDateChange, viewYear, viewMonth
 
             const dateStr = isoDate(viewYear, viewMonth, day);
             const dayPosts = postsByDay[day] || [];
+            const dayEvents = eventsByDay[day] || [];
             const isToday = dateStr === today;
             const isSelected = dateStr === selectedDate;
             const isDropTarget = dateStr === dropTargetDate;
@@ -536,6 +551,27 @@ function MonthView({ posts, onEdit, onNewPost, onDateChange, viewYear, viewMonth
                     </span>
                   )}
                 </div>
+
+                {/* Mini event tags */}
+                {dayEvents.map((ev) => (
+                  <div
+                    key={ev.id}
+                    onClick={(e) => { e.stopPropagation(); setSelectedEventLocal(ev); }}
+                    style={{
+                      fontSize: "10px", fontWeight: "600",
+                      color: "#fff",
+                      background: ev.color || "#6366F1",
+                      borderRadius: "4px",
+                      padding: "1px 5px",
+                      marginBottom: "2px",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      cursor: "pointer",
+                    }}
+                    title={ev.title}
+                  >
+                    📅 {ev.title}
+                  </div>
+                ))}
 
                 {/* Mini post tags */}
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -671,7 +707,15 @@ function MonthView({ posts, onEdit, onNewPost, onDateChange, viewYear, viewMonth
           <div style={{ height: "1px", background: C.border, marginBottom: "12px", flexShrink: 0 }} />
 
           <div style={{ flex: 1, overflowY: "auto" }}>
-            {selectedPosts.length === 0 ? (
+            {/* Events for this day */}
+            {selectedDate && (eventsByDay[parseInt(selectedDate.split("-")[2], 10)] || []).map((ev) => (
+              <div key={ev.id} style={{ padding: "10px 12px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}`, borderLeft: `4px solid ${ev.color || "#6366F1"}`, marginBottom: "8px" }}>
+                <div style={{ fontSize: "13px", fontWeight: "700", color: C.text }}>📅 {ev.title}</div>
+                {ev.description && <div style={{ fontSize: "11px", color: C.muted, marginTop: "3px" }}>{ev.description}</div>}
+                {ev.status && <span style={{ fontSize: "10px", fontWeight: "600", color: ev.color || "#6366F1", marginTop: "4px", display: "inline-block" }}>{ev.status.toUpperCase()}</span>}
+              </div>
+            ))}
+            {selectedPosts.length === 0 && !(selectedDate && (eventsByDay[parseInt(selectedDate.split("-")[2], 10)] || []).length) ? (
               <div
                 style={{
                   textAlign: "center",
@@ -691,6 +735,33 @@ function MonthView({ posts, onEdit, onNewPost, onDateChange, viewYear, viewMonth
             )}
           </div>
         </div>
+      )}
+
+      {/* Event quick-view popup */}
+      {selectedEvent && (
+        <>
+          <div onClick={() => setSelectedEventLocal(null)} style={{ position: "fixed", inset: 0, zIndex: 1999 }} />
+          <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: "360px", maxWidth: "90vw", background: C.card, border: `1px solid ${C.border}`, borderLeft: `5px solid ${selectedEvent.color || "#6366F1"}`, borderRadius: "14px", padding: "20px", zIndex: 2000, boxShadow: "0 12px 40px rgba(0,0,0,0.25)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+              <div>
+                <div style={{ fontSize: "16px", fontWeight: "800", color: C.text }}>{selectedEvent.title}</div>
+                {selectedEvent.date && <div style={{ fontSize: "12px", color: C.muted, marginTop: "4px" }}>📅 {new Date(selectedEvent.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric", year: "numeric" })}</div>}
+              </div>
+              <button onClick={() => setSelectedEventLocal(null)} style={{ background: "none", border: "none", color: C.muted, fontSize: "16px", cursor: "pointer", padding: "2px 4px" }}>✕</button>
+            </div>
+            {selectedEvent.description && <div style={{ fontSize: "13px", color: C.muted, lineHeight: "1.6", marginBottom: "10px" }}>{selectedEvent.description}</div>}
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {selectedEvent.status && <span style={{ fontSize: "11px", fontWeight: "700", padding: "2px 8px", borderRadius: "10px", background: `${selectedEvent.color || "#6366F1"}20`, color: selectedEvent.color || "#6366F1" }}>{selectedEvent.status}</span>}
+              {selectedEvent.club && <span style={{ fontSize: "11px", color: C.muted, padding: "2px 8px", borderRadius: "10px", background: C.cardBg, border: `1px solid ${C.border}` }}>{selectedEvent.club}</span>}
+              {selectedEvent.slackChannel && <span style={{ fontSize: "11px", color: "#4A154B" }}>💬 {selectedEvent.slackChannel}</span>}
+            </div>
+            {selectedEvent.driveFolderUrl && (
+              <a href={selectedEvent.driveFolderUrl} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "5px", marginTop: "12px", fontSize: "12px", color: C.accent, textDecoration: "none", padding: "5px 10px", borderRadius: "20px", border: `1px solid ${C.accent}`, background: C.accentLight }}>
+                📂 Open Drive Folder
+              </a>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
@@ -1259,11 +1330,20 @@ function CommentsView({ posts, onEdit }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function CalendarView({ posts, onEdit, onNewPost, onDateChange }) {
+export default function CalendarView({ posts, onEdit, onNewPost, onDateChange, token }) {
   const now = new Date();
   const today = now.toISOString().split("T")[0];
 
   const [calView, setCalView] = useState("month");
+  const [events, setEvents] = useState([]);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch("/api/events", { headers: { "x-session": token } })
+      .then((r) => r.json())
+      .then((data) => setEvents(Array.isArray(data) ? data.filter((e) => e.date) : []))
+      .catch(() => {});
+  }, [token]);
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
   const [selectedDate, setSelectedDate] = useState(null);
@@ -1370,6 +1450,7 @@ export default function CalendarView({ posts, onEdit, onNewPost, onDateChange })
       {calView === "month" && (
         <MonthView
           posts={posts}
+          events={events}
           onEdit={onEdit}
           onNewPost={onNewPost}
           onDateChange={onDateChange}
