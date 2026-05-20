@@ -1508,12 +1508,20 @@ export default function ContentScheduler() {
             sidebarOpen={sidebarOpen}
           />
 
-          {/* ── ABOUT TCF (before Content) ── */}
+          {/* ── ABOUT TCF + EVENTS (before Content) ── */}
           <NavBtn
             icon="🏫"
             label="About TCF"
             active={view === "tcfinfo"}
             onClick={() => { setView("tcfinfo"); setViewingUserId(null); }}
+            sidebarOpen={sidebarOpen}
+          />
+
+          <NavBtn
+            icon="📅"
+            label="Events"
+            active={view === "events"}
+            onClick={() => { setView("events"); setViewingUserId(null); }}
             sidebarOpen={sidebarOpen}
           />
 
@@ -1607,14 +1615,6 @@ export default function ContentScheduler() {
             label="Training"
             active={view === "training"}
             onClick={() => { setView("training"); setViewingUserId(null); }}
-            sidebarOpen={sidebarOpen}
-          />
-
-          <NavBtn
-            icon="📅"
-            label="Events"
-            active={view === "events"}
-            onClick={() => { setView("events"); setViewingUserId(null); }}
             sidebarOpen={sidebarOpen}
           />
 
@@ -1814,7 +1814,7 @@ export default function ContentScheduler() {
               {view === "teamtasks" && <TeamTaskTracker token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
               {view === "training" && <TrainingView token={authToken} currentUser={currentUser} />}
               {view === "events" && <EventsView token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
-              {view === "tcfinfo" && <TCFInfoView token={authToken} />}
+              {view === "tcfinfo" && <TCFInfoView token={authToken} teamMembers={teamMembers} />}
               {view === "locations" && <LocationsView token={authToken} teamMembers={teamMembers} />}
             </>
           )}

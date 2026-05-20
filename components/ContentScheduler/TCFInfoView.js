@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { C } from "./constants";
+import MemberJourneyView from "./MemberJourneyView";
 
 function apiFetch(url, opts = {}, token) {
   return fetch(url, {
@@ -109,7 +110,13 @@ function InfoSection({ sectionKey, icon, title, placeholder, value, onSave }) {
   );
 }
 
-export default function TCFInfoView({ token }) {
+const TABS = [
+  { id: "about", label: "🏫 About TCF" },
+  { id: "journey", label: "🗺️ Member Journey" },
+];
+
+export default function TCFInfoView({ token, teamMembers = [] }) {
+  const [activeTab, setActiveTab] = useState("about");
   const [info, setInfo] = useState({ mission: "", values: "", motto: "", history: "", ourWhy: "" });
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -136,32 +143,62 @@ export default function TCFInfoView({ token }) {
   };
 
   return (
-    <div style={{ padding: "24px", maxWidth: "820px", margin: "0 auto" }}>
+    <div style={{ padding: "24px", maxWidth: "980px", margin: "0 auto" }}>
       {/* Header */}
-      <div style={{ marginBottom: "28px" }}>
-        <h1 style={{ margin: "0 0 6px", fontSize: "24px", fontWeight: "800", color: C.text }}>🏫 About TCF</h1>
-        <p style={{ margin: 0, fontSize: "14px", color: C.muted, lineHeight: "1.6" }}>
-          Our identity, history, and purpose — everything that makes TCF who we are.
-          Click any section to edit.
-        </p>
+      <div style={{ marginBottom: "20px" }}>
+        <h1 style={{ margin: "0 0 6px", fontSize: "24px", fontWeight: "800", color: C.text }}>🏫 TCF Studio</h1>
+        <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>Who we are, what we stand for, and how we bring members in.</p>
       </div>
 
-      {loading ? (
-        <div style={{ textAlign: "center", padding: "60px", color: C.muted, fontSize: "14px" }}>Loading…</div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-          {SECTIONS.map((s) => (
-            <InfoSection
-              key={s.key}
-              sectionKey={s.key}
-              icon={s.icon}
-              title={s.title}
-              placeholder={s.placeholder}
-              value={info[s.key]}
-              onSave={handleSave}
-            />
-          ))}
-        </div>
+      {/* Tab bar */}
+      <div style={{ display: "flex", gap: "4px", marginBottom: "24px", borderBottom: `1px solid ${C.border}`, paddingBottom: "0" }}>
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              padding: "10px 18px", borderRadius: "10px 10px 0 0",
+              border: `1px solid ${activeTab === tab.id ? C.border : "transparent"}`,
+              borderBottom: activeTab === tab.id ? `1px solid ${C.card}` : "1px solid transparent",
+              background: activeTab === tab.id ? C.card : "transparent",
+              color: activeTab === tab.id ? C.accent : C.muted,
+              fontSize: "13px", fontWeight: "700", cursor: "pointer",
+              marginBottom: "-1px",
+              transition: "all 0.12s",
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* About TCF tab */}
+      {activeTab === "about" && (
+        loading ? (
+          <div style={{ textAlign: "center", padding: "60px", color: C.muted, fontSize: "14px" }}>Loading…</div>
+        ) : (
+          <div style={{ maxWidth: "820px" }}>
+            <p style={{ margin: "0 0 20px", fontSize: "13px", color: C.muted }}>Our identity, history, and purpose. Click any section to edit.</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+              {SECTIONS.map((s) => (
+                <InfoSection
+                  key={s.key}
+                  sectionKey={s.key}
+                  icon={s.icon}
+                  title={s.title}
+                  placeholder={s.placeholder}
+                  value={info[s.key]}
+                  onSave={handleSave}
+                />
+              ))}
+            </div>
+          </div>
+        )
+      )}
+
+      {/* Member Journey tab */}
+      {activeTab === "journey" && (
+        <MemberJourneyView token={token} teamMembers={teamMembers} />
       )}
 
       {/* Toast */}

@@ -1952,6 +1952,7 @@ function LocationAndEventTasksBar({ token, userId }) {
   const [myLocation, setMyLocation] = useState(null);
   const [eventTasks, setEventTasks] = useState([]);
   const [teamTasks, setTeamTasks] = useState([]);
+  const [journeyStages, setJourneyStages] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1960,7 +1961,8 @@ function LocationAndEventTasksBar({ token, userId }) {
       apiFetch("/api/locations", {}, token).then((r) => r.json()).catch(() => []),
       apiFetch("/api/events", {}, token).then((r) => r.json()).catch(() => []),
       apiFetch("/api/teamtasks", {}, token).then((r) => r.json()).catch(() => []),
-    ]).then(([locations, events, teamTasksData]) => {
+      apiFetch("/api/memberjourney", {}, token).then((r) => r.json()).catch(() => null),
+    ]).then(([locations, events, teamTasksData, journeyData]) => {
       // Find location user is responsible for
       const loc = Array.isArray(locations) ? locations.find((l) => l.responsibleMemberId === userId) : null;
       setMyLocation(loc || null);
@@ -1985,10 +1987,16 @@ function LocationAndEventTasksBar({ token, userId }) {
         );
         setTeamTasks(locTasks);
       }
+
+      // Journey stages assigned to this user
+      if (journeyData?.stages) {
+        const myStages = journeyData.stages.filter((s) => s.assignedMemberId === userId);
+        setJourneyStages(myStages);
+      }
     }).finally(() => setLoading(false));
   }, [token, userId]);
 
-  const hasContent = myLocation || eventTasks.length > 0;
+  const hasContent = myLocation || eventTasks.length > 0 || journeyStages.length > 0;
   if (loading || !hasContent) return null;
 
   return (
@@ -2038,6 +2046,42 @@ function LocationAndEventTasksBar({ token, userId }) {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Member Journey stages I own */}
+      {journeyStages.length > 0 && (
+        <div style={{ flex: "1 1 280px", minWidth: "260px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px 20px", boxShadow: C.shadow }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px" }}>🗺️ My Journey Stages</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {journeyStages.map((stage) => {
+              const done = (stage.steps || []).filter((s) => s.done).length;
+              const total = (stage.steps || []).length;
+              const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+              return (
+                <div key={stage.id} style={{ padding: "10px 12px", background: C.cardBg, borderRadius: "10px", border: `1px solid ${C.border}`, borderLeft: `4px solid ${stage.color || C.accent}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "16px" }}>{stage.icon}</span>
+                    <div>
+                      <div style={{ fontSize: "13px", fontWeight: "700", color: C.text }}>{stage.name}</div>
+                      <div style={{ fontSize: "10px", color: C.muted }}>{stage.tagline}</div>
+                    </div>
+                  </div>
+                  {total > 0 && (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
+                        <span style={{ fontSize: "10px", color: C.muted }}>Process</span>
+                        <span style={{ fontSize: "10px", color: stage.color || C.accent, fontWeight: "700" }}>{done}/{total}</span>
+                      </div>
+                      <div style={{ height: "4px", borderRadius: "2px", background: C.border, overflow: "hidden" }}>
+                        <div style={{ width: `${pct}%`, height: "100%", background: stage.color || C.accent, borderRadius: "2px" }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
