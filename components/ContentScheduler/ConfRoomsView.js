@@ -309,13 +309,16 @@ function RoomCard({ room, onClick, onNavigateToLocation }) {
 
 function EmbedSettings({ token, currentUser, settings, onSettingsChange }) {
   const [skeddaEmbed, setSkeddaEmbed] = useState(settings?.skeddaEmbedUrl || "");
-  const [honeyBookEmbed, setHoneyBookEmbed] = useState(settings?.honeyBookEmbedUrl || "");
+  const [honeyBookCode, setHoneyBookCode] = useState(settings?.honeyBookEmbedCode || "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
-    const res = await apiFetch("/api/confrooms/settings", { method: "PUT", body: JSON.stringify({ skeddaEmbedUrl: skeddaEmbed, honeyBookEmbedUrl: honeyBookEmbed }) }, token);
+    const res = await apiFetch("/api/confrooms/settings", {
+      method: "PUT",
+      body: JSON.stringify({ skeddaEmbedUrl: skeddaEmbed, honeyBookEmbedCode: honeyBookCode }),
+    }, token);
     const data = await res.json();
     onSettingsChange(data);
     setSaving(false);
@@ -328,18 +331,30 @@ function EmbedSettings({ token, currentUser, settings, onSettingsChange }) {
   return (
     <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "16px", marginBottom: "20px" }}>
       <div style={{ fontSize: "12px", fontWeight: "700", color: C.accent, marginBottom: "12px" }}>⚙️ Admin: Embed Settings</div>
-      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-        <div style={{ flex: 1, minWidth: "240px" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+        <div>
           <label style={labelStyle}>Skedda Embed URL (for the Skedda tab)</label>
           <input value={skeddaEmbed} onChange={(e) => setSkeddaEmbed(e.target.value)} style={{ ...textInput({ width: "100%" }) }} placeholder="https://skedda.com/book/yourspace" />
         </div>
-        <div style={{ flex: 1, minWidth: "240px" }}>
-          <label style={labelStyle}>HoneyBook Embed URL (for the HoneyBook tab)</label>
-          <input value={honeyBookEmbed} onChange={(e) => setHoneyBookEmbed(e.target.value)} style={{ ...textInput({ width: "100%" }) }} placeholder="https://www.honeybook.com/widget/…" />
+        <div>
+          <label style={labelStyle}>HoneyBook Embed Code (for the HoneyBook tab)</label>
+          <div style={{ fontSize: "11px", color: C.muted, marginBottom: "6px" }}>
+            Paste the full embed code snippet from HoneyBook — including any {"<iframe>"} or {"<script>"} tags.
+          </div>
+          <textarea
+            value={honeyBookCode}
+            onChange={(e) => setHoneyBookCode(e.target.value)}
+            rows={5}
+            spellCheck={false}
+            style={{
+              ...textInput({ width: "100%", resize: "vertical", fontFamily: "monospace", fontSize: "12px", lineHeight: "1.5" }),
+            }}
+            placeholder={"<iframe src=\"https://app.honeybook.com/…\" …></iframe>\nor\n<script src=\"…\"></script>"}
+          />
         </div>
       </div>
       <button onClick={handleSave} disabled={saving} style={{ marginTop: "10px", padding: "7px 18px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>
-        {saved ? "✓ Saved!" : saving ? "Saving…" : "Save Embed URLs"}
+        {saved ? "✓ Saved!" : saving ? "Saving…" : "Save Settings"}
       </button>
     </div>
   );
@@ -365,6 +380,47 @@ function EmbedTab({ url, placeholder, icon, label }) {
         style={{ width: "100%", height: "700px", border: "none", display: "block" }}
         allow="payment"
         title={label}
+      />
+    </div>
+  );
+}
+
+// ─── HoneyBook Embed Tab (renders raw embed code) ─────────────────────────────
+
+function HoneyBookEmbedTab({ embedCode }) {
+  if (!embedCode?.trim()) {
+    return (
+      <div style={{ textAlign: "center", padding: "60px 24px", background: C.cardBg, borderRadius: "12px", border: `1px dashed ${C.border}`, color: C.muted }}>
+        <div style={{ fontSize: "40px", marginBottom: "12px" }}>📋</div>
+        <div style={{ fontSize: "15px", fontWeight: "600", marginBottom: "6px" }}>HoneyBook embed not configured</div>
+        <div style={{ fontSize: "13px" }}>An admin needs to paste the HoneyBook embed code in the Rooms tab settings.</div>
+      </div>
+    );
+  }
+
+  // Wrap the embed code in a full HTML document so scripts execute correctly
+  const srcdoc = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0; font-family: sans-serif; }
+  </style>
+</head>
+<body>
+${embedCode}
+</body>
+</html>`;
+
+  return (
+    <div style={{ borderRadius: "12px", overflow: "hidden", border: `1px solid ${C.border}`, boxShadow: C.shadow }}>
+      <iframe
+        srcDoc={srcdoc}
+        style={{ width: "100%", height: "780px", border: "none", display: "block" }}
+        sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+        title="HoneyBook Request Form"
       />
     </div>
   );
@@ -528,12 +584,7 @@ export default function ConfRoomsView({ token, currentUser }) {
 
       {/* ── HONEYBOOK TAB ── */}
       {tab === "honeybook" && (
-        <EmbedTab
-          url={settings?.honeyBookEmbedUrl}
-          icon="📋"
-          label="HoneyBook Request Form"
-          placeholder="An admin needs to set the HoneyBook embed URL in the Rooms tab settings."
-        />
+        <HoneyBookEmbedTab embedCode={settings?.honeyBookEmbedCode} />
       )}
 
       {/* Modal */}

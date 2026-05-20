@@ -26,6 +26,7 @@ export async function PUT(req) {
       ...existing,
       ...(body.skeddaEmbedUrl !== undefined && { skeddaEmbedUrl: body.skeddaEmbedUrl }),
       ...(body.honeyBookEmbedUrl !== undefined && { honeyBookEmbedUrl: body.honeyBookEmbedUrl }),
+      ...(body.honeyBookEmbedCode !== undefined && { honeyBookEmbedCode: body.honeyBookEmbedCode }),
       updatedAt: new Date().toISOString(),
     };
     await kvSet(KEY, updated);
