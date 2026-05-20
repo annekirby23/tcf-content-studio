@@ -1925,6 +1925,7 @@ export default function ContentScheduler() {
               {view === "assets" && <AssetTracker currentUser={currentUser} token={authToken} teamMembers={teamMembers} />}
               {view === "mydash" && (
                 <MyDashboard
+                  key={effectiveViewingUserId}
                   currentUser={currentUser}
                   token={authToken}
                   viewingUserId={effectiveViewingUserId}

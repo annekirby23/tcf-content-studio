@@ -2763,6 +2763,7 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
       {/* My Tasks — full width below Daily Routines */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px 24px", boxShadow: C.shadow, marginBottom: "20px" }}>
         <TasksColumn
+          key={effectiveViewingUserId}
           token={token}
           viewingUserId={effectiveViewingUserId}
           currentUserId={currentUserId}
