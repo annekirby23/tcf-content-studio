@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { C } from "./constants";
+import WorkspaceAISummary from "./WorkspaceAISummary";
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -2516,6 +2517,14 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
           </div>
         );
       })()}
+
+      {/* ── AI Daily Briefing ── */}
+      <WorkspaceAISummary
+        token={token}
+        currentUser={currentUser}
+        viewingUserId={effectiveViewingUserId}
+        ownerName={ownerName}
+      />
 
       {/* Daily Routines — full width below header */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px 24px", boxShadow: C.shadow, marginBottom: "20px" }}>
