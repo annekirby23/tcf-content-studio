@@ -270,10 +270,87 @@ function ShoutoutForm({ token, teamMembers, currentUser, onSave, onClose }) {
 
 // ─── Announcement Card ────────────────────────────────────────────────────────
 
-function AnnouncementCard({ post, canDelete, onDelete }) {
+function AnnouncementCard({ post, canDelete, onDelete, canEdit, token, onUpdate }) {
   const [hov, setHov] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(post.title || "");
+  const [editContent, setEditContent] = useState(post.content || "");
+  const [editPinned, setEditPinned] = useState(!!post.pinned);
+  const [editMustRead, setEditMustRead] = useState(!!post.mustRead);
+  const [editWorkspace, setEditWorkspace] = useState(!!post.showOnWorkspace);
+  const [saving, setSaving] = useState(false);
   const isMustRead = !!post.mustRead;
 
+  const startEdit = () => {
+    setEditTitle(post.title || "");
+    setEditContent(post.content || "");
+    setEditPinned(!!post.pinned);
+    setEditMustRead(!!post.mustRead);
+    setEditWorkspace(!!post.showOnWorkspace);
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    if (!editContent.trim()) return;
+    setSaving(true);
+    try {
+      const res = await apiFetch("/api/bulletin", {
+        method: "PUT",
+        body: JSON.stringify({ postId: post.id, title: editTitle.trim(), content: editContent.trim(), pinned: editPinned, mustRead: editMustRead, showOnWorkspace: editWorkspace }),
+      }, token);
+      const updated = await res.json();
+      onUpdate?.(updated);
+      setEditing(false);
+    } finally { setSaving(false); }
+  };
+
+  // ── Edit mode ──────────────────────────────────────────────────────────────
+  if (editing) {
+    return (
+      <div style={{ background: C.card, border: `1.5px solid ${C.accent}`, borderRadius: "12px", padding: "18px 20px", boxShadow: C.shadowMd }}>
+        <div style={{ fontSize: "13px", fontWeight: "700", color: C.accent, marginBottom: "12px" }}>✏️ Edit Announcement</div>
+        <input
+          value={editTitle}
+          onChange={(e) => setEditTitle(e.target.value)}
+          placeholder="Title (optional)…"
+          style={{ ...textInput({ width: "100%", marginBottom: "8px", display: "block" }), marginBottom: "8px" }}
+        />
+        <textarea
+          autoFocus
+          value={editContent}
+          onChange={(e) => setEditContent(e.target.value)}
+          rows={4}
+          placeholder="Announcement content…"
+          style={{ ...textInput({ width: "100%", resize: "vertical", lineHeight: "1.6" }), marginBottom: "12px", display: "block" }}
+        />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
+          <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: C.muted, cursor: "pointer" }}>
+              <input type="checkbox" checked={editPinned} onChange={(e) => setEditPinned(e.target.checked)} style={{ accentColor: C.accent }} />
+              📌 Pinned
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: C.muted, cursor: "pointer" }}>
+              <input type="checkbox" checked={editWorkspace} onChange={(e) => setEditWorkspace(e.target.checked)} style={{ accentColor: C.accent }} />
+              🏠 Show on workspaces
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", cursor: "pointer", fontWeight: editMustRead ? "700" : "400", color: editMustRead ? "#DC2626" : C.muted, background: editMustRead ? "rgba(220,38,38,0.07)" : "transparent", padding: "3px 8px", borderRadius: "6px", border: editMustRead ? "1px solid rgba(220,38,38,0.2)" : "1px solid transparent" }}>
+              <input type="checkbox" checked={editMustRead} onChange={(e) => setEditMustRead(e.target.checked)} style={{ accentColor: "#DC2626" }} />
+              🔥 Must Read
+            </label>
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button onClick={() => setEditing(false)} style={{ padding: "7px 14px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", cursor: "pointer" }}>Cancel</button>
+            <button onClick={saveEdit} disabled={!editContent.trim() || saving} style={{ padding: "7px 16px", borderRadius: "8px", border: "none", background: editContent.trim() ? C.accent : C.border, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: editContent.trim() ? "pointer" : "not-allowed" }}>
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
+        </div>
+        {post.updatedAt && <div style={{ fontSize: "11px", color: C.muted, marginTop: "10px" }}>Last updated {timeAgo(post.updatedAt)}</div>}
+      </div>
+    );
+  }
+
+  // ── Display mode ────────────────────────────────────────────────────────────
   return (
     <div
       onMouseEnter={() => setHov(true)}
@@ -294,11 +371,7 @@ function AnnouncementCard({ post, canDelete, onDelete }) {
     >
       {/* Must-Read top banner */}
       {isMustRead && (
-        <div style={{
-          background: "linear-gradient(90deg, #DC2626, #EA580C)",
-          padding: "7px 20px",
-          display: "flex", alignItems: "center", gap: "8px",
-        }}>
+        <div style={{ background: "linear-gradient(90deg, #DC2626, #EA580C)", padding: "7px 20px", display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ fontSize: "14px" }}>🔥</span>
           <span style={{ fontSize: "11px", fontWeight: "800", color: "#fff", letterSpacing: "0.1em", textTransform: "uppercase" }}>Must Read</span>
           <span style={{ fontSize: "14px" }}>🔥</span>
@@ -306,15 +379,10 @@ function AnnouncementCard({ post, canDelete, onDelete }) {
       )}
 
       <div style={{ padding: isMustRead ? "16px 20px 18px" : "0" }}>
-        {/* Badge row for non-mustRead positioning */}
         {!isMustRead && (
           <>
-            {post.pinned && (
-              <div style={{ position: "absolute", top: "12px", right: "14px", fontSize: "14px" }} title="Pinned">📌</div>
-            )}
-            {post.showOnWorkspace && (
-              <div style={{ position: "absolute", top: post.pinned ? "36px" : "12px", right: "14px", fontSize: "11px", color: C.accent, fontWeight: "700" }} title="Shown on all workspaces">🏠 Workspace</div>
-            )}
+            {post.pinned && <div style={{ position: "absolute", top: "12px", right: "14px", fontSize: "14px" }} title="Pinned">📌</div>}
+            {post.showOnWorkspace && <div style={{ position: "absolute", top: post.pinned ? "36px" : "12px", right: "14px", fontSize: "11px", color: C.accent, fontWeight: "700" }}>🏠 Workspace</div>}
           </>
         )}
         {isMustRead && (
@@ -330,6 +398,7 @@ function AnnouncementCard({ post, canDelete, onDelete }) {
             <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: "2px" }}>
               <span style={{ fontSize: "13px", fontWeight: "700", color: C.text }}>{post.authorName}</span>
               <span style={{ fontSize: "11px", color: C.muted }}>{timeAgo(post.createdAt)}</span>
+              {post.updatedAt && <span style={{ fontSize: "10px", color: C.muted, fontStyle: "italic" }}>· edited {timeAgo(post.updatedAt)}</span>}
             </div>
             {post.title && (
               <div style={{ fontSize: isMustRead ? "17px" : "15px", fontWeight: "800", color: isMustRead ? "#DC2626" : C.text, marginBottom: "6px" }}>{post.title}</div>
@@ -338,13 +407,15 @@ function AnnouncementCard({ post, canDelete, onDelete }) {
           </div>
         </div>
 
-        {canDelete && hov && (
-          <button
-            onClick={() => onDelete(post.id, "post")}
-            style={{ position: "absolute", bottom: "10px", right: "12px", background: "none", border: "none", cursor: "pointer", color: "#EF4444", fontSize: "11px", opacity: 0.7, padding: "2px 6px" }}
-          >
-            Delete
-          </button>
+        {hov && (canEdit || canDelete) && (
+          <div style={{ position: "absolute", bottom: "10px", right: "12px", display: "flex", gap: "6px" }}>
+            {canEdit && (
+              <button onClick={startEdit} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: "6px", cursor: "pointer", color: C.muted, fontSize: "11px", padding: "2px 8px" }}>✏️ Edit</button>
+            )}
+            {canDelete && (
+              <button onClick={() => onDelete(post.id, "post")} style={{ background: "none", border: "none", cursor: "pointer", color: "#EF4444", fontSize: "11px", opacity: 0.7, padding: "2px 6px" }}>Delete</button>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -424,6 +495,8 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
     setShowPostForm(false);
     setShowShoutoutForm(false);
   };
+
+  const handleUpdate = (updated) => setData(updated);
 
   const handleDelete = async (id, type) => {
     if (!window.confirm("Delete this?")) return;
@@ -570,14 +643,14 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
 
           {activeTab === "all" && allItems.map((item) => (
             item._type === "post"
-              ? <AnnouncementCard key={item.id} post={item} canDelete={isAdmin} onDelete={handleDelete} />
+              ? <AnnouncementCard key={item.id} post={item} canDelete={isAdmin} onDelete={handleDelete} canEdit={isAdmin} token={token} onUpdate={handleUpdate} />
               : <ShoutoutCard key={item.id} shoutout={item} canDelete={isAdmin || item.fromId === currentUser?.id} onDelete={handleDelete} />
           ))}
 
           {activeTab === "posts" && (
             sortedPosts.length === 0
               ? <div style={{ textAlign: "center", padding: "40px", color: C.muted, fontSize: "14px" }}>No announcements yet.</div>
-              : sortedPosts.map((p) => <AnnouncementCard key={p.id} post={p} canDelete={isAdmin} onDelete={handleDelete} />)
+              : sortedPosts.map((p) => <AnnouncementCard key={p.id} post={p} canDelete={isAdmin} onDelete={handleDelete} canEdit={isAdmin} token={token} onUpdate={handleUpdate} />)
           )}
 
           {activeTab === "shoutouts" && (

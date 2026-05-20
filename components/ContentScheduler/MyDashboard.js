@@ -2458,21 +2458,41 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
         if (!showAnnouncements && !showShoutouts) return null;
         return (
           <div style={{ marginBottom: "20px", display: "flex", flexDirection: "column", gap: "12px" }}>
-            {showAnnouncements && workspaceAnnouncements.map((post) => (
-              <div
-                key={post.id}
-                onClick={() => onNavigate && onNavigate("bulletin")}
-                style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `4px solid ${C.accent}`, borderRadius: "12px", padding: "14px 18px", boxShadow: C.shadow, cursor: onNavigate ? "pointer" : "default" }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                  <span style={{ fontSize: "13px", fontWeight: "700", color: C.accent }}>📢 Announcement</span>
-                  {post.pinned && <span style={{ fontSize: "11px", color: C.muted }}>📌 Pinned</span>}
+            {showAnnouncements && [...workspaceAnnouncements].sort((a, b) => (b.mustRead ? 1 : 0) - (a.mustRead ? 1 : 0)).map((post) => {
+              const isMustRead = !!post.mustRead;
+              return (
+                <div
+                  key={post.id}
+                  onClick={() => onNavigate && onNavigate("bulletin")}
+                  style={{
+                    background: isMustRead ? "linear-gradient(135deg, rgba(220,38,38,0.05) 0%, rgba(251,146,60,0.05) 100%)" : C.card,
+                    border: isMustRead ? "1.5px solid rgba(220,38,38,0.35)" : `1px solid ${C.border}`,
+                    borderLeft: isMustRead ? "5px solid #DC2626" : `4px solid ${C.accent}`,
+                    borderRadius: "12px",
+                    overflow: "hidden",
+                    boxShadow: isMustRead ? "0 2px 10px rgba(220,38,38,0.1)" : C.shadow,
+                    cursor: onNavigate ? "pointer" : "default",
+                  }}
+                >
+                  {isMustRead && (
+                    <div style={{ background: "linear-gradient(90deg, #DC2626, #EA580C)", padding: "6px 16px", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span style={{ fontSize: "13px" }}>🔥</span>
+                      <span style={{ fontSize: "11px", fontWeight: "800", color: "#fff", letterSpacing: "0.1em", textTransform: "uppercase" }}>Must Read</span>
+                      <span style={{ fontSize: "13px" }}>🔥</span>
+                    </div>
+                  )}
+                  <div style={{ padding: "14px 18px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                      <span style={{ fontSize: "13px", fontWeight: "700", color: isMustRead ? "#DC2626" : C.accent }}>📢 Announcement</span>
+                      {post.pinned && <span style={{ fontSize: "11px", color: C.muted }}>📌 Pinned</span>}
+                    </div>
+                    {post.title && <div style={{ fontSize: isMustRead ? "15px" : "14px", fontWeight: "800", color: isMustRead ? "#DC2626" : C.text, marginBottom: "2px" }}>{post.title}</div>}
+                    <div style={{ fontSize: "13px", color: C.text, lineHeight: "1.6", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{post.content}</div>
+                    <div style={{ fontSize: "11px", color: C.muted, marginTop: "6px" }}>From {post.authorName}</div>
+                  </div>
                 </div>
-                {post.title && <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "2px" }}>{post.title}</div>}
-                <div style={{ fontSize: "13px", color: C.text, lineHeight: "1.6", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{post.content}</div>
-                <div style={{ fontSize: "11px", color: C.muted, marginTop: "6px" }}>From {post.authorName}</div>
-              </div>
-            ))}
+              );
+            })}
             {showShoutouts && (
               <div
                 onClick={() => onNavigate && onNavigate("bulletin")}

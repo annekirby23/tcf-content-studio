@@ -34,6 +34,26 @@ export async function PUT(req) {
     if (user.role !== "admin") return Response.json({ error: "Forbidden" }, { status: 403 });
     const body = await req.json();
     const data = (await kvGet(KEY)) || { ...DEFAULT_DATA };
+
+    // ── Edit an existing post ───────────────────────────────────────────────────
+    if (body.postId) {
+      data.posts = (data.posts || []).map((p) => {
+        if (p.id !== body.postId) return p;
+        return {
+          ...p,
+          title: body.title !== undefined ? body.title : p.title,
+          content: body.content !== undefined ? body.content : p.content,
+          pinned: body.pinned !== undefined ? !!body.pinned : p.pinned,
+          mustRead: body.mustRead !== undefined ? !!body.mustRead : p.mustRead,
+          showOnWorkspace: body.showOnWorkspace !== undefined ? !!body.showOnWorkspace : p.showOnWorkspace,
+          updatedAt: new Date().toISOString(),
+        };
+      });
+      await kvSet(KEY, data);
+      return Response.json(data);
+    }
+
+    // ── Member count / goal update ──────────────────────────────────────────────
     if (body.memberCount !== undefined) data.memberCount = Number(body.memberCount);
     if (body.memberGoal !== undefined) data.memberGoal = Number(body.memberGoal);
     if (body.memberGoalDate !== undefined) data.memberGoalDate = body.memberGoalDate;
