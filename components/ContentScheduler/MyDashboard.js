@@ -288,94 +288,101 @@ function TaskDetailModal({ task, token, onClose, onUpdate, onDelete }) {
 
 function TaskItem({ task, onToggle, onDelete, onOpen, readOnly }) {
   const [hov, setHov] = useState(false);
+  const priCfg = PRIORITY_MAP[task.priority] || {};
+  const priColor = priCfg.color || C.accent;
+  const isOverdueTask = !task.done && task.dueDate && isOverdue(task.dueDate);
+  const isTodayTask = !task.done && task.dueDate && isToday(task.dueDate);
+  const accentBorder = isOverdueTask ? "#EF4444" : priColor;
+
   return (
     <div
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
+      onClick={() => !readOnly && onOpen && onOpen(task)}
       style={{
-        display: "flex", alignItems: "flex-start", gap: "10px",
-        padding: "9px 10px", borderRadius: "8px",
-        background: hov ? C.hover : "transparent",
-        transition: "background 0.12s",
+        background: task.done ? C.cardBg : C.card,
+        border: `1px solid ${hov && !task.done ? accentBorder : C.border}`,
+        borderLeft: `3px solid ${task.done ? C.border : accentBorder}`,
+        borderRadius: "10px",
+        padding: "10px 12px",
+        cursor: !readOnly && onOpen ? "pointer" : "default",
+        transition: "all 0.12s",
+        opacity: task.done ? 0.6 : 1,
+        boxShadow: hov && !task.done ? C.shadow : "none",
+        display: "flex",
+        flexDirection: "column",
+        gap: "5px",
+        position: "relative",
       }}
     >
-      {/* Checkbox */}
-      <button
-        onClick={() => !readOnly && onToggle(task)}
-        style={{
-          width: "18px", height: "18px", borderRadius: "5px", flexShrink: 0,
-          border: `2px solid ${task.done ? C.accent : C.border}`,
-          background: task.done ? C.accent : "transparent",
-          cursor: readOnly ? "default" : "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          padding: 0, transition: "all 0.12s", marginTop: "1px",
-        }}
-      >
-        {task.done && <span style={{ color: "#fff", fontSize: "11px", lineHeight: 1 }}>✓</span>}
-      </button>
+      {/* Top row: checkbox + priority + actions */}
+      <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); !readOnly && onToggle(task); }}
+          style={{
+            width: "16px", height: "16px", borderRadius: "4px", flexShrink: 0,
+            border: `2px solid ${task.done ? "#10B981" : C.border}`,
+            background: task.done ? "#10B981" : "transparent",
+            cursor: readOnly ? "default" : "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 0, transition: "all 0.12s",
+          }}
+        >
+          {task.done && <span style={{ color: "#fff", fontSize: "9px", lineHeight: 1 }}>✓</span>}
+        </button>
 
-      {/* Text + meta */}
-      <div
-        style={{ flex: 1, minWidth: 0, cursor: readOnly ? "default" : "pointer" }}
-        onClick={() => !readOnly && onOpen && onOpen(task)}
-      >
-        <div style={{
-          fontSize: "13px", fontWeight: "500",
-          color: task.done ? C.muted : C.text,
-          textDecoration: task.done ? "line-through" : "none",
-          lineHeight: "1.4",
-        }}>
-          {task.text}
-        </div>
-        {task.description && (
-          <div style={{ fontSize: "11px", color: C.muted, marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {task.description}
+        {task.priority && !task.done && (
+          <span style={{
+            fontSize: "10px", fontWeight: "700",
+            padding: "1px 7px", borderRadius: "20px",
+            background: priCfg.bg || `${priColor}18`,
+            color: priColor, flexShrink: 0,
+          }}>
+            {priCfg.emoji} {priCfg.label}
+          </span>
+        )}
+
+        {(isOverdueTask || isTodayTask) && (
+          <span style={{
+            fontSize: "10px", fontWeight: "700",
+            padding: "1px 7px", borderRadius: "20px",
+            background: isOverdueTask ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.12)",
+            color: isOverdueTask ? "#EF4444" : "#F59E0B", flexShrink: 0,
+          }}>
+            {isOverdueTask ? "⚠ Overdue" : "📅 Today"}
+          </span>
+        )}
+
+        {/* Edit + delete on hover */}
+        {hov && !readOnly && (
+          <div style={{ display: "flex", gap: "2px", marginLeft: "auto" }} onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => onOpen && onOpen(task)} title="Edit" style={{ background: "none", border: "none", cursor: "pointer", color: C.accent, fontSize: "11px", padding: "1px 4px", borderRadius: "4px", opacity: 0.85 }}>✏️</button>
+            <button onClick={() => onDelete(task.id)} title="Delete" style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "12px", padding: "1px 4px", borderRadius: "4px", opacity: 0.65 }}>✕</button>
           </div>
         )}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px", flexWrap: "wrap" }}>
-          {task.priority && <PriorityPill priority={task.priority} />}
-          {task.dueDate && (
-            <span style={{
-              fontSize: "11px",
-              padding: "2px 7px",
-              borderRadius: "20px",
-              background: isOverdue(task.dueDate) && !task.done ? "rgba(239,68,68,0.12)" : C.cardBg,
-              border: `1px solid ${isOverdue(task.dueDate) && !task.done ? "rgba(239,68,68,0.3)" : C.border}`,
-              color: isOverdue(task.dueDate) && !task.done ? "#EF4444" : C.muted,
-              fontWeight: isOverdue(task.dueDate) && !task.done ? "700" : "500",
-            }}>
-              {isOverdue(task.dueDate) && !task.done ? "⚠ " : ""}Due: {formatDate(task.dueDate)}
-            </span>
-          )}
-        </div>
       </div>
 
-      {/* Actions: edit + delete */}
-      {hov && !readOnly && (
-        <div style={{ display: "flex", gap: "2px", flexShrink: 0 }}>
-          <button
-            onClick={() => onOpen && onOpen(task)}
-            title="Edit task"
-            style={{
-              background: "none", border: "none", cursor: "pointer",
-              color: C.accent, fontSize: "12px", padding: "2px 5px",
-              borderRadius: "5px", opacity: 0.8,
-              transition: "opacity 0.12s",
-            }}
-          >
-            ✏️
-          </button>
-          <button
-            onClick={() => onDelete(task.id)}
-            title="Delete task"
-            style={{
-              background: "none", border: "none", cursor: "pointer",
-              color: C.muted, fontSize: "13px", padding: "2px 5px",
-              borderRadius: "5px", opacity: 0.6,
-            }}
-          >
-            ✕
-          </button>
+      {/* Task text */}
+      <div style={{
+        fontSize: "13px", fontWeight: "600",
+        color: task.done ? C.muted : C.text,
+        textDecoration: task.done ? "line-through" : "none",
+        lineHeight: "1.35", wordBreak: "break-word",
+      }}>
+        {task.text}
+      </div>
+
+      {/* Description preview */}
+      {task.description && (
+        <div style={{ fontSize: "11px", color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {task.description}
+        </div>
+      )}
+
+      {/* Due date (if not already shown as today/overdue badge) */}
+      {task.dueDate && !isOverdueTask && !isTodayTask && (
+        <div style={{ fontSize: "10px", color: C.muted, marginTop: "1px" }}>
+          📅 {formatDate(task.dueDate)}
         </div>
       )}
     </div>
@@ -609,6 +616,14 @@ function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSave
     { id: "duedate",  label: "Due Date" },
   ];
 
+  const taskGrid = (tasks) => (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", paddingLeft: "2px" }}>
+      {tasks.map((t) => (
+        <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={isOwnWorkspace ? setOpenTask : null} readOnly={!isOwnWorkspace} />
+      ))}
+    </div>
+  );
+
   // Build the visible list based on sort
   const renderActive = () => {
     if (sortBy === "default") {
@@ -619,16 +634,12 @@ function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSave
         <>
           {todayOverdue.length > 0 && (
             <CollapsibleSection title="Today & Overdue" count={todayOverdue.length}>
-              {todayOverdue.map((t) => (
-                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={isOwnWorkspace ? setOpenTask : null} readOnly={!isOwnWorkspace} />
-              ))}
+              {taskGrid(todayOverdue)}
             </CollapsibleSection>
           )}
           {(upcoming.length > 0 || noDue.length > 0) && (
             <CollapsibleSection title="Upcoming" count={upcoming.length + noDue.length}>
-              {[...upcoming, ...noDue].map((t) => (
-                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={isOwnWorkspace ? setOpenTask : null} readOnly={!isOwnWorkspace} />
-              ))}
+              {taskGrid([...upcoming, ...noDue])}
             </CollapsibleSection>
           )}
         </>
@@ -638,9 +649,7 @@ function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSave
     const sorted = sortTasks(active, sortBy);
     return (
       <CollapsibleSection title={`Active (${sorted.length})`} count={sorted.length}>
-        {sorted.map((t) => (
-          <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={isOwnWorkspace ? setOpenTask : null} readOnly={!isOwnWorkspace} />
-        ))}
+        {taskGrid(sorted)}
       </CollapsibleSection>
     );
   };
@@ -686,10 +695,8 @@ function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSave
         <div>
           {renderActive()}
           {done.length > 0 && (
-            <CollapsibleSection title="Done" count={done.length} defaultOpen={false} maxVisible={5}>
-              {done.map((t) => (
-                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={isOwnWorkspace ? setOpenTask : null} readOnly={!isOwnWorkspace} />
-              ))}
+            <CollapsibleSection title="Done" count={done.length} defaultOpen={false} maxVisible={6}>
+              {taskGrid(done)}
             </CollapsibleSection>
           )}
         </div>
@@ -1742,7 +1749,7 @@ function ProjectsSection({ token, sectionTitle, onSaveTitle, teamMembers = [] })
             project={proj}
             token={token}
             teamMembers={teamMembers}
-            onToggleTask={(pid, task) => { handleToggleTask(pid, task); setProjects((prev) => prev.map((p) => p.id === pid ? { ...p, tasks: (p.tasks || []).map((t) => t.id === task.id ? { ...t, done: !t.done } : t) } : p)); }}
+            onToggleTask={handleToggleTask}
             onAddTask={handleAddTask}
             onDelete={handleDelete}
             onAddStatusUpdate={(pid, text) => { handleAddStatusUpdate(pid, text); }}
@@ -2308,8 +2315,16 @@ function LocationAndEventTasksBar({ token, userId, onNavigate }) {
     <div style={{ display: "flex", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
       {/* My Location */}
       {myLocation && (
-        <div style={{ flex: "1 1 280px", minWidth: "260px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px 20px", boxShadow: C.shadow }}>
-          <div style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px" }}>📍 My Location</div>
+        <div
+          onClick={() => onNavigate && onNavigate("locations")}
+          style={{ flex: "1 1 280px", minWidth: "260px", background: C.card, border: `1px solid ${onNavigate ? C.accent : C.border}`, borderRadius: "16px", padding: "18px 20px", boxShadow: C.shadow, cursor: onNavigate ? "pointer" : "default", transition: "box-shadow 0.15s, border-color 0.15s" }}
+          onMouseEnter={(e) => { if (onNavigate) e.currentTarget.style.boxShadow = C.shadowMd; }}
+          onMouseLeave={(e) => { if (onNavigate) e.currentTarget.style.boxShadow = C.shadow; }}
+        >
+          <div style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span>📍 My Location</span>
+            {onNavigate && <span style={{ fontSize: "10px", color: C.accent, fontWeight: "600" }}>View details →</span>}
+          </div>
           <div style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
             {myLocation.image && (
               <img src={myLocation.image} alt={myLocation.name} style={{ width: "64px", height: "52px", objectFit: "cover", borderRadius: "8px", border: `1px solid ${C.border}`, flexShrink: 0 }} />

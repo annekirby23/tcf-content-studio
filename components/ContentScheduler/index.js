@@ -27,6 +27,7 @@ import ReportingView from "./ReportingView";
 import BugReportsView from "./BugReportsView";
 import InventoryView from "./InventoryView";
 import ConfRoomsView from "./ConfRoomsView";
+import LeadershipView from "./LeadershipView";
 
 const TOKEN_KEY = "tcf_session";
 
@@ -1465,6 +1466,7 @@ export default function ContentScheduler() {
     { id: "confrooms", label: "Conf Rooms" },
     { id: "bulletin", label: "Bulletin Board" },
     { id: "reporting", label: "Reports" },
+    { id: "leadership", label: "Leadership Hub" },
   ];
   const topBarTitle = view === "mydash"
     ? workspaceTitle
@@ -1760,6 +1762,20 @@ export default function ContentScheduler() {
             </button>
           </div>
 
+          {/* ── Leadership Hub (admin only) ── */}
+          {currentUser.role === "admin" && (
+            <button
+              onClick={() => navigate("leadership")}
+              title={!sidebarOpen ? "Leadership Hub" : undefined}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "9px 10px", borderRadius: "8px", border: "none", background: view === "leadership" ? C.accentLight : "transparent", color: view === "leadership" ? C.accentBright : C.muted, fontSize: "13px", fontWeight: view === "leadership" ? "600" : "400", cursor: "pointer", transition: "all 0.15s", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}
+              onMouseEnter={(e) => { if (view !== "leadership") e.currentTarget.style.background = C.hover; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = view === "leadership" ? C.accentLight : "transparent"; }}
+            >
+              <span style={{ fontSize: "16px", flexShrink: 0 }}>🏛</span>
+              {sidebarOpen && "Leadership Hub"}
+            </button>
+          )}
+
           {/* ── Admin tools ── */}
           <div style={{ margin: "0", padding: "0" }}>
             {currentUser.role === "admin" && (
@@ -1974,6 +1990,7 @@ export default function ContentScheduler() {
               )}
               {view === "locations" && <LocationsView token={authToken} teamMembers={teamMembers} />}
               {view === "confrooms" && <ConfRoomsView token={authToken} />}
+              {view === "leadership" && <LeadershipView token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
             </>
           )}
         </div>
