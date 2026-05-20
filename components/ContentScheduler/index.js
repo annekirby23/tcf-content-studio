@@ -26,6 +26,7 @@ import BulletinBoardView from "./BulletinBoardView";
 import ReportingView from "./ReportingView";
 import BugReportsView from "./BugReportsView";
 import InventoryView from "./InventoryView";
+import ConfRoomsView from "./ConfRoomsView";
 
 const TOKEN_KEY = "tcf_session";
 
@@ -53,6 +54,7 @@ const DEFAULT_INTERNAL_VIEWS = [
   { id: "internal",    icon: "🔒", label: "Internal" },
   { id: "memberships", icon: "🏛",  label: "Memberships" },
   { id: "locations",   icon: "📍", label: "Locations" },
+  { id: "confrooms",   icon: "🏢", label: "Conf Rooms" },
   { id: "inventory",   icon: "📦", label: "Inventory" },
   { id: "teamtasks",   icon: "✅", label: "Task Tracker" },
   { id: "training",    icon: "🎓", label: "Training" },
@@ -1460,6 +1462,7 @@ export default function ContentScheduler() {
     { id: "tcfinfo", label: "About TCF" },
     { id: "memberjourney", label: "Member Journey" },
     { id: "locations", label: "Locations" },
+    { id: "confrooms", label: "Conf Rooms" },
     { id: "bulletin", label: "Bulletin Board" },
     { id: "reporting", label: "Reports" },
   ];
@@ -1969,6 +1972,7 @@ export default function ContentScheduler() {
                 </div>
               )}
               {view === "locations" && <LocationsView token={authToken} teamMembers={teamMembers} />}
+              {view === "confrooms" && <ConfRoomsView token={authToken} />}
             </>
           )}
         </div>
