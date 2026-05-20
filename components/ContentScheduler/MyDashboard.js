@@ -350,25 +350,47 @@ function TaskItem({ task, onToggle, onDelete, onOpen, readOnly }) {
         </div>
       </div>
 
-      {/* Delete */}
+      {/* Actions: edit + delete */}
       {hov && !readOnly && (
-        <button
-          onClick={() => onDelete(task.id)}
-          style={{
-            background: "none", border: "none", cursor: "pointer",
-            color: C.muted, fontSize: "14px", padding: "2px 4px",
-            opacity: 0.6, flexShrink: 0,
-          }}
-        >
-          ✕
-        </button>
+        <div style={{ display: "flex", gap: "2px", flexShrink: 0 }}>
+          <button
+            onClick={() => onOpen && onOpen(task)}
+            title="Edit task"
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              color: C.accent, fontSize: "12px", padding: "2px 5px",
+              borderRadius: "5px", opacity: 0.8,
+              transition: "opacity 0.12s",
+            }}
+          >
+            ✏️
+          </button>
+          <button
+            onClick={() => onDelete(task.id)}
+            title="Delete task"
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              color: C.muted, fontSize: "13px", padding: "2px 5px",
+              borderRadius: "5px", opacity: 0.6,
+            }}
+          >
+            ✕
+          </button>
+        </div>
       )}
     </div>
   );
 }
 
-function CollapsibleSection({ title, count, children, defaultOpen = true }) {
+function CollapsibleSection({ title, count, children, defaultOpen = true, maxVisible }) {
   const [open, setOpen] = useState(defaultOpen);
+  const [showAll, setShowAll] = useState(false);
+
+  // If maxVisible set, cap the children shown
+  const childArray = Array.isArray(children) ? children : [children];
+  const visibleChildren = maxVisible && !showAll ? childArray.slice(0, maxVisible) : childArray;
+  const hidden = maxVisible ? Math.max(0, childArray.length - maxVisible) : 0;
+
   return (
     <div style={{ marginBottom: "4px" }}>
       <button
@@ -376,24 +398,36 @@ function CollapsibleSection({ title, count, children, defaultOpen = true }) {
         style={{
           display: "flex", alignItems: "center", gap: "6px",
           width: "100%", background: "none", border: "none",
-          padding: "6px 10px", cursor: "pointer", borderRadius: "6px",
-          color: C.muted, fontSize: "11px", fontWeight: "700",
+          padding: "5px 8px", cursor: "pointer", borderRadius: "6px",
+          color: C.muted, fontSize: "10px", fontWeight: "700",
           textTransform: "uppercase", letterSpacing: "0.07em",
         }}
       >
-        <span style={{ fontSize: "9px", transform: open ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block", transition: "transform 0.15s" }}>
+        <span style={{ fontSize: "8px", transform: open ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block", transition: "transform 0.15s" }}>
           ▶
         </span>
         {title}
         <span style={{
           marginLeft: "auto", background: C.cardBg, border: `1px solid ${C.border}`,
-          borderRadius: "10px", padding: "0 7px", fontSize: "11px",
+          borderRadius: "10px", padding: "0 6px", fontSize: "10px",
           fontWeight: "700", color: C.muted,
         }}>
           {count}
         </span>
       </button>
-      {open && <div style={{ paddingLeft: "4px" }}>{children}</div>}
+      {open && (
+        <div style={{ paddingLeft: "2px" }}>
+          {visibleChildren}
+          {hidden > 0 && !showAll && (
+            <button
+              onClick={() => setShowAll(true)}
+              style={{ background: "none", border: "none", color: C.accent, fontSize: "11px", fontWeight: "600", cursor: "pointer", padding: "4px 10px", marginTop: "2px" }}
+            >
+              + Show {hidden} more
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -480,12 +514,38 @@ function AddTaskForm({ onAdd }) {
   );
 }
 
+const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
+
+function sortTasks(tasks, sortBy) {
+  if (sortBy === "priority") {
+    return [...tasks].sort((a, b) => {
+      const pa = PRIORITY_ORDER[a.priority] ?? 1;
+      const pb = PRIORITY_ORDER[b.priority] ?? 1;
+      if (pa !== pb) return pa - pb;
+      // secondary: due date
+      if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
+      return 0;
+    });
+  }
+  if (sortBy === "duedate") {
+    return [...tasks].sort((a, b) => {
+      if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
+      return 0;
+    });
+  }
+  return tasks; // default: creation order
+}
+
 function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSaveTitle }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [openTask, setOpenTask] = useState(null);
-  // readOnly means you can't edit/delete existing tasks, but you CAN add new tasks for someone
+  const [sortBy, setSortBy] = useState("default"); // "default" | "priority" | "duedate"
   const isOwnWorkspace = viewingUserId === currentUserId;
 
   const fetchUrl = isOwnWorkspace ? "/api/tasks" : `/api/tasks?userId=${viewingUserId}`;
@@ -541,25 +601,22 @@ function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSave
 
   const active = tasks.filter((t) => !t.done);
   const done = tasks.filter((t) => t.done);
-  const todayOverdue = active.filter((t) => t.dueDate && (isToday(t.dueDate) || isOverdue(t.dueDate)));
-  const upcoming = active.filter((t) => t.dueDate && isUpcoming(t.dueDate));
-  const noDue = active.filter((t) => !t.dueDate);
 
-  return (
-    <div style={{ marginBottom: "4px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-        <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={!isOwnWorkspace} />
-        <AddBtn onClick={() => setShowForm((v) => !v)} label={showForm ? "✕ Cancel" : `+ Add${!isOwnWorkspace ? " for them" : ""}`} />
-      </div>
+  // Sort controls
+  const SORT_OPTIONS = [
+    { id: "default",  label: "Default" },
+    { id: "priority", label: "Priority" },
+    { id: "duedate",  label: "Due Date" },
+  ];
 
-      {showForm && <AddTaskForm onAdd={handleAdd} />}
-
-      {loading ? (
-        <div style={{ textAlign: "center", padding: "32px", color: C.muted, fontSize: "13px" }}>Loading tasks…</div>
-      ) : tasks.length === 0 ? (
-        <EmptyState icon="✅" message={!isOwnWorkspace ? "No tasks yet." : "No tasks yet. Add your first task above."} />
-      ) : (
-        <div>
+  // Build the visible list based on sort
+  const renderActive = () => {
+    if (sortBy === "default") {
+      const todayOverdue = active.filter((t) => t.dueDate && (isToday(t.dueDate) || isOverdue(t.dueDate)));
+      const upcoming = active.filter((t) => t.dueDate && isUpcoming(t.dueDate));
+      const noDue = active.filter((t) => !t.dueDate);
+      return (
+        <>
           {todayOverdue.length > 0 && (
             <CollapsibleSection title="Today & Overdue" count={todayOverdue.length}>
               {todayOverdue.map((t) => (
@@ -570,12 +627,66 @@ function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSave
           {(upcoming.length > 0 || noDue.length > 0) && (
             <CollapsibleSection title="Upcoming" count={upcoming.length + noDue.length}>
               {[...upcoming, ...noDue].map((t) => (
-                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={setOpenTask} readOnly={!isOwnWorkspace} />
+                <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={isOwnWorkspace ? setOpenTask : null} readOnly={!isOwnWorkspace} />
               ))}
             </CollapsibleSection>
           )}
+        </>
+      );
+    }
+    // Flat sorted list
+    const sorted = sortTasks(active, sortBy);
+    return (
+      <CollapsibleSection title={`Active (${sorted.length})`} count={sorted.length}>
+        {sorted.map((t) => (
+          <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={isOwnWorkspace ? setOpenTask : null} readOnly={!isOwnWorkspace} />
+        ))}
+      </CollapsibleSection>
+    );
+  };
+
+  return (
+    <div style={{ marginBottom: "4px" }}>
+      {/* Header row */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+        <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={!isOwnWorkspace} />
+        <AddBtn onClick={() => setShowForm((v) => !v)} label={showForm ? "✕ Cancel" : `+ Add${!isOwnWorkspace ? " for them" : ""}`} />
+      </div>
+
+      {/* Sort chips */}
+      {tasks.length > 1 && (
+        <div style={{ display: "flex", gap: "4px", marginBottom: "10px", alignItems: "center" }}>
+          <span style={{ fontSize: "10px", color: C.muted, fontWeight: "600", marginRight: "2px" }}>Sort:</span>
+          {SORT_OPTIONS.map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => setSortBy(id)}
+              style={{
+                padding: "3px 10px", borderRadius: "20px",
+                border: sortBy === id ? `1px solid ${C.accent}` : `1px solid ${C.border}`,
+                background: sortBy === id ? C.accentLight : "transparent",
+                color: sortBy === id ? C.accentBright : C.muted,
+                fontSize: "10px", fontWeight: "600", cursor: "pointer",
+                transition: "all 0.12s",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {showForm && <AddTaskForm onAdd={handleAdd} />}
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "32px", color: C.muted, fontSize: "13px" }}>Loading tasks…</div>
+      ) : tasks.length === 0 ? (
+        <EmptyState icon="✅" message={!isOwnWorkspace ? "No tasks yet." : "No tasks yet. Add your first task above."} />
+      ) : (
+        <div>
+          {renderActive()}
           {done.length > 0 && (
-            <CollapsibleSection title="Done" count={done.length} defaultOpen={false}>
+            <CollapsibleSection title="Done" count={done.length} defaultOpen={false} maxVisible={5}>
               {done.map((t) => (
                 <TaskItem key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} onOpen={isOwnWorkspace ? setOpenTask : null} readOnly={!isOwnWorkspace} />
               ))}
