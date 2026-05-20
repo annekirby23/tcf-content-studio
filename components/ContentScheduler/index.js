@@ -1956,10 +1956,6 @@ export default function ContentScheduler() {
               {view === "tcfinfo" && <TCFInfoView token={authToken} teamMembers={teamMembers} />}
               {view === "memberjourney" && (
                 <div style={{ padding: "24px", maxWidth: "980px", margin: "0 auto" }}>
-                  <div style={{ marginBottom: "20px" }}>
-                    <h1 style={{ margin: "0 0 6px", fontSize: "24px", fontWeight: "800", color: C.text }}>🗺️ Member Journey</h1>
-                    <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>The full process from discovery to becoming a connected, lifelong TCF member.</p>
-                  </div>
                   <MemberJourneyView token={authToken} teamMembers={teamMembers} />
                 </div>
               )}

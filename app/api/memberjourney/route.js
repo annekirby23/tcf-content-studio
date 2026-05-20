@@ -146,7 +146,9 @@ export async function PUT(req) {
     const body = await req.json();
     const current = (await kvGet(KEY)) || { stages: DEFAULT_STAGES };
 
-    if (body.stageAction === "updateStage") {
+    if (body.pageDescription !== undefined && !body.stageAction) {
+      current.pageDescription = body.pageDescription;
+    } else if (body.stageAction === "updateStage") {
       const { stageId, patch } = body;
       current.stages = (current.stages || []).map((s) =>
         s.id === stageId ? { ...s, ...patch } : s

@@ -542,14 +542,29 @@ export default function MemberJourneyView({ token, teamMembers = [] }) {
   const stages = data?.stages || [];
   const selectedStage = stages.find((s) => s.id === selectedStageId);
 
+  const savePageDescription = async (val) => {
+    const updated = { ...data, pageDescription: val };
+    setData(updated);
+    try {
+      await apiFetch("/api/memberjourney", { method: "PUT", body: JSON.stringify({ pageDescription: val }) }, token);
+    } catch {}
+  };
+
+  const pageDescription = data?.pageDescription ?? "Every step from first hearing about TCF to becoming a connected, lifelong member. Click any stage to view and edit its process, importance, and ownership.";
+
   return (
     <div>
       {/* Intro */}
       <div style={{ marginBottom: "24px" }}>
-        <h2 style={{ margin: "0 0 6px", fontSize: "20px", fontWeight: "800", color: C.text }}>🗺️ Member Journey</h2>
-        <p style={{ margin: 0, fontSize: "13px", color: C.muted, lineHeight: "1.6" }}>
-          Every step from first hearing about TCF to becoming a connected, lifelong member. Click any stage to view and edit its process, importance, and ownership.
-        </p>
+        <h1 style={{ margin: "0 0 8px", fontSize: "24px", fontWeight: "800", color: C.text }}>🗺️ Member Journey</h1>
+        <EditableText
+          value={pageDescription}
+          onSave={savePageDescription}
+          multiline
+          placeholder="Add a description for this page…"
+          fontSize="14px"
+          color={C.muted}
+        />
       </div>
 
       {/* Stats row */}
