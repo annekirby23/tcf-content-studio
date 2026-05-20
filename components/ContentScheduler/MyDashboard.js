@@ -2182,6 +2182,40 @@ function blockDays(b) {
   return [Number(b.day ?? 0)];
 }
 
+// Greedy lane assignment for overlapping blocks in a column.
+// Returns { [blockId]: { left: cssString, width: cssString } }
+function computeOverlapLayout(dayBlocks) {
+  if (!dayBlocks || dayBlocks.length === 0) return {};
+  if (dayBlocks.length === 1) {
+    return { [dayBlocks[0].id]: { left: "2px", width: "calc(100% - 4px)" } };
+  }
+  const sorted = [...dayBlocks].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+  const lanes = [];        // lanes[i] = array of blocks in that lane
+  const blockLane = {};    // blockId → lane index
+  for (const b of sorted) {
+    const bS = timeToMinutes(b.startTime), bE = timeToMinutes(b.endTime);
+    let placed = false;
+    for (let li = 0; li < lanes.length; li++) {
+      const conflict = lanes[li].some((lb) => {
+        const s = timeToMinutes(lb.startTime), e = timeToMinutes(lb.endTime);
+        return bS < e && bE > s;
+      });
+      if (!conflict) { lanes[li].push(b); blockLane[b.id] = li; placed = true; break; }
+    }
+    if (!placed) { blockLane[b.id] = lanes.length; lanes.push([b]); }
+  }
+  const n = lanes.length;
+  const result = {};
+  for (const b of dayBlocks) {
+    const li = blockLane[b.id] ?? 0;
+    result[b.id] = {
+      left:  `calc(${(li / n) * 100}% + 2px)`,
+      width: `calc(${(1 / n) * 100}% - 4px)`,
+    };
+  }
+  return result;
+}
+
 function BlockModal({ block, onClose, onSave, onDelete }) {
   const isNew = !block?.id;
   const primaryDay = block?.day ?? (Array.isArray(block?.days) ? block.days[0] : 0);
@@ -2330,6 +2364,23 @@ function BlockScheduleSection({ token, viewingUserId, currentUserId, sectionTitl
   };
   const handleDeleteBlock = (id) => persist(blocks.filter((b) => b.id !== id));
 
+  // Duplicate a block and immediately enter drag mode on the copy
+  const handleDuplicate = (e, b) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const newId = `blk_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+    const newBlock = { ...b, id: newId };
+    const newBlocks = [...blocks, newBlock];
+    setBlocks(newBlocks);
+    // Fire-and-forget API save; the onUp drag handler will save the final position
+    apiFetch("/api/blockschedule", { method: "PUT", body: JSON.stringify({ blocks: newBlocks }) }, token).catch(() => {});
+    // Start move drag on the new duplicate block
+    dragRef.current = { blockId: newId, origBlock: newBlock, mode: "move", startX: e.clientX, startY: e.clientY };
+    setDragBlock({ ...newBlock });
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "grabbing";
+  };
+
   const yFor = (t) => ((timeToMinutes(t) - GRID_START) / 60) * HOUR_HEIGHT;
   const heightFor = (s, e) => Math.max(((timeToMinutes(e) - timeToMinutes(s)) / 60) * HOUR_HEIGHT, 20);
 
@@ -2400,14 +2451,19 @@ function BlockScheduleSection({ token, viewingUserId, currentUserId, sectionTitl
   }, [blocks, visibleDayIndices]);
 
   // ── Block renderer (for a single day column) ────────────────────────────────
-  const renderBlock = (b, di) => {
+  const renderBlock = (b, di, colLayout) => {
     const live = dragBlock && dragBlock.id === b.id;
     const display = live ? dragBlock : b;
     // For single-day blocks being dragged, only show in the target day column
-    if (live && blockDays(origBlockForDrag(b)) .length === 1 && display.day !== di) return null;
+    if (live && blockDays(origBlockForDrag(b)).length === 1 && display.day !== di) return null;
     const top = yFor(display.startTime);
     const height = heightFor(display.startTime, display.endTime);
     if (top < 0 || top > GRID_HEIGHT) return null;
+
+    // Overlap layout: dragging block gets full width for clarity; others use computed lanes
+    const blockLayout = live
+      ? { left: "2px", width: "calc(100% - 4px)" }
+      : (colLayout?.[b.id] || { left: "2px", width: "calc(100% - 4px)" });
 
     return (
       <div
@@ -2416,7 +2472,8 @@ function BlockScheduleSection({ token, viewingUserId, currentUserId, sectionTitl
         onClick={(e) => { if (!live && !dragRef.current) { e.stopPropagation(); setEditBlock(b); } }}
         title={`${b.label}\n${formatBlockTime(b.startTime)} – ${formatBlockTime(b.endTime)}`}
         style={{
-          position: "absolute", top: `${top}px`, left: "2px", right: "2px",
+          position: "absolute", top: `${top}px`,
+          left: blockLayout.left, width: blockLayout.width,
           height: `${height}px`, background: display.color, borderRadius: "5px",
           padding: "3px 4px 0", overflow: "hidden",
           cursor: live ? (dragRef.current?.mode === "resize" ? "ns-resize" : "grabbing") : "grab",
@@ -2427,11 +2484,21 @@ function BlockScheduleSection({ token, viewingUserId, currentUserId, sectionTitl
           userSelect: "none",
         }}
       >
-        <div style={{ fontSize: "9px", fontWeight: "700", color: "#fff", lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{display.label}</div>
+        <div style={{ fontSize: "9px", fontWeight: "700", color: "#fff", lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: height > 28 ? "16px" : "0" }}>{display.label}</div>
         {height > 32 && (
           <div style={{ fontSize: "8px", color: "rgba(255,255,255,0.85)", lineHeight: 1.2 }}>
             {formatBlockTime(display.startTime)}–{formatBlockTime(display.endTime)}
           </div>
+        )}
+        {/* Duplicate button */}
+        {!readOnly && height > 24 && (
+          <button
+            onMouseDown={(e) => { e.stopPropagation(); handleDuplicate(e, b); }}
+            title="Duplicate block"
+            style={{ position: "absolute", top: "2px", right: "3px", width: "13px", height: "13px", border: "none", borderRadius: "3px", background: "rgba(255,255,255,0.28)", color: "#fff", fontSize: "9px", cursor: "copy", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, lineHeight: 1, fontWeight: "900" }}
+          >
+            ⧉
+          </button>
         )}
         {/* Resize handle */}
         {!readOnly && (
@@ -2505,6 +2572,11 @@ function BlockScheduleSection({ token, viewingUserId, currentUserId, sectionTitl
                     if (dragBlock?.id === b.id && bd.length === 1) return dragBlock.day === di;
                     return bd.includes(di);
                   });
+                  // Compute overlap layout using live positions (dragBlock position during drag)
+                  const effectiveForLayout = dayBlocksForCol.map((b) =>
+                    (dragBlock?.id === b.id) ? dragBlock : b
+                  );
+                  const colLayout = computeOverlapLayout(effectiveForLayout);
 
                   return (
                     <div key={di} style={{ display: "flex", flexDirection: "column" }}>
@@ -2544,7 +2616,7 @@ function BlockScheduleSection({ token, viewingUserId, currentUserId, sectionTitl
                         ))}
 
                         {/* Blocks */}
-                        {dayBlocksForCol.map((b) => renderBlock(b, di))}
+                        {dayBlocksForCol.map((b) => renderBlock(b, di, colLayout))}
                       </div>
                     </div>
                   );
