@@ -18,6 +18,7 @@ import MemberProfile from "./MemberProfile";
 import MyDashboard from "./MyDashboard";
 import TeamTaskTracker from "./TeamTaskTracker";
 import TrainingView from "./TrainingView";
+import EventsView from "./EventsView";
 
 const TOKEN_KEY = "tcf_session";
 
@@ -1341,6 +1342,7 @@ export default function ContentScheduler() {
     { id: "inventory", label: "Inventory" },
     { id: "teamtasks", label: "Task Tracker" },
     { id: "training", label: "Training" },
+    { id: "events", label: "Events" },
   ];
   const topBarTitle = view === "mydash"
     ? workspaceTitle
@@ -1562,6 +1564,14 @@ export default function ContentScheduler() {
             sidebarOpen={sidebarOpen}
           />
 
+          <NavBtn
+            icon="📅"
+            label="Events"
+            active={view === "events"}
+            onClick={() => { setView("events"); setViewingUserId(null); }}
+            sidebarOpen={sidebarOpen}
+          />
+
           {/* ── Admin tools ── */}
           <div style={{ borderTop: `1px solid ${C.border}`, margin: "10px 0", padding: "10px 0 0" }}>
             {currentUser.role === "admin" && (
@@ -1757,6 +1767,7 @@ export default function ContentScheduler() {
               )}
               {view === "teamtasks" && <TeamTaskTracker token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
               {view === "training" && <TrainingView token={authToken} currentUser={currentUser} />}
+              {view === "events" && <EventsView token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
             </>
           )}
         </div>

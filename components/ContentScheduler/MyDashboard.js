@@ -918,6 +918,7 @@ function NewProjectModal({ onSave, onClose, teamMembers = [] }) {
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [details, setDetails] = useState("");
+  const [link, setLink] = useState("");
   const [color, setColor] = useState(PROJECT_COLORS[0]);
   const [status, setStatus] = useState("planning");
   const [selectedMembers, setSelectedMembers] = useState([]);
@@ -930,7 +931,7 @@ function NewProjectModal({ onSave, onClose, teamMembers = [] }) {
 
   const submit = () => {
     if (!name.trim()) return;
-    onSave({ name: name.trim(), description: desc, details, color, status, members: selectedMembers });
+    onSave({ name: name.trim(), description: desc, details, link: link.trim(), color, status, members: selectedMembers });
   };
 
   return (
@@ -956,6 +957,10 @@ function NewProjectModal({ onSave, onClose, teamMembers = [] }) {
         <div style={{ marginBottom: "14px" }}>
           <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>What We're Working On</label>
           <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={3} style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit" }) }} placeholder="Current focus, goals, what the team is actively doing…" />
+        </div>
+        <div style={{ marginBottom: "14px" }}>
+          <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Link (Google Drive / Resource URL)</label>
+          <input value={link} onChange={(e) => setLink(e.target.value)} style={{ ...textInput({ width: "100%" }) }} placeholder="https://drive.google.com/…" />
         </div>
         <div style={{ marginBottom: "14px" }}>
           <label style={{ display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>Color</label>
@@ -1117,6 +1122,27 @@ function ProjectCard({ project, onToggleTask, onAddTask, onDelete, onAddStatusUp
 
       {project.description && (
         <div style={{ fontSize: "12px", color: C.muted, marginBottom: "10px", lineHeight: "1.4" }}>{project.description}</div>
+      )}
+
+      {project.link && (
+        <div style={{ marginBottom: "10px" }}>
+          <a
+            href={project.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: "5px",
+              fontSize: "12px", color: C.accent, textDecoration: "none",
+              padding: "4px 10px", borderRadius: "20px",
+              border: `1px solid ${C.accent}`, background: C.accentLight,
+              fontWeight: "500", transition: "opacity 0.12s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.75")}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+          >
+            🔗 Open Resource
+          </a>
+        </div>
       )}
 
       {/* What we're working on — collapsible details */}
@@ -1352,12 +1378,14 @@ function ProjectsSection({ token, sectionTitle, onSaveTitle, teamMembers = [] })
   };
 
   const handleAddTask = async (projectId, text, assignedTo = null) => {
-    const newTask = { id: genId(), text, done: false, assignedTo };
+    const tempId = genId();
+    const newTask = { id: tempId, text, done: false, assignedTo };
     setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, tasks: [...(p.tasks || []), newTask] } : p));
     try {
-      const project = projects.find((p) => p.id === projectId);
-      const tasks = [...(project?.tasks || []), { text, done: false, assignedTo }];
-      const res = await apiFetch(`/api/projects/${projectId}`, { method: "PUT", body: JSON.stringify({ tasks }) }, token);
+      const res = await apiFetch(`/api/projects/${projectId}`, {
+        method: "PUT",
+        body: JSON.stringify({ taskAction: "add", taskText: text, assignedTo }),
+      }, token);
       const saved = await res.json();
       setProjects((prev) => prev.map((p) => p.id === projectId ? saved : p));
     } catch {}
@@ -1379,9 +1407,12 @@ function ProjectsSection({ token, sectionTitle, onSaveTitle, teamMembers = [] })
       )
     );
     try {
-      const project = projects.find((p) => p.id === projectId);
-      const tasks = (project?.tasks || []).map((t) => t.id === task.id ? { ...t, done: !t.done } : t);
-      await apiFetch(`/api/projects/${projectId}`, { method: "PUT", body: JSON.stringify({ tasks }) }, token);
+      const res = await apiFetch(`/api/projects/${projectId}`, {
+        method: "PUT",
+        body: JSON.stringify({ taskAction: "toggle", taskId: task.id }),
+      }, token);
+      const saved = await res.json();
+      setProjects((prev) => prev.map((p) => p.id === projectId ? saved : p));
     } catch {}
   };
 
