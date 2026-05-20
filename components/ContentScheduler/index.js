@@ -16,6 +16,8 @@ import QuickLinks from "./QuickLinks";
 import AssetTracker from "./AssetTracker";
 import MemberProfile from "./MemberProfile";
 import MyDashboard from "./MyDashboard";
+import TeamTaskTracker from "./TeamTaskTracker";
+import TrainingView from "./TrainingView";
 
 const TOKEN_KEY = "tcf_session";
 
@@ -149,6 +151,7 @@ function InventoryTab({ token, currentUser }) {
   const [editingId, setEditingId] = useState(null);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterNeeded, setFilterNeeded] = useState("");
+  const [filterLocation, setFilterLocation] = useState("");
 
   const emptyForm = { itemName: "", neededWhen: "", forWhat: "", orderStatus: "Not Started", location: "", notes: "", url: "" };
   const [addForm, setAddForm] = useState(emptyForm);
@@ -165,6 +168,7 @@ function InventoryTab({ token, currentUser }) {
   const filtered = items.filter((item) => {
     if (filterStatus && item.orderStatus !== filterStatus) return false;
     if (filterNeeded && item.neededWhen !== filterNeeded) return false;
+    if (filterLocation && item.location !== filterLocation) return false;
     return true;
   });
 
@@ -243,6 +247,21 @@ function InventoryTab({ token, currentUser }) {
           <option value="">All Timings</option>
           {NEEDED_WHEN_OPTIONS.map((n)=><option key={n} value={n}>{n}</option>)}
         </select>
+        {/* Location filter chips */}
+        <div style={{ display:"flex", gap:"4px" }}>
+          {[["All",""], ["321","321"], ["342","342"], ["812","812"]].map(([label, val]) => (
+            <button
+              key={val}
+              onClick={() => setFilterLocation(val)}
+              style={{
+                padding:"4px 10px", borderRadius:"20px", border:"none", cursor:"pointer", fontSize:"12px", fontWeight:"600",
+                background: filterLocation === val ? C.accent : C.cardBg,
+                color: filterLocation === val ? "#fff" : C.muted,
+                transition:"all 0.12s",
+              }}
+            >{label}</button>
+          ))}
+        </div>
         <div style={{ flex:1 }} />
         <button onClick={()=>setShowAdd((v)=>!v)} style={{ padding:"8px 16px", borderRadius:"8px", border:"none", background:C.accent, color:"#fff", fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>
           {showAdd ? "Cancel" : "+ Add Item"}
@@ -827,7 +846,6 @@ function InternalView({ token }) {
     { id: "hrInfo", label: "HR Info", icon: "🏢" },
     { id: "contacts", label: "Important Contacts", icon: "📞" },
     { id: "membership", label: "Membership Details", icon: "🏛" },
-    { id: "inventory", label: "Inventory 📦", icon: "" },
     { id: "pto", label: "PTO / Vacation 🗓", icon: "" },
   ];
 
@@ -861,7 +879,6 @@ function InternalView({ token }) {
       {activeTab === "hrInfo" && <HRInfoTab token={token} />}
       {activeTab === "contacts" && <ContactsTab token={token} />}
       {activeTab === "membership" && <MembershipsTab token={token} />}
-      {activeTab === "inventory" && <InventoryTab token={token} />}
       {activeTab === "pto" && <PTOEmbedTab token={token} />}
     </div>
   );
@@ -1055,6 +1072,7 @@ export default function ContentScheduler() {
     } catch { return null; }
   });
   const dragIndexRef = useRef(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -1317,9 +1335,16 @@ export default function ContentScheduler() {
   const workspaceTitle = ownerName.endsWith("s") ? `${ownerName}' Workspace` : `${ownerName}'s Workspace`;
 
   // Top bar title
+  const ALL_VIEWS = [
+    ...CONTENT_VIEWS,
+    INTERNAL_VIEW,
+    { id: "inventory", label: "Inventory" },
+    { id: "teamtasks", label: "Task Tracker" },
+    { id: "training", label: "Training" },
+  ];
   const topBarTitle = view === "mydash"
     ? workspaceTitle
-    : [...CONTENT_VIEWS, INTERNAL_VIEW].find((v) => v.id === view)?.label || view;
+    : ALL_VIEWS.find((v) => v.id === view)?.label || view;
 
   const assignedPostsForViewer = posts.filter((p) => p.assignedTo === effectiveViewingUserId);
 
@@ -1337,10 +1362,39 @@ export default function ContentScheduler() {
         select option { background: ${C.card}; color: ${C.text}; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Mobile responsive ── */
+        @media (max-width: 768px) {
+          .tcf-sidebar { display: none !important; }
+          .tcf-mobile-header { display: flex !important; }
+          .tcf-sidebar.mobile-open { display: flex !important; position: fixed; left: 0; top: 0; bottom: 0; z-index: 300; width: 240px !important; box-shadow: 4px 0 20px rgba(0,0,0,0.15); }
+          .tcf-sidebar-overlay { display: block !important; }
+          .tcf-view-area { padding: 16px !important; }
+          .tcf-topbar { padding: 0 16px !important; }
+          .tcf-task-table { display: none; }
+          .tcf-task-cards { display: flex !important; }
+          .workspace-2col { flex-direction: column !important; }
+          .workspace-2col > div:first-child { width: 100% !important; }
+        }
+        @media (min-width: 769px) {
+          .tcf-mobile-header { display: none !important; }
+          .tcf-sidebar-overlay { display: none !important; }
+          .tcf-task-table { display: block; }
+          .tcf-task-cards { display: none; }
+        }
       `}</style>
 
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
-      <div style={{
+      {/* ── Mobile sidebar overlay ─── */}
+      {mobileSidebarOpen && (
+        <div
+          onClick={() => setMobileSidebarOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 299, display: "none" }}
+          className="tcf-sidebar-overlay"
+        />
+      )}
+
+      <div className={`tcf-sidebar${mobileSidebarOpen ? " mobile-open" : ""}`} style={{
         width: sidebarOpen ? "220px" : "56px",
         background: C.surface,
         borderRight: `1px solid ${C.border}`,
@@ -1351,8 +1405,9 @@ export default function ContentScheduler() {
         overflow: "hidden",
       }}>
         {/* Logo */}
-        <div style={{ padding: "20px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: "10px", minHeight: "64px" }}>
-          <div style={{ width: "28px", height: "28px", borderRadius: "8px", background: `linear-gradient(135deg, ${C.accent}, #8B5CF6)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", color: "#fff", flexShrink: 0 }}>T</div>
+        <div style={{ padding: "14px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: "10px", minHeight: "64px" }}>
+          <img src="/tcf-logo.png" alt="TCF" style={{ width: "36px", height: "36px", objectFit: "contain", flexShrink: 0 }} onError={(e) => { e.target.style.display = "none"; e.target.nextSibling && (e.target.nextSibling.style.display = "flex"); }} />
+          <div style={{ width: "36px", height: "36px", borderRadius: "8px", background: `linear-gradient(135deg, ${C.accent}, #8B5CF6)`, display: "none", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", color: "#fff", flexShrink: 0 }}>T</div>
           {sidebarOpen && <span style={{ fontSize: "15px", fontWeight: "800", color: C.text, letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>TCF Studio</span>}
         </div>
 
@@ -1483,6 +1538,30 @@ export default function ContentScheduler() {
             sidebarOpen={sidebarOpen}
           />
 
+          <NavBtn
+            icon="📦"
+            label="Inventory"
+            active={view === "inventory"}
+            onClick={() => { setView("inventory"); setViewingUserId(null); }}
+            sidebarOpen={sidebarOpen}
+          />
+
+          <NavBtn
+            icon="✅"
+            label="Task Tracker"
+            active={view === "teamtasks"}
+            onClick={() => { setView("teamtasks"); setViewingUserId(null); }}
+            sidebarOpen={sidebarOpen}
+          />
+
+          <NavBtn
+            icon="🎓"
+            label="Training"
+            active={view === "training"}
+            onClick={() => { setView("training"); setViewingUserId(null); }}
+            sidebarOpen={sidebarOpen}
+          />
+
           {/* ── Admin tools ── */}
           <div style={{ borderTop: `1px solid ${C.border}`, margin: "10px 0", padding: "10px 0 0" }}>
             {currentUser.role === "admin" && (
@@ -1550,7 +1629,16 @@ export default function ContentScheduler() {
       {/* ── Main content ─────────────────────────────────────────────────── */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         {/* Top bar */}
-        <div style={{ padding: "0 28px", height: "64px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${C.border}`, background: C.surface, flexShrink: 0 }}>
+        <div className="tcf-topbar" style={{ padding: "0 28px", height: "64px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${C.border}`, background: C.surface, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {/* Mobile hamburger */}
+            <button
+              className="tcf-mobile-header"
+              onClick={() => setMobileSidebarOpen((v) => !v)}
+              style={{ padding: "6px 8px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, cursor: "pointer", fontSize: "16px", color: C.text, lineHeight: 1 }}
+            >
+              ☰
+            </button>
           <div>
             <h1 style={{ margin: 0, fontSize: "18px", fontWeight: "700", color: C.text }}>
               {topBarTitle}
@@ -1558,6 +1646,7 @@ export default function ContentScheduler() {
             {scheduledToday > 0 && (
               <div style={{ fontSize: "11px", color: C.accentBright, marginTop: "1px" }}>{scheduledToday} post{scheduledToday !== 1 ? "s" : ""} going out today</div>
             )}
+          </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <div style={{ fontSize: "12px", color: C.muted }}>{posts.length} total posts</div>
@@ -1620,7 +1709,7 @@ export default function ContentScheduler() {
         </div>
 
         {/* View area */}
-        <div style={{ flex: 1, overflow: "auto", padding: "28px" }}>
+        <div className="tcf-view-area" style={{ flex: 1, overflow: "auto", padding: "28px" }}>
           {loading ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "300px" }}>
               <div style={{ width: "32px", height: "32px", border: `3px solid ${C.border}`, borderTopColor: C.accent, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
@@ -1657,6 +1746,17 @@ export default function ContentScheduler() {
                 />
               )}
               {view === "internal" && <InternalView token={authToken} />}
+              {view === "inventory" && (
+                <div>
+                  <div style={{ marginBottom: "20px" }}>
+                    <h1 style={{ margin: "0 0 4px", fontSize: "24px", fontWeight: "800", color: C.text }}>Inventory</h1>
+                    <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>Track supplies, equipment, and orders. Filter by location: 321, 342, or 812.</p>
+                  </div>
+                  <InventoryTab token={authToken} currentUser={currentUser} />
+                </div>
+              )}
+              {view === "teamtasks" && <TeamTaskTracker token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
+              {view === "training" && <TrainingView token={authToken} currentUser={currentUser} />
             </>
           )}
         </div>

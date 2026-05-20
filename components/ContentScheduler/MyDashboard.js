@@ -2134,7 +2134,7 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
       </div>
 
       {/* 2-column layout */}
-      <div style={{ display: "flex", gap: "20px", alignItems: "flex-start" }}>
+      <div className="workspace-2col" style={{ display: "flex", gap: "20px", alignItems: "flex-start" }}>
 
         {/* LEFT column — Assigned to Me */}
         <div style={{
