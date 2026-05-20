@@ -439,85 +439,85 @@ function CollapsibleSection({ title, count, children, defaultOpen = true, maxVis
   );
 }
 
-function AddTaskForm({ onAdd }) {
+function AddTaskModal({ onAdd, onClose }) {
   const [text, setText] = useState("");
   const [priority, setPriority] = useState("medium");
   const [dueDate, setDueDate] = useState("");
   const [description, setDescription] = useState("");
-  const [showDetails, setShowDetails] = useState(false);
-  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
 
   const submit = () => {
     if (!text.trim()) return;
     onAdd({ text: text.trim(), priority, dueDate: dueDate || null, description: description || "" });
-    setText(""); setDueDate(""); setDescription(""); setShowDetails(false);
+    onClose();
   };
 
+  const lbl = { display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "5px" };
+
   return (
-    <div style={{
-      marginBottom: "16px", padding: "12px",
-      background: C.cardBg, borderRadius: "10px",
-      border: `1px solid ${focused ? C.accent : C.border}`,
-      transition: "border-color 0.15s",
-    }}>
-      <input
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        onKeyDown={(e) => e.key === "Enter" && submit()}
-        placeholder="New task…"
-        style={{ ...textInput({ width: "100%", background: "transparent", border: "none", padding: "4px 0", marginBottom: "8px", fontSize: "14px" }) }}
-      />
-      <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: showDetails ? "8px" : 0 }}>
-        <select
-          value={priority}
-          onChange={(e) => setPriority(e.target.value)}
-          style={{ ...textInput({ flex: "0 0 auto" }), color: C.text }}
-        >
-          {Object.entries(PRIORITY_MAP).map(([k, v]) => (
-            <option key={k} value={k}>{v.emoji} {v.label}</option>
-          ))}
-        </select>
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "2px" }}>
-          <label style={{ fontSize: "10px", fontWeight: "600", color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Due Date</label>
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", backdropFilter: "blur(3px)", zIndex: 2000 }} />
+      <div style={{
+        position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+        background: C.card, border: `1px solid ${C.border}`,
+        borderRadius: "16px", padding: "24px", width: "500px", maxWidth: "92vw",
+        zIndex: 2001, boxShadow: C.shadowMd,
+      }}>
+        <h3 style={{ margin: "0 0 18px", fontSize: "15px", fontWeight: "700", color: C.text }}>New Task</h3>
+
+        <div style={{ marginBottom: "12px" }}>
+          <label style={lbl}>Task *</label>
           <input
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            style={{ ...textInput({ width: "100%", colorScheme: "light" }) }}
+            autoFocus
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+            placeholder="What needs to be done?"
+            style={{ ...textInput({ width: "100%" }) }}
           />
         </div>
-        <button
-          onClick={() => setShowDetails((v) => !v)}
-          style={{ padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "11px", cursor: "pointer", whiteSpace: "nowrap" }}
-        >
-          {showDetails ? "▲ Less" : "▼ Details"}
-        </button>
-        <button
-          onClick={submit}
-          disabled={!text.trim()}
-          style={{
-            padding: "8px 16px", borderRadius: "8px",
-            border: "none", background: text.trim() ? C.accent : C.border,
-            color: "#fff", fontSize: "13px", fontWeight: "600",
-            cursor: text.trim() ? "pointer" : "not-allowed",
-            transition: "background 0.15s", flexShrink: 0,
-          }}
-        >
-          Add
-        </button>
+
+        <div style={{ marginBottom: "12px" }}>
+          <label style={lbl}>Description</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            placeholder="Add more detail (optional)…"
+            style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.5" }) }}
+          />
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+          <div>
+            <label style={lbl}>Priority</label>
+            <select value={priority} onChange={(e) => setPriority(e.target.value)} style={{ ...textInput({ width: "100%" }), color: C.text }}>
+              {Object.entries(PRIORITY_MAP).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>Due Date</label>
+            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={{ ...textInput({ width: "100%", colorScheme: "light" }) }} />
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+          <button onClick={onClose} style={{ padding: "9px 18px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
+          <button
+            onClick={submit}
+            disabled={!text.trim()}
+            style={{ padding: "9px 20px", borderRadius: "8px", border: "none", background: text.trim() ? C.accent : C.border, color: "#fff", fontSize: "13px", fontWeight: "600", cursor: text.trim() ? "pointer" : "not-allowed" }}
+          >
+            Add Task
+          </button>
+        </div>
       </div>
-      {showDetails && (
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={2}
-          placeholder="Add description (optional)…"
-          style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.5" }) }}
-        />
-      )}
-    </div>
+    </>
   );
 }
 
@@ -550,7 +550,7 @@ function sortTasks(tasks, sortBy) {
 function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSaveTitle }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [openTask, setOpenTask] = useState(null);
   const [sortBy, setSortBy] = useState("default"); // "default" | "priority" | "duedate"
   const isOwnWorkspace = viewingUserId === currentUserId;
@@ -659,7 +659,7 @@ function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSave
       {/* Header row */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
         <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={!isOwnWorkspace} />
-        <AddBtn onClick={() => setShowForm((v) => !v)} label={showForm ? "✕ Cancel" : `+ Add${!isOwnWorkspace ? " for them" : ""}`} />
+        <AddBtn onClick={() => setShowAddModal(true)} label={`+ Add${!isOwnWorkspace ? " for them" : ""}`} />
       </div>
 
       {/* Sort chips */}
@@ -685,8 +685,6 @@ function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSave
         </div>
       )}
 
-      {showForm && <AddTaskForm onAdd={handleAdd} />}
-
       {loading ? (
         <div style={{ textAlign: "center", padding: "32px", color: C.muted, fontSize: "13px" }}>Loading tasks…</div>
       ) : tasks.length === 0 ? (
@@ -700,6 +698,10 @@ function TasksColumn({ token, viewingUserId, currentUserId, sectionTitle, onSave
             </CollapsibleSection>
           )}
         </div>
+      )}
+
+      {showAddModal && isOwnWorkspace && (
+        <AddTaskModal onAdd={handleAdd} onClose={() => setShowAddModal(false)} />
       )}
 
       {openTask && isOwnWorkspace && (
@@ -1959,6 +1961,281 @@ function LinkPill({ link, onDelete, readOnly }) {
   );
 }
 
+// ─── BLOCK SCHEDULE ───────────────────────────────────────────────────────────
+
+const BLOCK_COLORS = [
+  { value: "#6366F1", label: "Indigo" },
+  { value: "#8B5CF6", label: "Purple" },
+  { value: "#EC4899", label: "Pink" },
+  { value: "#EF4444", label: "Red" },
+  { value: "#F59E0B", label: "Amber" },
+  { value: "#10B981", label: "Green" },
+  { value: "#3B82F6", label: "Blue" },
+  { value: "#06B6D4", label: "Cyan" },
+  { value: "#64748B", label: "Gray" },
+];
+
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAY_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+function timeToMinutes(t) {
+  if (!t) return 0;
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function minutesToTime(m) {
+  const h = Math.floor(m / 60);
+  const min = m % 60;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
+function formatBlockTime(t) {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  const suffix = h >= 12 ? "pm" : "am";
+  const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+  return `${h12}${m > 0 ? `:${String(m).padStart(2, "0")}` : ""}${suffix}`;
+}
+
+function BlockModal({ block, onClose, onSave, onDelete }) {
+  const isNew = !block?.id;
+  const [label, setLabel] = useState(block?.label || "");
+  const [day, setDay] = useState(block?.day ?? 0);
+  const [startTime, setStartTime] = useState(block?.startTime || "09:00");
+  const [endTime, setEndTime] = useState(block?.endTime || "10:00");
+  const [color, setColor] = useState(block?.color || "#6366F1");
+
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const handleSave = () => {
+    if (!label.trim()) return;
+    onSave({ id: block?.id || Date.now().toString(), label: label.trim(), day: Number(day), startTime, endTime, color });
+    onClose();
+  };
+
+  const lbl = { display: "block", fontSize: "11px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "5px" };
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", backdropFilter: "blur(3px)", zIndex: 3000 }} />
+      <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "22px", width: "420px", maxWidth: "92vw", zIndex: 3001, boxShadow: C.shadowMd }}>
+        <h3 style={{ margin: "0 0 16px", fontSize: "15px", fontWeight: "700", color: C.text }}>{isNew ? "Add Time Block" : "Edit Time Block"}</h3>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div>
+            <label style={lbl}>Label *</label>
+            <input autoFocus value={label} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSave()} style={{ ...textInput({ width: "100%" }) }} placeholder="Deep Work, Team Standup, Lunch Break…" />
+          </div>
+
+          <div>
+            <label style={lbl}>Day</label>
+            <select value={day} onChange={(e) => setDay(e.target.value)} style={{ ...textInput({ width: "100%" }), color: C.text }}>
+              {DAY_FULL.map((d, i) => <option key={i} value={i}>{d}</option>)}
+            </select>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+            <div>
+              <label style={lbl}>Start Time</label>
+              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={{ ...textInput({ width: "100%" }) }} />
+            </div>
+            <div>
+              <label style={lbl}>End Time</label>
+              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={{ ...textInput({ width: "100%" }) }} />
+            </div>
+          </div>
+
+          <div>
+            <label style={lbl}>Color</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              {BLOCK_COLORS.map((c) => (
+                <button key={c.value} onClick={() => setColor(c.value)} title={c.label} style={{ width: "24px", height: "24px", borderRadius: "50%", background: c.value, border: color === c.value ? `3px solid ${C.text}` : `2px solid transparent`, cursor: "pointer", flexShrink: 0, transition: "border 0.1s" }} />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "18px" }}>
+          <div>
+            {!isNew && (
+              <button onClick={() => { onDelete(block.id); onClose(); }} style={{ padding: "8px 14px", borderRadius: "8px", border: "1px solid #EF4444", background: "none", color: "#EF4444", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>🗑 Delete</button>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button onClick={onClose} style={{ padding: "8px 16px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
+            <button onClick={handleSave} disabled={!label.trim()} style={{ padding: "8px 18px", borderRadius: "8px", border: "none", background: label.trim() ? C.accent : C.border, color: "#fff", fontSize: "13px", fontWeight: "600", cursor: label.trim() ? "pointer" : "not-allowed" }}>
+              {isNew ? "Add Block" : "Save"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function BlockScheduleSection({ token, viewingUserId, currentUserId, sectionTitle, onSaveTitle }) {
+  const [blocks, setBlocks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editBlock, setEditBlock] = useState(null); // null=closed, false=new, obj=edit
+  const [newBlockDay, setNewBlockDay] = useState(null);
+  const readOnly = viewingUserId !== currentUserId;
+  const GRID_START = 7 * 60;  // 7am
+  const GRID_END   = 20 * 60; // 8pm
+  const GRID_TOTAL = GRID_END - GRID_START;
+  const HOUR_HEIGHT = 48; // px per hour
+  const GRID_HEIGHT = (GRID_TOTAL / 60) * HOUR_HEIGHT;
+
+  const fetchUrl = `/api/blockschedule?userId=${viewingUserId}`;
+
+  useEffect(() => {
+    setLoading(true);
+    apiFetch(fetchUrl, {}, token)
+      .then((r) => r.json())
+      .then((d) => setBlocks(Array.isArray(d?.blocks) ? d.blocks : []))
+      .catch(() => setBlocks([]))
+      .finally(() => setLoading(false));
+  }, [viewingUserId]);
+
+  const save = async (newBlocks) => {
+    setBlocks(newBlocks);
+    await apiFetch("/api/blockschedule", { method: "PUT", body: JSON.stringify({ blocks: newBlocks }) }, token);
+  };
+
+  const handleSaveBlock = (b) => {
+    const existing = blocks.find((x) => x.id === b.id);
+    const updated = existing ? blocks.map((x) => x.id === b.id ? b : x) : [...blocks, b];
+    save(updated);
+  };
+
+  const handleDeleteBlock = (id) => save(blocks.filter((b) => b.id !== id));
+
+  const openNew = (day) => { setNewBlockDay(day ?? 0); setEditBlock(false); };
+
+  // Hours to render on y-axis
+  const hours = [];
+  for (let h = 7; h <= 20; h++) hours.push(h);
+
+  // px offset from GRID_START for a given time string
+  const yFor = (t) => ((timeToMinutes(t) - GRID_START) / 60) * HOUR_HEIGHT;
+  const heightFor = (s, e) => Math.max(((timeToMinutes(e) - timeToMinutes(s)) / 60) * HOUR_HEIGHT, 18);
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+        <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={readOnly} />
+        {!readOnly && (
+          <AddBtn onClick={() => openNew(0)} label="+ Add Block" />
+        )}
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "24px", color: C.muted, fontSize: "12px" }}>Loading…</div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <div style={{ display: "flex", minWidth: "420px" }}>
+            {/* Time axis */}
+            <div style={{ flexShrink: 0, width: "36px", paddingTop: "20px" }}>
+              {hours.map((h) => (
+                <div key={h} style={{ height: `${HOUR_HEIGHT}px`, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", paddingRight: "6px" }}>
+                  <span style={{ fontSize: "9px", color: C.muted, fontWeight: "600", lineHeight: 1, marginTop: "-1px" }}>{h > 12 ? `${h-12}p` : h === 12 ? "12p" : `${h}a`}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Day columns */}
+            <div style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "3px" }}>
+              {DAYS.map((day, di) => {
+                const dayBlocks = blocks.filter((b) => Number(b.day) === di);
+                return (
+                  <div key={di} style={{ display: "flex", flexDirection: "column" }}>
+                    {/* Day header */}
+                    <div
+                      onClick={() => !readOnly && openNew(di)}
+                      style={{ textAlign: "center", fontSize: "10px", fontWeight: "700", color: C.muted, marginBottom: "4px", height: "20px", lineHeight: "20px", cursor: readOnly ? "default" : "pointer", borderRadius: "4px", transition: "background 0.1s" }}
+                      onMouseEnter={(e) => { if (!readOnly) e.currentTarget.style.background = C.hover; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                    >
+                      {day}
+                    </div>
+
+                    {/* Block grid */}
+                    <div
+                      style={{ position: "relative", height: `${GRID_HEIGHT}px`, background: C.cardBg, borderRadius: "6px", border: `1px solid ${C.border}`, overflow: "hidden", cursor: readOnly ? "default" : "pointer" }}
+                      onClick={(e) => {
+                        if (readOnly || e.target !== e.currentTarget) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const clickY = e.clientY - rect.top;
+                        const mins = GRID_START + Math.round((clickY / GRID_HEIGHT) * GRID_TOTAL / 30) * 30;
+                        const snapped = minutesToTime(Math.min(Math.max(mins, GRID_START), GRID_END - 60));
+                        setNewBlockDay(di);
+                        setEditBlock({ day: di, startTime: snapped, endTime: minutesToTime(timeToMinutes(snapped) + 60), color: "#6366F1" });
+                      }}
+                    >
+                      {/* Hour grid lines */}
+                      {hours.slice(0, -1).map((h) => (
+                        <div key={h} style={{ position: "absolute", top: `${(h - 7) * HOUR_HEIGHT}px`, left: 0, right: 0, borderTop: `1px solid ${C.border}`, opacity: 0.4, pointerEvents: "none" }} />
+                      ))}
+
+                      {/* Blocks */}
+                      {dayBlocks.map((b) => {
+                        const top = yFor(b.startTime);
+                        const height = heightFor(b.startTime, b.endTime);
+                        if (top < 0 || top > GRID_HEIGHT) return null;
+                        return (
+                          <div
+                            key={b.id}
+                            onClick={(e) => { e.stopPropagation(); if (!readOnly) setEditBlock(b); }}
+                            title={`${b.label}\n${formatBlockTime(b.startTime)} – ${formatBlockTime(b.endTime)}`}
+                            style={{
+                              position: "absolute", top: `${top}px`, left: "2px", right: "2px",
+                              height: `${height}px`, background: b.color, borderRadius: "4px",
+                              padding: "2px 4px", overflow: "hidden", cursor: readOnly ? "default" : "pointer",
+                              boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "opacity 0.1s",
+                            }}
+                            onMouseEnter={(e) => { if (!readOnly) e.currentTarget.style.opacity = "0.85"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                          >
+                            <div style={{ fontSize: "9px", fontWeight: "700", color: "#fff", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.label}</div>
+                            {height > 30 && (
+                              <div style={{ fontSize: "8px", color: "rgba(255,255,255,0.85)", lineHeight: 1.2 }}>
+                                {formatBlockTime(b.startTime)}–{formatBlockTime(b.endTime)}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {blocks.length === 0 && !readOnly && (
+            <div style={{ textAlign: "center", padding: "12px 0 4px", fontSize: "12px", color: C.muted }}>
+              Click on a day column or + Add Block to get started.
+            </div>
+          )}
+        </div>
+      )}
+
+      {editBlock !== null && (
+        <BlockModal
+          block={editBlock || (newBlockDay !== null ? { day: newBlockDay, startTime: "09:00", endTime: "10:00", color: "#6366F1" } : null)}
+          onClose={() => { setEditBlock(null); setNewBlockDay(null); }}
+          onSave={handleSaveBlock}
+          onDelete={handleDeleteBlock}
+        />
+      )}
+    </div>
+  );
+}
+
 function LinksSection({ token, viewingUserId, currentUserId, sectionTitle, onSaveTitle }) {
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2245,6 +2522,7 @@ const DEFAULT_SECTION_TITLES = {
   projects: "TCF Community Projects",
   notes: "My Notes",
   links: "My Links",
+  blockSchedule: "My Block Schedule",
   processRole: "My Process & Role",
   assignedContent: "Assigned to Me",
 };
@@ -2843,6 +3121,17 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
               currentUserId={currentUserId}
               sectionTitle={sectionTitles.links}
               onSaveTitle={(v) => saveSectionTitle("links", v)}
+            />
+          </div>
+
+          {/* Block Schedule */}
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", boxShadow: C.shadow }}>
+            <BlockScheduleSection
+              token={token}
+              viewingUserId={effectiveViewingUserId}
+              currentUserId={currentUserId}
+              sectionTitle={sectionTitles.blockSchedule}
+              onSaveTitle={(v) => saveSectionTitle("blockSchedule", v)}
             />
           </div>
 
