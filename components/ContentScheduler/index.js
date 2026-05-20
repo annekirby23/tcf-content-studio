@@ -343,14 +343,20 @@ function InventoryTab({ token, currentUser }) {
       {/* Table — helper */}
       {(() => {
         const tableHeaders = ["Item Needed","Date","Needed When","For What","Status","Location","Notes","Person","Link"];
+        const hexToRgb = (hex) => {
+          const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+          return { r, g, b };
+        };
         const renderSection = (label, emoji, sectionItems, accentColor) => {
           if (sectionItems.length === 0) return null;
+          const { r, g, b } = hexToRgb(accentColor);
           return (
-            <div style={{ marginBottom:"28px", background: C.card, borderRadius:"16px", border:`1px solid ${C.border}`, boxShadow: C.shadow, overflow:"hidden" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:"10px", padding:"16px 20px", borderBottom:`1px solid ${C.border}`, background: accentColor + "10", borderTop:`4px solid ${accentColor}` }}>
-                <span style={{ fontSize:"20px" }}>{emoji}</span>
-                <span style={{ fontSize:"15px", fontWeight:"800", color: C.text }}>{label}</span>
-                <span style={{ fontSize:"11px", color: accentColor, padding:"2px 10px", borderRadius:"10px", background: accentColor + "20", fontWeight:"700", marginLeft:"auto" }}>{sectionItems.length} item{sectionItems.length!==1?"s":""}</span>
+            <div style={{ marginBottom:"28px", background: C.card, borderRadius:"16px", border:`2px solid rgba(${r},${g},${b},0.35)`, boxShadow: `0 2px 12px rgba(${r},${g},${b},0.12)`, overflow:"hidden" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:"10px", padding:"16px 20px", borderBottom:`1px solid rgba(${r},${g},${b},0.2)`, background: `rgba(${r},${g},${b},0.08)` }}>
+                <div style={{ width:"6px", height:"40px", borderRadius:"3px", background: accentColor, flexShrink:0 }} />
+                <span style={{ fontSize:"22px" }}>{emoji}</span>
+                <span style={{ fontSize:"16px", fontWeight:"800", color: C.text }}>{label}</span>
+                <span style={{ fontSize:"12px", color: accentColor, padding:"3px 12px", borderRadius:"20px", background: `rgba(${r},${g},${b},0.15)`, fontWeight:"700", marginLeft:"auto" }}>{sectionItems.length} item{sectionItems.length!==1?"s":""}</span>
               </div>
               <div style={{ border:"none", borderRadius:"0", overflow:"hidden" }}>
                 <div style={{ display:"grid", gridTemplateColumns:"2fr 90px 130px 1fr 130px 70px 1fr 60px 60px", background:C.cardBg, borderBottom:`1px solid ${C.border}`, padding:"0 8px" }}>

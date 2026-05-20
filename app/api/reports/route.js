@@ -2,7 +2,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getSession } from "@/lib/serverAuth";
 import { kvGet } from "@/lib/redis";
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+function getClient() {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set. Add it to your Vercel environment variables.");
+  return new Anthropic({ apiKey });
+}
 
 export async function POST(req) {
   try {
@@ -11,6 +15,8 @@ export async function POST(req) {
 
     const body = await req.json();
     const { type } = body;
+
+    const client = getClient();
 
     // ── AI Task Summary ────────────────────────────────────────────────────────
     if (type === "summary") {
