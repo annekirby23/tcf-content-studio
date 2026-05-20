@@ -1766,13 +1766,40 @@ function ProjectsSection({ token, sectionTitle, onSaveTitle, teamMembers = [] })
 
 // ─── NOTES ────────────────────────────────────────────────────────────────────
 
+// Post-it color palettes: [bg, topStrip, textColor, borderColor]
+const POSTIT_PALETTES = [
+  { bg: "#FEF9C3", strip: "#FDE047", text: "#713F12", border: "#FACC15" },  // yellow
+  { bg: "#FCE7F3", strip: "#F9A8D4", text: "#831843", border: "#F472B6" },  // pink
+  { bg: "#DBEAFE", strip: "#93C5FD", text: "#1E3A8A", border: "#60A5FA" },  // blue
+  { bg: "#DCFCE7", strip: "#86EFAC", text: "#14532D", border: "#4ADE80" },  // green
+  { bg: "#FEF3C7", strip: "#FDBA74", text: "#7C2D12", border: "#FB923C" },  // orange
+  { bg: "#EDE9FE", strip: "#C4B5FD", text: "#4C1D95", border: "#A78BFA" },  // purple
+  { bg: "#CCFBF1", strip: "#5EEAD4", text: "#134E4A", border: "#2DD4BF" },  // teal
+  { bg: "#FFF1F2", strip: "#FCA5A5", text: "#881337", border: "#F87171" },  // red
+];
+
+function notepalette(id) {
+  let h = 0;
+  for (let i = 0; i < (id || "").length; i++) h = (id || "").charCodeAt(i) + ((h << 5) - h);
+  return POSTIT_PALETTES[Math.abs(h) % POSTIT_PALETTES.length];
+}
+
+function notetilt(id) {
+  let h = 0;
+  for (let i = 0; i < (id || "").length; i++) h = (id || "").charCodeAt(i) + ((h << 5) - h);
+  const base = (Math.abs(h) % 7) - 3; // -3 to +3
+  return base * 0.45; // subtle: max ±1.35deg
+}
+
 function NoteCard({ note, onSave, onDelete, readOnly }) {
   const [expanded, setExpanded] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(note.title === "" && note.content === "");
   const [title, setTitle] = useState(note.title || "");
   const [content, setContent] = useState(note.content || "");
   const [saving, setSaving] = useState(false);
   const [hov, setHov] = useState(false);
+  const pal = notepalette(note.id);
+  const tilt = notetilt(note.id);
 
   const handleSave = async () => {
     setSaving(true);
@@ -1781,58 +1808,132 @@ function NoteCard({ note, onSave, onDelete, readOnly }) {
     setEditing(false);
   };
 
-  const handleBlur = () => {
-    if (title !== note.title || content !== note.content) handleSave();
-  };
-
   return (
     <div
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        background: C.card, border: `1px solid ${hov && !editing ? C.accent : C.border}`,
-        borderRadius: "12px", padding: "14px",
-        boxShadow: hov ? C.shadowMd : C.shadow,
-        transition: "border-color 0.15s, box-shadow 0.15s",
+        background: pal.bg,
+        border: `1px solid ${pal.border}`,
+        borderRadius: "3px",
+        boxShadow: hov
+          ? `3px 6px 18px rgba(0,0,0,0.22), 1px 1px 0 ${pal.border}`
+          : `2px 4px 10px rgba(0,0,0,0.14), 1px 1px 0 ${pal.border}`,
+        transform: editing ? "rotate(0deg) scale(1.01)" : `rotate(${tilt}deg)`,
+        transition: "transform 0.18s, box-shadow 0.15s",
+        position: "relative",
+        overflow: "hidden",
+        cursor: readOnly || editing ? "default" : "pointer",
       }}
+      onClick={() => { if (!editing && !readOnly) setEditing(true); }}
     >
-      {editing && !readOnly ? (
-        <div>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} onBlur={handleBlur} style={{ ...textInput({ width: "100%", marginBottom: "8px", fontWeight: "600" }) }} placeholder="Note title…" />
-          <textarea value={content} onChange={(e) => setContent(e.target.value)} onBlur={handleBlur} rows={5} style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.5" }) }} placeholder="Write your note…" />
-          <div style={{ display: "flex", gap: "8px", marginTop: "10px", justifyContent: "flex-end" }}>
-            <button onClick={() => { setTitle(note.title || ""); setContent(note.content || ""); setEditing(false); }} style={{ padding: "6px 14px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: "6px 14px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>{saving ? "Saving…" : "Save"}</button>
-          </div>
-        </div>
-      ) : (
-        <div>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
-            <div onClick={() => !readOnly && setEditing(true)} style={{ flex: 1, cursor: readOnly ? "default" : "pointer" }}>
-              {note.title && <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "4px" }}>{note.title}</div>}
-              <div style={{ fontSize: "13px", color: C.muted, lineHeight: "1.5", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: expanded ? "unset" : 2, WebkitBoxOrient: "vertical" }}>
-                {note.content || <em style={{ opacity: 0.5 }}>Empty note</em>}
-              </div>
+      {/* Top sticky strip */}
+      <div style={{ height: "10px", background: pal.strip, opacity: 0.85 }} />
+
+      {/* Pin dot */}
+      <div style={{
+        position: "absolute", top: "4px", left: "50%", transform: "translateX(-50%)",
+        width: "8px", height: "8px", borderRadius: "50%",
+        background: pal.text, opacity: 0.35,
+        boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+      }} />
+
+      {/* Content area */}
+      <div style={{ padding: "12px 14px 14px" }}>
+        {editing && !readOnly ? (
+          <div onClick={(e) => e.stopPropagation()}>
+            <input
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              style={{
+                width: "100%", background: "transparent", border: "none",
+                borderBottom: `2px solid ${pal.border}`, outline: "none",
+                fontSize: "14px", fontWeight: "700", color: pal.text,
+                marginBottom: "10px", padding: "2px 0", boxSizing: "border-box",
+                fontFamily: "inherit",
+              }}
+              placeholder="Title…"
+            />
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              rows={5}
+              style={{
+                width: "100%", background: "transparent", border: "none", outline: "none",
+                fontSize: "13px", color: pal.text, lineHeight: "1.65",
+                resize: "vertical", fontFamily: "inherit", boxSizing: "border-box",
+                opacity: 0.9,
+              }}
+              placeholder="Write your note…"
+            />
+            <div style={{ display: "flex", gap: "6px", marginTop: "10px", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => { setTitle(note.title || ""); setContent(note.content || ""); setEditing(false); }}
+                style={{ padding: "5px 12px", borderRadius: "6px", border: `1px solid ${pal.border}`, background: "rgba(255,255,255,0.5)", color: pal.text, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                style={{ padding: "5px 14px", borderRadius: "6px", border: "none", background: pal.strip, color: pal.text, fontSize: "11px", fontWeight: "700", cursor: "pointer" }}
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
             </div>
-            {!readOnly && (
-              <button onClick={() => onDelete(note.id)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "14px", opacity: hov ? 0.7 : 0, transition: "opacity 0.12s", flexShrink: 0 }}>✕</button>
+          </div>
+        ) : (
+          <div>
+            {/* Delete button on hover */}
+            {!readOnly && hov && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
+                style={{ position: "absolute", top: "14px", right: "10px", background: "rgba(0,0,0,0.12)", border: "none", borderRadius: "50%", width: "20px", height: "20px", cursor: "pointer", fontSize: "10px", color: pal.text, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700" }}
+              >
+                ✕
+              </button>
+            )}
+
+            {note.title && (
+              <div style={{ fontSize: "14px", fontWeight: "800", color: pal.text, marginBottom: "6px", paddingRight: "24px", fontFamily: "inherit", lineHeight: 1.3 }}>
+                {note.title}
+              </div>
+            )}
+            <div style={{
+              fontSize: "13px", color: pal.text, lineHeight: "1.65", opacity: 0.85,
+              overflow: "hidden", display: "-webkit-box",
+              WebkitLineClamp: expanded ? "unset" : 5,
+              WebkitBoxOrient: "vertical",
+              whiteSpace: "pre-wrap", wordBreak: "break-word",
+            }}>
+              {note.content || <em style={{ opacity: 0.4 }}>Tap to add a note…</em>}
+            </div>
+            {note.content && note.content.length > 180 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: pal.text, fontSize: "11px", fontWeight: "700", padding: "5px 0 0", opacity: 0.6 }}
+              >
+                {expanded ? "▲ less" : "▼ more"}
+              </button>
             )}
           </div>
-          {note.content && note.content.length > 100 && (
-            <button onClick={() => setExpanded((e) => !e)} style={{ background: "none", border: "none", cursor: "pointer", color: C.accent, fontSize: "12px", fontWeight: "600", padding: "4px 0 0" }}>
-              {expanded ? "Show less" : "Read more"}
-            </button>
-          )}
-          {!readOnly && (
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button onClick={() => setEditing(true)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "12px", opacity: hov ? 1 : 0, transition: "opacity 0.12s" }}>✏️ Edit</button>
-            </div>
-          )}
-        </div>
+        )}
+      </div>
+
+      {/* Folded corner at bottom-right */}
+      {!editing && (
+        <div style={{
+          position: "absolute", bottom: 0, right: 0, width: 0, height: 0,
+          borderStyle: "solid",
+          borderWidth: "0 0 18px 18px",
+          borderColor: `transparent transparent rgba(0,0,0,0.12) transparent`,
+        }} />
       )}
     </div>
   );
 }
+
 
 function NotesSection({ token, viewingUserId, currentUserId, sectionTitle, onSaveTitle }) {
   const [notes, setNotes] = useState([]);
@@ -1882,16 +1983,26 @@ function NotesSection({ token, viewingUserId, currentUserId, sectionTitle, onSav
 
   return (
     <div style={{ marginBottom: "24px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
         <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={readOnly} />
-        {!readOnly && <AddBtn onClick={handleNew} label="+ New Note" />}
+        {!readOnly && (
+          <button
+            onClick={handleNew}
+            style={{ padding: "7px 14px", borderRadius: "8px", border: "none", background: "#FDE047", color: "#713F12", fontSize: "12px", fontWeight: "700", cursor: "pointer", boxShadow: "1px 2px 6px rgba(0,0,0,0.15)" }}
+          >
+            + New Note
+          </button>
+        )}
       </div>
       {loading ? (
         <div style={{ textAlign: "center", padding: "20px", color: C.muted, fontSize: "13px" }}>Loading notes…</div>
       ) : notes.length === 0 ? (
-        <EmptyState icon="📝" message={readOnly ? "No notes yet." : "No notes yet. Create one to get started."} />
+        <div style={{ textAlign: "center", padding: "28px 16px", color: C.muted }}>
+          <div style={{ fontSize: "32px", marginBottom: "8px" }}>📝</div>
+          <div style={{ fontSize: "13px" }}>{readOnly ? "No notes yet." : "No notes yet. Hit + New Note to start."}</div>
+        </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
           {notes.map((note) => (
             <NoteCard key={note.id} note={note} onSave={handleSave} onDelete={handleDelete} readOnly={readOnly} />
           ))}
