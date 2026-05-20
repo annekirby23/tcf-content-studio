@@ -281,6 +281,9 @@ function CircleModal({ circle, token, teamMembers, onClose, onSave, onDelete }) 
   const [photos, setPhotos] = useState(circle?.photos || []);
   const [tasks, setTasks] = useState(circle?.tasks || []);
   const [newTask, setNewTask] = useState("");
+  const [editingMemberId, setEditingMemberId] = useState(null);
+  const [editMemberName, setEditMemberName] = useState("");
+  const [editMemberEmail, setEditMemberEmail] = useState("");
   const [saving, setSaving] = useState(false);
   const [activeSection, setActiveSection] = useState("info");
 
@@ -290,13 +293,32 @@ function CircleModal({ circle, token, teamMembers, onClose, onSave, onDelete }) 
     return () => document.removeEventListener("keydown", h);
   }, [onClose]);
 
-  const addMember = () => {
-    if (!newMemberName.trim()) return;
-    setMembers([...members, { id: Date.now().toString(), name: newMemberName.trim(), email: newMemberEmail.trim() }]);
+  const addMember = (overrideName, overrideEmail) => {
+    const n = (overrideName ?? newMemberName).trim();
+    if (!n) return;
+    const e = (overrideEmail ?? newMemberEmail).trim();
+    setMembers((prev) => [...prev, { id: Date.now().toString(), name: n, email: e }]);
     setNewMemberName(""); setNewMemberEmail("");
   };
 
-  const removeMember = (id) => setMembers(members.filter((m) => m.id !== id));
+  const removeMember = (id) => {
+    setMembers((prev) => prev.filter((m) => m.id !== id));
+    if (editingMemberId === id) setEditingMemberId(null);
+  };
+
+  const startEditMember = (m) => {
+    setEditingMemberId(m.id);
+    setEditMemberName(m.name);
+    setEditMemberEmail(m.email || "");
+  };
+
+  const saveEditMember = (id) => {
+    if (!editMemberName.trim()) return;
+    setMembers((prev) => prev.map((m) => m.id === id ? { ...m, name: editMemberName.trim(), email: editMemberEmail.trim() } : m));
+    setEditingMemberId(null);
+  };
+
+  const cancelEditMember = () => setEditingMemberId(null);
 
   const addTask = () => {
     if (!newTask.trim()) return;
@@ -316,7 +338,18 @@ function CircleModal({ circle, token, teamMembers, onClose, onSave, onDelete }) 
   const handleSave = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    await onSave({ name: name.trim(), members, assignedMemberId: assignedMemberId || null, assignedMemberName: assignedMemberName || "", connectionReason, goals, status, rating, dinnerInvited, dinnerNotes, communicationPref, nextMeetup, notes, meetups, photos, tasks }, circle?.id);
+
+    // Flush any pending member that was typed but not yet committed with "Add"
+    let finalMembers = members;
+    if (newMemberName.trim()) {
+      finalMembers = [...members, { id: Date.now().toString(), name: newMemberName.trim(), email: newMemberEmail.trim() }];
+    }
+    // Flush any member currently being edited
+    if (editingMemberId && editMemberName.trim()) {
+      finalMembers = finalMembers.map((m) => m.id === editingMemberId ? { ...m, name: editMemberName.trim(), email: editMemberEmail.trim() } : m);
+    }
+
+    await onSave({ name: name.trim(), members: finalMembers, assignedMemberId: assignedMemberId || null, assignedMemberName: assignedMemberName || "", connectionReason, goals, status, rating, dinnerInvited, dinnerNotes, communicationPref, nextMeetup, notes, meetups, photos, tasks }, circle?.id);
     setSaving(false);
     onClose();
   };
@@ -441,24 +474,86 @@ function CircleModal({ circle, token, teamMembers, onClose, onSave, onDelete }) 
           {/* ── MEMBERS SECTION ── */}
           {activeSection === "members" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {members.length === 0 && (
+                <div style={{ fontSize: "13px", color: C.muted, textAlign: "center", padding: "16px 0" }}>No members yet. Add one below.</div>
+              )}
               {members.map((m) => (
-                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "10px", background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px" }}>
-                  <MemberInitials name={m.name} size={32} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: "13px", fontWeight: "700", color: C.text }}>{m.name}</div>
-                    {m.email && <div style={{ fontSize: "11px", color: C.muted }}>{m.email}</div>}
-                  </div>
-                  <button onClick={() => removeMember(m.id)} style={{ fontSize: "12px", color: "#EF4444", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+                <div key={m.id} style={{ background: C.cardBg, border: `1px solid ${editingMemberId === m.id ? C.accent : C.border}`, borderRadius: "10px", padding: "10px 12px", transition: "border-color 0.12s" }}>
+                  {editingMemberId === m.id ? (
+                    /* ── Edit mode ── */
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      <div style={{ fontSize: "11px", fontWeight: "700", color: C.accent, textTransform: "uppercase", letterSpacing: "0.07em" }}>Editing member</div>
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                        <input
+                          autoFocus
+                          value={editMemberName}
+                          onChange={(e) => setEditMemberName(e.target.value)}
+                          placeholder="Full name *"
+                          style={{ ...textInput({ flex: 1, minWidth: "140px" }) }}
+                          onKeyDown={(e) => { if (e.key === "Enter") saveEditMember(m.id); if (e.key === "Escape") cancelEditMember(); }}
+                        />
+                        <input
+                          value={editMemberEmail}
+                          onChange={(e) => setEditMemberEmail(e.target.value)}
+                          placeholder="Email (optional)"
+                          style={{ ...textInput({ flex: 1, minWidth: "140px" }) }}
+                          onKeyDown={(e) => { if (e.key === "Enter") saveEditMember(m.id); if (e.key === "Escape") cancelEditMember(); }}
+                        />
+                      </div>
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        <button onClick={() => saveEditMember(m.id)} disabled={!editMemberName.trim()} style={{ padding: "6px 14px", borderRadius: "7px", border: "none", background: editMemberName.trim() ? C.accent : C.border, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: editMemberName.trim() ? "pointer" : "not-allowed" }}>Save</button>
+                        <button onClick={cancelEditMember} style={{ padding: "6px 12px", borderRadius: "7px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", cursor: "pointer" }}>Cancel</button>
+                        <button onClick={() => removeMember(m.id)} style={{ marginLeft: "auto", padding: "6px 10px", borderRadius: "7px", border: `1px solid #EF4444`, background: "none", color: "#EF4444", fontSize: "12px", cursor: "pointer" }}>🗑 Remove</button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* ── View mode ── */
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <MemberInitials name={m.name} size={32} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: "13px", fontWeight: "700", color: C.text }}>{m.name}</div>
+                        {m.email && <div style={{ fontSize: "11px", color: C.muted }}>{m.email}</div>}
+                      </div>
+                      <button
+                        onClick={() => startEditMember(m)}
+                        title="Edit member"
+                        style={{ padding: "4px 8px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", cursor: "pointer" }}
+                      >✏️</button>
+                      <button onClick={() => removeMember(m.id)} style={{ padding: "4px 8px", borderRadius: "6px", border: "none", background: "none", color: "#EF4444", fontSize: "13px", cursor: "pointer" }}>✕</button>
+                    </div>
+                  )}
                 </div>
               ))}
+
               {/* Add member */}
               <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                <div style={{ fontSize: "12px", fontWeight: "700", color: C.muted, marginBottom: "2px" }}>ADD MEMBER</div>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <input value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="Full name *" style={{ ...textInput({ flex: 1 }) }} onKeyDown={(e) => e.key === "Enter" && addMember()} />
-                  <input value={newMemberEmail} onChange={(e) => setNewMemberEmail(e.target.value)} placeholder="Email (optional)" style={{ ...textInput({ flex: 1 }) }} />
-                  <button onClick={addMember} disabled={!newMemberName.trim()} style={{ padding: "8px 14px", borderRadius: "8px", border: "none", background: newMemberName.trim() ? C.accent : C.border, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: newMemberName.trim() ? "pointer" : "not-allowed" }}>Add</button>
+                <div style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>Add Member</div>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <input
+                    value={newMemberName}
+                    onChange={(e) => setNewMemberName(e.target.value)}
+                    placeholder="Full name *"
+                    style={{ ...textInput({ flex: 1, minWidth: "140px" }) }}
+                    onKeyDown={(e) => e.key === "Enter" && addMember()}
+                  />
+                  <input
+                    value={newMemberEmail}
+                    onChange={(e) => setNewMemberEmail(e.target.value)}
+                    placeholder="Email (optional)"
+                    style={{ ...textInput({ flex: 1, minWidth: "140px" }) }}
+                    onKeyDown={(e) => e.key === "Enter" && addMember()}
+                  />
+                  <button
+                    onClick={() => addMember()}
+                    disabled={!newMemberName.trim()}
+                    style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: newMemberName.trim() ? C.accent : C.border, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: newMemberName.trim() ? "pointer" : "not-allowed", whiteSpace: "nowrap" }}
+                  >
+                    + Add
+                  </button>
                 </div>
+                {newMemberName.trim() && (
+                  <div style={{ fontSize: "11px", color: C.muted }}>Press Enter or click Add — or just hit Save Changes and it'll be included automatically.</div>
+                )}
               </div>
             </div>
           )}
