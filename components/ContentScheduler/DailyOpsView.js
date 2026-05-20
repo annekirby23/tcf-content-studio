@@ -474,6 +474,307 @@ function EmailTemplateCard({ template, isAdmin, onEdit }) {
   );
 }
 
+// ── Mail & Packages Tab ───────────────────────────────────────────────────────
+const MAIL_LOCATIONS_DEFAULT = [
+  { id: "321", name: "321", assignedMemberId: "", assignedMemberName: "", mailboxes: [] },
+  { id: "342", name: "342", assignedMemberId: "", assignedMemberName: "", mailboxes: [] },
+  { id: "812", name: "812", assignedMemberId: "", assignedMemberName: "", mailboxes: [] },
+];
+
+const LOCATION_ACCENT = { "321": "#3B82F6", "342": "#10B981", "812": "#8B5CF6" };
+
+function MailPackagesTab({ token, currentUser, teamMembers, reference, setReference }) {
+  const isAdmin = currentUser?.role === "admin";
+
+  const [locations, setLocations] = useState(() => {
+    const existing = reference?.mailLocations;
+    if (existing && existing.length === 3) return existing;
+    // Merge existing data into defaults (preserve any partial saves)
+    return MAIL_LOCATIONS_DEFAULT.map((def) => {
+      const found = (existing || []).find((l) => l.id === def.id);
+      return found ? { ...def, ...found } : def;
+    });
+  });
+  const [saving, setSaving] = useState(false);
+
+  // Keep local state in sync when reference changes from outside
+  useEffect(() => {
+    const existing = reference?.mailLocations;
+    if (!existing || existing.length === 0) return;
+    setLocations(
+      MAIL_LOCATIONS_DEFAULT.map((def) => {
+        const found = existing.find((l) => l.id === def.id);
+        return found ? { ...def, ...found } : def;
+      })
+    );
+  }, [reference]);
+
+  async function save(updatedLocations) {
+    setSaving(true);
+    try {
+      const res = await apiFetch(
+        "/api/dailyops/reference",
+        { method: "PUT", body: JSON.stringify({ mailLocations: updatedLocations }) },
+        token
+      );
+      const data = await res.json();
+      setReference(data);
+      setLocations(
+        MAIL_LOCATIONS_DEFAULT.map((def) => {
+          const found = (data.mailLocations || []).find((l) => l.id === def.id);
+          return found ? { ...def, ...found } : def;
+        })
+      );
+    } catch (e) {
+      alert("Save failed: " + e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function updateLocation(locId, patch) {
+    const updated = locations.map((l) => (l.id === locId ? { ...l, ...patch } : l));
+    setLocations(updated);
+    save(updated);
+  }
+
+  function handleMemberChange(locId, memberId) {
+    const member = teamMembers.find((m) => m.id === memberId);
+    updateLocation(locId, {
+      assignedMemberId: memberId,
+      assignedMemberName: member ? member.name : "",
+    });
+  }
+
+  function addMailbox(locId) {
+    const updated = locations.map((l) => {
+      if (l.id !== locId) return l;
+      return {
+        ...l,
+        mailboxes: [
+          ...l.mailboxes,
+          { id: genId(), number: "", contact: "", googleBizProfile: false, signCreated: false, crizDetails: "", memberAlerted: false },
+        ],
+      };
+    });
+    setLocations(updated);
+    save(updated);
+  }
+
+  function deleteMailbox(locId, boxId) {
+    const updated = locations.map((l) => {
+      if (l.id !== locId) return l;
+      return { ...l, mailboxes: l.mailboxes.filter((b) => b.id !== boxId) };
+    });
+    setLocations(updated);
+    save(updated);
+  }
+
+  function updateMailbox(locId, boxId, patch) {
+    const updated = locations.map((l) => {
+      if (l.id !== locId) return l;
+      return { ...l, mailboxes: l.mailboxes.map((b) => (b.id === boxId ? { ...b, ...patch } : b)) };
+    });
+    setLocations(updated);
+    save(updated);
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: "18px", fontWeight: "800", color: C.text }}>📬 Mail & Packages</h3>
+          <p style={{ margin: "4px 0 0", fontSize: "13px", color: C.muted }}>Manage mailbox assignments per location.</p>
+        </div>
+        {saving && <span style={{ fontSize: "12px", color: C.muted, fontStyle: "italic" }}>Saving…</span>}
+      </div>
+
+      {locations.map((loc) => {
+        const accent = LOCATION_ACCENT[loc.id] || C.accent;
+        return (
+          <div
+            key={loc.id}
+            style={{
+              background: C.card,
+              border: `1px solid ${C.border}`,
+              borderRadius: "14px",
+              padding: "18px",
+              marginBottom: "16px",
+              borderLeft: `4px solid ${accent}`,
+            }}
+          >
+            {/* Location Header */}
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px", flexWrap: "wrap" }}>
+              <h4 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: C.text, minWidth: "60px" }}>📍 {loc.name}</h4>
+
+              {isAdmin ? (
+                <select
+                  value={loc.assignedMemberId}
+                  onChange={(e) => handleMemberChange(loc.id, e.target.value)}
+                  style={textInput({ fontSize: "13px", padding: "6px 10px", minWidth: "160px" })}
+                >
+                  <option value="">— Assign team member —</option>
+                  {teamMembers.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              ) : loc.assignedMemberName ? (
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: "20px", padding: "4px 10px 4px 6px" }}>
+                  <Avatar name={loc.assignedMemberName} size={22} />
+                  <span style={{ fontSize: "12px", color: C.text, fontWeight: "600" }}>{loc.assignedMemberName}</span>
+                </div>
+              ) : null}
+
+              {loc.assignedMemberName && isAdmin && (
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: "20px", padding: "4px 10px 4px 6px" }}>
+                  <Avatar name={loc.assignedMemberName} size={20} />
+                  <span style={{ fontSize: "12px", color: C.text, fontWeight: "600" }}>{loc.assignedMemberName}</span>
+                </div>
+              )}
+
+              <span style={{ marginLeft: "auto", fontSize: "11px", fontWeight: "700", padding: "3px 10px", borderRadius: "20px", background: `${accent}20`, color: accent }}>
+                {loc.mailboxes.length} mailbox{loc.mailboxes.length !== 1 ? "es" : ""}
+              </span>
+            </div>
+
+            {/* Mailbox Rows */}
+            {loc.mailboxes.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "20px", color: C.muted, fontSize: "13px", fontStyle: "italic", background: C.cardBg, borderRadius: "10px", marginBottom: "12px" }}>
+                No mailboxes yet.{isAdmin ? " Click \"+ Add Mailbox\" below." : ""}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0px", marginBottom: "12px", borderRadius: "10px", overflow: "hidden", border: `1px solid ${C.border}` }}>
+                {/* Header row */}
+                <div style={{ display: "grid", gridTemplateColumns: loc.id === "812" ? "1fr 1.5fr auto auto 1.5fr auto auto" : "1fr 1.5fr auto auto auto", gap: "8px", padding: "8px 12px", background: C.cardBg, borderBottom: `1px solid ${C.border}` }}>
+                  <span style={{ ...labelStyle, margin: 0 }}>Mailbox #</span>
+                  <span style={{ ...labelStyle, margin: 0 }}>Contact</span>
+                  <span style={{ ...labelStyle, margin: 0 }}>GBP</span>
+                  <span style={{ ...labelStyle, margin: 0 }}>Sign</span>
+                  {loc.id === "812" && <span style={{ ...labelStyle, margin: 0, color: "#8B5CF6" }}>CRIZ Details</span>}
+                  {loc.id === "812" && <span style={{ ...labelStyle, margin: 0, color: "#8B5CF6" }}>Alerted</span>}
+                  {isAdmin && <span style={{ ...labelStyle, margin: 0 }}></span>}
+                </div>
+
+                {loc.mailboxes.map((box, idx) => (
+                  <div
+                    key={box.id}
+                    style={{
+                      background: idx % 2 === 0 ? C.card : C.cardBg,
+                      borderBottom: idx < loc.mailboxes.length - 1 ? `1px solid ${C.border}` : "none",
+                    }}
+                  >
+                    <div style={{ display: "grid", gridTemplateColumns: loc.id === "812" ? "1fr 1.5fr auto auto 1.5fr auto auto" : "1fr 1.5fr auto auto auto", gap: "8px", padding: "10px 12px", alignItems: "center" }}>
+                      {/* Mailbox number */}
+                      {isAdmin ? (
+                        <input
+                          value={box.number}
+                          onChange={(e) => updateMailbox(loc.id, box.id, { number: e.target.value })}
+                          onBlur={() => save(locations)}
+                          style={textInput({ fontSize: "13px", padding: "6px 8px", width: "100%" })}
+                          placeholder="# / Suite"
+                        />
+                      ) : (
+                        <span style={{ fontSize: "13px", color: C.text, fontWeight: "600" }}>{box.number || "—"}</span>
+                      )}
+
+                      {/* Contact */}
+                      {isAdmin ? (
+                        <input
+                          value={box.contact}
+                          onChange={(e) => updateMailbox(loc.id, box.id, { contact: e.target.value })}
+                          onBlur={() => save(locations)}
+                          style={textInput({ fontSize: "13px", padding: "6px 8px", width: "100%" })}
+                          placeholder="Contact name(s)"
+                        />
+                      ) : (
+                        <span style={{ fontSize: "13px", color: C.text }}>{box.contact || "—"}</span>
+                      )}
+
+                      {/* GBP checkbox */}
+                      <label style={{ display: "flex", alignItems: "center", gap: "4px", cursor: isAdmin ? "pointer" : "default", whiteSpace: "nowrap" }}>
+                        <input
+                          type="checkbox"
+                          checked={!!box.googleBizProfile}
+                          onChange={(e) => isAdmin && updateMailbox(loc.id, box.id, { googleBizProfile: e.target.checked })}
+                          disabled={!isAdmin}
+                          style={{ accentColor: C.accent, width: "15px", height: "15px", cursor: isAdmin ? "pointer" : "default" }}
+                        />
+                        <span style={{ fontSize: "11px", color: C.muted, fontWeight: "600" }}>GBP</span>
+                      </label>
+
+                      {/* Sign Created checkbox */}
+                      <label style={{ display: "flex", alignItems: "center", gap: "4px", cursor: isAdmin ? "pointer" : "default", whiteSpace: "nowrap" }}>
+                        <input
+                          type="checkbox"
+                          checked={!!box.signCreated}
+                          onChange={(e) => isAdmin && updateMailbox(loc.id, box.id, { signCreated: e.target.checked })}
+                          disabled={!isAdmin}
+                          style={{ accentColor: C.accent, width: "15px", height: "15px", cursor: isAdmin ? "pointer" : "default" }}
+                        />
+                        <span style={{ fontSize: "11px", color: C.muted, fontWeight: "600" }}>Sign</span>
+                      </label>
+
+                      {/* 812 CRIZ Details */}
+                      {loc.id === "812" && (
+                        isAdmin ? (
+                          <input
+                            value={box.crizDetails || ""}
+                            onChange={(e) => updateMailbox(loc.id, box.id, { crizDetails: e.target.value })}
+                            onBlur={() => save(locations)}
+                            style={textInput({ fontSize: "13px", padding: "6px 8px", width: "100%", background: "rgba(139,92,246,0.07)", borderColor: "rgba(139,92,246,0.3)" })}
+                            placeholder="CRIZ details…"
+                          />
+                        ) : (
+                          <span style={{ fontSize: "13px", color: "#8B5CF6", background: "rgba(139,92,246,0.07)", borderRadius: "6px", padding: "4px 8px" }}>{box.crizDetails || "—"}</span>
+                        )
+                      )}
+
+                      {/* 812 Member Alerted checkbox */}
+                      {loc.id === "812" && (
+                        <label style={{ display: "flex", alignItems: "center", gap: "4px", cursor: isAdmin ? "pointer" : "default", whiteSpace: "nowrap" }}>
+                          <input
+                            type="checkbox"
+                            checked={!!box.memberAlerted}
+                            onChange={(e) => isAdmin && updateMailbox(loc.id, box.id, { memberAlerted: e.target.checked })}
+                            disabled={!isAdmin}
+                            style={{ accentColor: "#8B5CF6", width: "15px", height: "15px", cursor: isAdmin ? "pointer" : "default" }}
+                          />
+                          <span style={{ fontSize: "11px", color: "#8B5CF6", fontWeight: "600" }}>Alerted</span>
+                        </label>
+                      )}
+
+                      {/* Delete button */}
+                      {isAdmin && (
+                        <button
+                          onClick={() => deleteMailbox(loc.id, box.id)}
+                          style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer", fontSize: "16px", lineHeight: 1, padding: "2px 4px", borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          title="Remove mailbox"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add Mailbox button */}
+            {isAdmin && (
+              <button
+                onClick={() => addMailbox(loc.id)}
+                style={{ padding: "8px 16px", borderRadius: "8px", border: `1px dashed ${accent}`, background: `${accent}10`, color: accent, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}
+              >
+                + Add Mailbox
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 const TABS = [
   { id: "checklists", label: "📋 Checklists" },
@@ -487,7 +788,6 @@ const TABS = [
 ];
 
 const REFERENCE_TABS = {
-  mail: { icon: "📬", title: "Mail & Packages" },
   tours: { icon: "🚶", title: "Tours" },
   papercut: { icon: "🖨️", title: "Papercut" },
   parking: { icon: "🅿️", title: "Parking" },
@@ -599,6 +899,16 @@ export default function DailyOpsView({ token, currentUser, teamMembers = [] }) {
             </div>
           )}
         </div>
+      )}
+
+      {!loading && activeTab === "mail" && (
+        <MailPackagesTab
+          token={token}
+          currentUser={currentUser}
+          teamMembers={teamMembers}
+          reference={reference}
+          setReference={setReference}
+        />
       )}
 
       {!loading && REFERENCE_TABS[activeTab] && (

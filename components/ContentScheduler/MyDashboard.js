@@ -3191,6 +3191,52 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
 
   const sectionTitles = { ...DEFAULT_SECTION_TITLES, ...(profile?.sectionTitles || {}) };
 
+  // ── Collapsible workspace cards ───────────────────────────────────────────
+  const CARD_STORAGE_KEY = `tcf_cards_${effectiveViewingUserId}`;
+  const [cardCollapsed, setCardCollapsed] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(CARD_STORAGE_KEY) || "{}"); } catch { return {}; }
+  });
+  const toggleCard = (key) => {
+    const next = { ...cardCollapsed, [key]: !cardCollapsed[key] };
+    setCardCollapsed(next);
+    try { localStorage.setItem(CARD_STORAGE_KEY, JSON.stringify(next)); } catch {}
+  };
+  const openAllCards  = () => { setCardCollapsed({}); try { localStorage.setItem(CARD_STORAGE_KEY, "{}"); } catch {} };
+  const closeAllCards = () => {
+    const all = { dailyRoutines: true, tasks: true, assignedContent: true, projects: true, notes: true, links: true, blockSchedule: true, processRole: true };
+    setCardCollapsed(all);
+    try { localStorage.setItem(CARD_STORAGE_KEY, JSON.stringify(all)); } catch {}
+  };
+
+  // Helper: wraps a workspace section in a collapsible card shell
+  // When collapsed → shows a slim header bar with title + ▼
+  // When expanded → shows full content with a small ▲ in the top-right corner
+  const CCard = ({ cardKey, title, padding = "20px", children }) => {
+    const collapsed = !!cardCollapsed[cardKey];
+    return (
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", boxShadow: C.shadow, overflow: "hidden" }}>
+        {collapsed ? (
+          <div
+            onClick={() => toggleCard(cardKey)}
+            style={{ padding: "13px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
+          >
+            <span style={{ fontSize: "13px", fontWeight: "700", color: C.muted }}>{title}</span>
+            <span style={{ fontSize: "11px", color: C.muted, fontWeight: "600" }}>▼ expand</span>
+          </div>
+        ) : (
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => toggleCard(cardKey)}
+              title="Collapse"
+              style={{ position: "absolute", top: "12px", right: "14px", zIndex: 5, background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "11px", fontWeight: "600", padding: "2px 6px", borderRadius: "4px", lineHeight: 1 }}
+            >▲</button>
+            <div style={{ padding }}>{children}</div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const saveSectionTitle = async (key, value) => {
     const updated = { ...sectionTitles, [key]: value };
     setProfile((p) => ({ ...p, sectionTitles: updated }));
@@ -3509,27 +3555,39 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
         ownerName={ownerName}
       />
 
-      {/* Daily Routines — full width below header */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px 24px", boxShadow: C.shadow, marginBottom: "20px" }}>
-        <DailyRoutinesSection
-          token={token}
-          viewingUserId={effectiveViewingUserId}
-          currentUserId={currentUserId}
-          sectionTitle={sectionTitles.dailyRoutines}
-          onSaveTitle={(v) => saveSectionTitle("dailyRoutines", v)}
-        />
+      {/* Open / Close all cards */}
+      {!readOnly && (
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "6px", marginBottom: "12px" }}>
+          <button onClick={openAllCards}  style={{ padding: "5px 12px", borderRadius: "20px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}>↕ Open all</button>
+          <button onClick={closeAllCards} style={{ padding: "5px 12px", borderRadius: "20px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}>↕ Close all</button>
+        </div>
+      )}
+
+      {/* Daily Routines — full width */}
+      <div style={{ marginBottom: "20px" }}>
+        <CCard cardKey="dailyRoutines" title={sectionTitles.dailyRoutines} padding="20px 24px">
+          <DailyRoutinesSection
+            token={token}
+            viewingUserId={effectiveViewingUserId}
+            currentUserId={currentUserId}
+            sectionTitle={sectionTitles.dailyRoutines}
+            onSaveTitle={(v) => saveSectionTitle("dailyRoutines", v)}
+          />
+        </CCard>
       </div>
 
-      {/* My Tasks — full width below Daily Routines */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px 24px", boxShadow: C.shadow, marginBottom: "20px" }}>
-        <TasksColumn
-          key={effectiveViewingUserId}
-          token={token}
-          viewingUserId={effectiveViewingUserId}
-          currentUserId={currentUserId}
-          sectionTitle={sectionTitles.tasks}
-          onSaveTitle={(v) => saveSectionTitle("tasks", v)}
-        />
+      {/* My Tasks — full width */}
+      <div style={{ marginBottom: "20px" }}>
+        <CCard cardKey="tasks" title={sectionTitles.tasks} padding="20px 24px">
+          <TasksColumn
+            key={effectiveViewingUserId}
+            token={token}
+            viewingUserId={effectiveViewingUserId}
+            currentUserId={currentUserId}
+            sectionTitle={sectionTitles.tasks}
+            onSaveTitle={(v) => saveSectionTitle("tasks", v)}
+          />
+        </CCard>
       </div>
 
       {/* My Location + Event Tasks */}
@@ -3539,11 +3597,8 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
       <div className="workspace-2col" style={{ display: "flex", gap: "20px", alignItems: "flex-start" }}>
 
         {/* LEFT column — Assigned to Me */}
-        <div style={{
-          width: "340px", flexShrink: 0,
-          display: "flex", flexDirection: "column", gap: "16px",
-        }}>
-          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", boxShadow: C.shadow }}>
+        <div style={{ width: "340px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "16px" }}>
+          <CCard cardKey="assignedContent" title={sectionTitles.assignedContent}>
             <AssignedContentSection
               assignedPosts={assignedPosts}
               assignedAssets={assignedAssets}
@@ -3553,24 +3608,22 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
               onOpenAsset={onOpenAsset}
               onOpenSlack={onOpenSlack}
             />
-          </div>
+          </CCard>
         </div>
 
         {/* RIGHT column */}
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "16px" }}>
 
-          {/* Projects */}
-          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", boxShadow: C.shadow }}>
+          <CCard cardKey="projects" title={sectionTitles.projects}>
             <ProjectsSection
               token={token}
               sectionTitle={sectionTitles.projects}
               onSaveTitle={(v) => saveSectionTitle("projects", v)}
               teamMembers={teamMembers}
             />
-          </div>
+          </CCard>
 
-          {/* Notes */}
-          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", boxShadow: C.shadow }}>
+          <CCard cardKey="notes" title={sectionTitles.notes}>
             <NotesSection
               token={token}
               viewingUserId={effectiveViewingUserId}
@@ -3578,10 +3631,9 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
               sectionTitle={sectionTitles.notes}
               onSaveTitle={(v) => saveSectionTitle("notes", v)}
             />
-          </div>
+          </CCard>
 
-          {/* Links */}
-          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", boxShadow: C.shadow }}>
+          <CCard cardKey="links" title={sectionTitles.links}>
             <LinksSection
               token={token}
               viewingUserId={effectiveViewingUserId}
@@ -3589,10 +3641,9 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
               sectionTitle={sectionTitles.links}
               onSaveTitle={(v) => saveSectionTitle("links", v)}
             />
-          </div>
+          </CCard>
 
-          {/* Block Schedule */}
-          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", boxShadow: C.shadow }}>
+          <CCard cardKey="blockSchedule" title={sectionTitles.blockSchedule}>
             <BlockScheduleSection
               token={token}
               viewingUserId={effectiveViewingUserId}
@@ -3600,10 +3651,9 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
               sectionTitle={sectionTitles.blockSchedule}
               onSaveTitle={(v) => saveSectionTitle("blockSchedule", v)}
             />
-          </div>
+          </CCard>
 
-          {/* Process/Role */}
-          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", boxShadow: C.shadow }}>
+          <CCard cardKey="processRole" title={sectionTitles.processRole}>
             <ProcessRoleSection
               token={token}
               viewingUserId={effectiveViewingUserId}
@@ -3613,7 +3663,7 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
               processRole={processRole}
               onProcessRoleSaved={(v) => setProfile((p) => ({ ...p, processRole: v }))}
             />
-          </div>
+          </CCard>
         </div>
       </div>
     </div>
