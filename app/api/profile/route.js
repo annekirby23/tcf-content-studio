@@ -27,7 +27,7 @@ export async function PUT(req) {
     // Admins can edit any user's profile by passing targetUserId
     const targetId = (user.role === "admin" && body.targetUserId) ? body.targetUserId : user.id;
 
-    const { image, title, jobTitle, email, phone, bio, orgLevel, funFacts, headerImage, processRole, sectionTitles, headerImagePositionX, headerImagePositionY, reportsTo, reportsToName } = body;
+    const { image, title, jobTitle, email, phone, bio, orgLevel, funFacts, headerImage, processRole, sectionTitles, headerImagePositionX, headerImagePositionY, reportsTo, reportsToName, photoDriveUrl } = body;
 
     const existing = (await kvGet(`tcf:profile:${targetId}`)) || {};
     const updated = {
@@ -47,6 +47,7 @@ export async function PUT(req) {
       ...(headerImagePositionY !== undefined && { headerImagePositionY }),
       ...(reportsTo !== undefined && { reportsTo }),
       ...(reportsToName !== undefined && { reportsToName }),
+      ...(photoDriveUrl !== undefined && { photoDriveUrl }),
       updatedAt: new Date().toISOString(),
     };
 

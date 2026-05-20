@@ -867,6 +867,23 @@ function DailyRoutinesSection({ token, viewingUserId, currentUserId, sectionTitl
   const [selectedDay, setSelectedDay] = useState("all");
   const readOnly = viewingUserId !== currentUserId;
 
+  // Daily Ops assigned checklists
+  const [opsChecklists, setOpsChecklists] = useState([]);
+  const [opsCompletions, setOpsCompletions] = useState({}); // { [checklistId]: { [itemId]: boolean } }
+  useEffect(() => {
+    apiFetch(`/api/dailyops?assignedTo=${viewingUserId}`, {}, token)
+      .then((r) => r.json())
+      .then((data) => setOpsChecklists(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [token, viewingUserId]);
+
+  const toggleOpsItem = (checklistId, itemId) => {
+    setOpsCompletions((prev) => {
+      const cl = prev[checklistId] || {};
+      return { ...prev, [checklistId]: { ...cl, [itemId]: !cl[itemId] } };
+    });
+  };
+
   const url = readOnly ? `/api/dailytasks?userId=${viewingUserId}` : "/api/dailytasks";
 
   useEffect(() => {
@@ -1010,6 +1027,47 @@ function DailyRoutinesSection({ token, viewingUserId, currentUserId, sectionTitl
               isDone={isDoneThisWeek(t)}
             />
           ))}
+        </div>
+      )}
+
+      {/* Daily Ops Assigned Checklists */}
+      {opsChecklists.length > 0 && (
+        <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+          <div style={{ fontSize: "11px", fontWeight: "700", color: C.accent, textTransform: "uppercase", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "6px" }}>
+            <span>📋</span> Daily Ops Checklists
+          </div>
+          {opsChecklists.map((cl) => {
+            const items = cl.items || [];
+            const completions = opsCompletions[cl.id] || {};
+            const doneCount = items.filter((item) => completions[item.id]).length;
+            const isOpen = cl.type === "open";
+            return (
+              <div key={cl.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", overflow: "hidden" }}>
+                <div style={{ background: isOpen ? "rgba(16,185,129,0.08)" : "rgba(139,92,246,0.08)", borderBottom: `1px solid ${C.border}`, padding: "8px 12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: "700", color: isOpen ? "#10B981" : "#8B5CF6", background: isOpen ? "rgba(16,185,129,0.12)" : "rgba(139,92,246,0.12)", padding: "2px 8px", borderRadius: "20px" }}>
+                    {isOpen ? "OPEN" : "CLOSE"}
+                  </span>
+                  <span style={{ fontSize: "13px", fontWeight: "700", color: C.text, flex: 1 }}>{cl.title}</span>
+                  {cl.location && <span style={{ fontSize: "11px", color: C.muted }}>📍 {cl.location}</span>}
+                  <span style={{ fontSize: "11px", color: doneCount === items.length && items.length > 0 ? "#10B981" : C.muted, fontWeight: "600" }}>{doneCount}/{items.length}</span>
+                </div>
+                <div style={{ padding: "8px 12px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {items.map((item) => (
+                    <label key={item.id} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={!!completions[item.id]}
+                        onChange={() => toggleOpsItem(cl.id, item.id)}
+                        style={{ accentColor: isOpen ? "#10B981" : "#8B5CF6", width: "15px", height: "15px", cursor: "pointer", flexShrink: 0 }}
+                      />
+                      <span style={{ fontSize: "13px", color: completions[item.id] ? C.muted : C.text, textDecoration: completions[item.id] ? "line-through" : "none" }}>{item.text}</span>
+                    </label>
+                  ))}
+                  {items.length === 0 && <span style={{ fontSize: "12px", color: C.muted, fontStyle: "italic" }}>No items in this checklist yet.</span>}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -3094,6 +3152,21 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
   const processRole = profile?.processRole || "";
   const headerImage = profile?.headerImage || null;
 
+  // Photo Dump URL editing
+  const [editingPhotoDrive, setEditingPhotoDrive] = useState(false);
+  const [photoDriveInput, setPhotoDriveInput] = useState("");
+  const savePhotoDriveUrl = async (url) => {
+    setProfile((p) => ({ ...p, photoDriveUrl: url }));
+    setEditingPhotoDrive(false);
+    try {
+      await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-session": token },
+        body: JSON.stringify({ photoDriveUrl: url }),
+      });
+    } catch {}
+  };
+
   const [posX, setPosX] = useState(50);
   const [posY, setPosY] = useState(50);
   const posXRef = useRef(50);
@@ -3235,11 +3308,52 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
                   <p style={{ margin: 0, fontSize: "13px", color: C.muted }}>Read-only view</p>
                 )}
               </div>
+              {/* Photo Dump button */}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
+                {profile?.photoDriveUrl ? (
+                  <a
+                    href={profile.photoDriveUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "7px 16px", borderRadius: "20px", background: "#8B5CF6", color: "#fff", fontSize: "13px", fontWeight: "700", textDecoration: "none", boxShadow: "0 2px 8px rgba(139,92,246,0.35)" }}
+                  >
+                    📸 Photo Dump
+                  </a>
+                ) : !readOnly && (
+                  <button
+                    onClick={() => { setPhotoDriveInput(""); setEditingPhotoDrive(true); }}
+                    style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "7px 16px", borderRadius: "20px", border: `1px dashed ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}
+                  >
+                    📸 Set Photo Dump Folder
+                  </button>
+                )}
+                {!readOnly && profile?.photoDriveUrl && (
+                  <button
+                    onClick={() => { setPhotoDriveInput(profile.photoDriveUrl || ""); setEditingPhotoDrive(true); }}
+                    style={{ fontSize: "11px", color: C.muted, background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
+                    title="Edit photo dump URL"
+                  >
+                    ✏️
+                  </button>
+                )}
+                {editingPhotoDrive && !readOnly && (
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                    <input
+                      autoFocus
+                      value={photoDriveInput}
+                      onChange={(e) => setPhotoDriveInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") savePhotoDriveUrl(photoDriveInput); if (e.key === "Escape") setEditingPhotoDrive(false); }}
+                      placeholder="Paste Google Drive / Dropbox folder URL…"
+                      style={{ padding: "6px 10px", borderRadius: "8px", border: `1px solid ${C.accent}`, background: C.inputBg, color: C.text, fontSize: "12px", outline: "none", width: "280px" }}
+                    />
+                    <button onClick={() => savePhotoDriveUrl(photoDriveInput)} style={{ padding: "6px 12px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>Save</button>
+                    <button onClick={() => setEditingPhotoDrive(false)} style={{ padding: "6px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", cursor: "pointer" }}>✕</button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-
       {/* Workspace Announcements */}
       {bulletinData && (() => {
         const now = Date.now();

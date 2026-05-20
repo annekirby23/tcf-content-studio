@@ -29,6 +29,10 @@ import InventoryView from "./InventoryView";
 import ConfRoomsView from "./ConfRoomsView";
 import CirclesView from "./CirclesView";
 import LeadershipView from "./LeadershipView";
+import DailyOpsView from "./DailyOpsView";
+import BrandRepoView from "./BrandRepoView";
+import MemberResourcesView from "./MemberResourcesView";
+import MembershipInfoView from "./MembershipInfoView";
 
 const TOKEN_KEY = "tcf_session";
 
@@ -39,28 +43,31 @@ const CONTENT_VIEWS = [
   { id: "list", label: "List", icon: "☰" },
   { id: "links", label: "Quick Links", icon: "🔗" },
   { id: "assets", label: "Assets", icon: "📦" },
+  { id: "brandrepo", label: "Brand Repository", icon: "🎨" },
 ];
 
 const INTERNAL_VIEW = { id: "internal", label: "Internal", icon: "🔒" };
 
 const DEFAULT_TCF_HUB_VIEWS = [
-  { id: "tcfinfo",      icon: "🏫", label: "About TCF" },
-  { id: "memberjourney",icon: "🗺️", label: "Member Journey" },
-  { id: "events",       icon: "📅", label: "Event Planning" },
-  { id: "slack",        icon: "💬", label: "Slack" },
-  { id: "bulletin",     icon: "📋", label: "Bulletin Board" },
-  { id: "reporting",    icon: "📊", label: "Reports" },
+  { id: "tcfinfo",        icon: "🏫", label: "About TCF" },
+  { id: "memberjourney",  icon: "🗺️", label: "Member Journey" },
+  { id: "membershipinfo", icon: "🏛",  label: "TCF Membership Info" },
+  { id: "memberresources",icon: "🤝", label: "Member Resources" },
+  { id: "events",         icon: "📅", label: "Event Planning" },
+  { id: "slack",          icon: "💬", label: "Slack" },
+  { id: "bulletin",       icon: "📋", label: "Bulletin Board" },
+  { id: "reporting",      icon: "📊", label: "Reports" },
 ];
 
 const DEFAULT_INTERNAL_VIEWS = [
-  { id: "internal",    icon: "🔒", label: "Internal" },
-  { id: "memberships", icon: "🏛",  label: "Memberships" },
-  { id: "locations",   icon: "📍", label: "Locations" },
-  { id: "confrooms",   icon: "🏢", label: "Conf Rooms" },
-  { id: "circles",     icon: "⭕", label: "TCF Circles" },
-  { id: "inventory",   icon: "📦", label: "Inventory" },
-  { id: "teamtasks",   icon: "✅", label: "Task Tracker" },
-  { id: "training",    icon: "🎓", label: "Training" },
+  { id: "internal",   icon: "🔒", label: "Internal" },
+  { id: "dailyops",   icon: "📋", label: "Daily Ops & Systems" },
+  { id: "locations",  icon: "📍", label: "Locations" },
+  { id: "confrooms",  icon: "🏢", label: "Conf Rooms" },
+  { id: "circles",    icon: "⭕", label: "TCF Circles" },
+  { id: "inventory",  icon: "📦", label: "Inventory" },
+  { id: "teamtasks",  icon: "✅", label: "Task Tracker" },
+  { id: "training",   icon: "🎓", label: "Training" },
 ];
 
 // ─── Avatar helpers ──────────────────────────────────────────────────────────
@@ -1458,18 +1465,21 @@ export default function ContentScheduler() {
     { id: "slack", label: "Slack" },
     INTERNAL_VIEW,
     { id: "inventory", label: "Inventory" },
-    { id: "memberships", label: "Memberships" },
     { id: "teamtasks", label: "Task Tracker" },
     { id: "training", label: "Training" },
     { id: "events", label: "Event Planning" },
     { id: "tcfinfo", label: "About TCF" },
     { id: "memberjourney", label: "Member Journey" },
+    { id: "membershipinfo", label: "TCF Membership Info" },
+    { id: "memberresources", label: "Member Resources" },
     { id: "locations", label: "Locations" },
     { id: "confrooms", label: "Conf Rooms" },
     { id: "circles", label: "TCF Circles" },
     { id: "bulletin", label: "Bulletin Board" },
     { id: "reporting", label: "Reports" },
     { id: "leadership", label: "Leadership Hub" },
+    { id: "dailyops", label: "Daily Ops & Systems" },
+    { id: "brandrepo", label: "Brand Repository" },
   ];
   const topBarTitle = view === "mydash"
     ? workspaceTitle
@@ -1982,19 +1992,14 @@ export default function ContentScheduler() {
                   <MemberJourneyView token={authToken} teamMembers={teamMembers} />
                 </div>
               )}
-              {view === "memberships" && (
-                <div style={{ padding: "24px", maxWidth: "860px", margin: "0 auto" }}>
-                  <div style={{ marginBottom: "20px" }}>
-                    <h1 style={{ margin: "0 0 6px", fontSize: "24px", fontWeight: "800", color: C.text }}>🏛 Memberships</h1>
-                    <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>Track memberships, subscriptions, and recurring costs.</p>
-                  </div>
-                  <MembershipsTab token={authToken} />
-                </div>
-              )}
               {view === "locations" && <LocationsView token={authToken} teamMembers={teamMembers} />}
               {view === "confrooms" && <ConfRoomsView token={authToken} currentUser={currentUser} />}
               {view === "circles" && <CirclesView token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
               {view === "leadership" && <LeadershipView token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
+              {view === "dailyops" && <DailyOpsView token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
+              {view === "brandrepo" && <BrandRepoView token={authToken} currentUser={currentUser} />}
+              {view === "memberresources" && <MemberResourcesView token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
+              {view === "membershipinfo" && <MembershipInfoView token={authToken} currentUser={currentUser} />}
             </>
           )}
         </div>
