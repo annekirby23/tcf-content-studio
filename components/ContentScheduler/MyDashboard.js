@@ -2044,7 +2044,7 @@ const DEFAULT_SECTION_TITLES = {
 
 // ─── Location + Event Tasks bar ───────────────────────────────────────────────
 
-function LocationAndEventTasksBar({ token, userId }) {
+function LocationAndEventTasksBar({ token, userId, onNavigate }) {
   const [myLocation, setMyLocation] = useState(null);
   const [eventTasks, setEventTasks] = useState([]);
   const [teamTasks, setTeamTasks] = useState([]);
@@ -2086,7 +2086,7 @@ function LocationAndEventTasksBar({ token, userId }) {
 
       // Journey stages assigned to this user
       if (journeyData?.stages) {
-        const myStages = journeyData.stages.filter((s) => s.assignedMemberId === userId);
+        const myStages = journeyData.stages.filter((s) => (s.assignedMembers || []).some((m) => m.id === userId));
         setJourneyStages(myStages);
       }
     }).finally(() => setLoading(false));
@@ -2129,7 +2129,13 @@ function LocationAndEventTasksBar({ token, userId }) {
       {/* Event Tasks assigned to me */}
       {eventTasks.length > 0 && (
         <div style={{ flex: "1 1 280px", minWidth: "260px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px 20px", boxShadow: C.shadow }}>
-          <div style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px" }}>📅 My Event Tasks</div>
+          <div
+            onClick={() => onNavigate && onNavigate("events")}
+            style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px", cursor: onNavigate ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+          >
+            <span>📅 My Event Tasks</span>
+            {onNavigate && <span style={{ fontSize: "10px", color: C.accent, fontWeight: "600" }}>View all →</span>}
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {eventTasks.map((task) => (
               <div key={task.id} style={{ display: "flex", alignItems: "flex-start", gap: "8px", padding: "8px 10px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}`, borderLeft: `3px solid ${task.eventColor || C.accent}` }}>
@@ -2149,7 +2155,13 @@ function LocationAndEventTasksBar({ token, userId }) {
       {/* Member Journey stages I own */}
       {journeyStages.length > 0 && (
         <div style={{ flex: "1 1 280px", minWidth: "260px", background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px 20px", boxShadow: C.shadow }}>
-          <div style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px" }}>🗺️ My Journey Stages</div>
+          <div
+            onClick={() => onNavigate && onNavigate("memberjourney")}
+            style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px", cursor: onNavigate ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+          >
+            <span>🗺️ My Journey Stages</span>
+            {onNavigate && <span style={{ fontSize: "10px", color: C.accent, fontWeight: "600" }}>View all →</span>}
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {journeyStages.map((stage) => {
               const done = (stage.steps || []).filter((s) => s.done).length;
@@ -2185,7 +2197,7 @@ function LocationAndEventTasksBar({ token, userId }) {
   );
 }
 
-export default function MyDashboard({ currentUser, token, viewingUserId, teamMembers = [], assignedPosts = [], assignedAssets = [], assignedSlackChannels = [], onOpenPost, onOpenAsset, onOpenSlack }) {
+export default function MyDashboard({ currentUser, token, viewingUserId, teamMembers = [], assignedPosts = [], assignedAssets = [], assignedSlackChannels = [], onOpenPost, onOpenAsset, onOpenSlack, onNavigate }) {
   const currentUserId = currentUser?.id;
   const effectiveViewingUserId = viewingUserId || currentUserId;
   const readOnly = effectiveViewingUserId !== currentUserId;
@@ -2194,6 +2206,15 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
   const [profile, setProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const fileInputRef = useRef(null);
+
+  // Bulletin board data (workspace announcements + shoutouts for this user)
+  const [bulletinData, setBulletinData] = useState(null);
+  useEffect(() => {
+    apiFetch("/api/bulletin", {}, token)
+      .then((r) => r.json())
+      .then((d) => setBulletinData(d || {}))
+      .catch(() => {});
+  }, [token]);
 
   const ownerName = readOnly
     ? (teamMembers.find((m) => m.id === effectiveViewingUserId)?.name || "Member")
@@ -2381,6 +2402,58 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
         </div>
       </div>
 
+      {/* Workspace Announcements */}
+      {bulletinData && (() => {
+        const now = Date.now();
+        const workspaceAnnouncements = (bulletinData.posts || []).filter((p) => p.showOnWorkspace);
+        // Shoutouts received by current page owner, all-time count + recent messages (< 7 days)
+        const ownerShoutouts = (bulletinData.shoutouts || []).filter((s) => s.toId === effectiveViewingUserId);
+        const starCount = ownerShoutouts.length;
+        const recentShoutouts = ownerShoutouts.filter((s) => now - new Date(s.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000);
+        const showShoutouts = starCount > 0;
+        const showAnnouncements = workspaceAnnouncements.length > 0;
+        if (!showAnnouncements && !showShoutouts) return null;
+        return (
+          <div style={{ marginBottom: "20px", display: "flex", flexDirection: "column", gap: "12px" }}>
+            {showAnnouncements && workspaceAnnouncements.map((post) => (
+              <div
+                key={post.id}
+                onClick={() => onNavigate && onNavigate("bulletin")}
+                style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `4px solid ${C.accent}`, borderRadius: "12px", padding: "14px 18px", boxShadow: C.shadow, cursor: onNavigate ? "pointer" : "default" }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: "700", color: C.accent }}>📢 Announcement</span>
+                  {post.pinned && <span style={{ fontSize: "11px", color: C.muted }}>📌 Pinned</span>}
+                </div>
+                {post.title && <div style={{ fontSize: "14px", fontWeight: "700", color: C.text, marginBottom: "2px" }}>{post.title}</div>}
+                <div style={{ fontSize: "13px", color: C.text, lineHeight: "1.6", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{post.content}</div>
+                <div style={{ fontSize: "11px", color: C.muted, marginTop: "6px" }}>From {post.authorName}</div>
+              </div>
+            ))}
+            {showShoutouts && (
+              <div
+                onClick={() => onNavigate && onNavigate("bulletin")}
+                style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: "12px", padding: "14px 18px", boxShadow: C.shadow, cursor: onNavigate ? "pointer" : "default" }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: recentShoutouts.length > 0 ? "10px" : 0 }}>
+                  <span style={{ fontSize: "18px" }}>⭐</span>
+                  <span style={{ fontSize: "13px", fontWeight: "700", color: "#F59E0B" }}>{starCount} shoutout{starCount !== 1 ? "s" : ""} received</span>
+                </div>
+                {recentShoutouts.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {recentShoutouts.slice(0, 3).map((s) => (
+                      <div key={s.id} style={{ fontSize: "13px", color: C.text, lineHeight: "1.6", fontStyle: "italic", borderLeft: "2px solid rgba(245,158,11,0.4)", paddingLeft: "10px" }}>
+                        "{s.message}" <span style={{ fontSize: "11px", color: C.muted, fontStyle: "normal" }}>— {s.fromName}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Daily Routines — full width below header */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px 24px", boxShadow: C.shadow, marginBottom: "20px" }}>
         <DailyRoutinesSection
@@ -2404,7 +2477,7 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
       </div>
 
       {/* My Location + Event Tasks */}
-      <LocationAndEventTasksBar token={token} userId={effectiveViewingUserId} />
+      <LocationAndEventTasksBar token={token} userId={effectiveViewingUserId} onNavigate={onNavigate} />
 
       {/* 2-column layout */}
       <div className="workspace-2col" style={{ display: "flex", gap: "20px", alignItems: "flex-start" }}>

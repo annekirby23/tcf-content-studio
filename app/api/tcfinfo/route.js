@@ -3,12 +3,11 @@ import { kvGet, kvSet } from "@/lib/redis";
 
 const KEY = "tcf:tcfinfo";
 
+const ALLOWED = ["mission", "values", "motto", "history", "ourWhy", "website", "instagram", "facebook", "linkedin", "tiktok", "youtube"];
+
 const DEFAULT = {
-  mission: "",
-  values: "",
-  motto: "",
-  history: "",
-  ourWhy: "",
+  mission: "", values: "", motto: "", history: "", ourWhy: "",
+  website: "", instagram: "", facebook: "", linkedin: "", tiktok: "", youtube: "",
 };
 
 export async function GET(req) {
@@ -27,13 +26,9 @@ export async function PUT(req) {
     const user = await getSession(req);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
     const body = await req.json();
-    const current = (await kvGet(KEY)) || DEFAULT;
+    const current = (await kvGet(KEY)) || { ...DEFAULT };
     const updated = { ...current };
-    if (body.mission !== undefined) updated.mission = body.mission;
-    if (body.values !== undefined) updated.values = body.values;
-    if (body.motto !== undefined) updated.motto = body.motto;
-    if (body.history !== undefined) updated.history = body.history;
-    if (body.ourWhy !== undefined) updated.ourWhy = body.ourWhy;
+    ALLOWED.forEach((key) => { if (body[key] !== undefined) updated[key] = body[key]; });
     await kvSet(KEY, updated);
     return Response.json(updated);
   } catch (e) {

@@ -980,16 +980,25 @@ function Toast({ message, type }) {
 
 // ─── Section label for sidebar ───────────────────────────────────────────────
 
-function SidebarSectionLabel({ label, visible }) {
+function SidebarSectionLabel({ label, visible, collapsed, onToggle }) {
   if (!visible) return <div style={{ height: "8px" }} />;
+  const canCollapse = typeof onToggle === "function";
   return (
-    <div style={{
-      fontSize: "10px", color: C.muted, fontWeight: "700",
-      textTransform: "uppercase", letterSpacing: "0.1em",
-      padding: "12px 10px 4px",
-      userSelect: "none",
-    }}>
-      {label}
+    <div
+      onClick={canCollapse ? onToggle : undefined}
+      style={{
+        fontSize: "10px", color: C.muted, fontWeight: "700",
+        textTransform: "uppercase", letterSpacing: "0.1em",
+        padding: "12px 10px 4px",
+        userSelect: "none",
+        cursor: canCollapse ? "pointer" : "default",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}
+    >
+      <span>{label}</span>
+      {canCollapse && (
+        <span style={{ fontSize: "8px", display: "inline-block", transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)", transition: "transform 0.15s", marginRight: "4px" }}>▼</span>
+      )}
     </div>
   );
 }
@@ -1068,7 +1077,9 @@ function DraggableNavItem({ v, idx, active, sidebarOpen, dragIndexRef, orderedCo
 // ─── Main export ─────────────────────────────────────────────────────────────
 
 export default function ContentScheduler() {
-  const [view, setView] = useState("mydash");
+  const [view, setView] = useState(() => {
+    try { const v = typeof window !== "undefined" ? localStorage.getItem("tcf_current_view") : null; return v || "mydash"; } catch { return "mydash"; }
+  });
   const [viewingUserId, setViewingUserId] = useState(null); // null = current user
   const [posts, setPosts] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
@@ -1102,6 +1113,9 @@ export default function ContentScheduler() {
   const viewAreaRef = useRef(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [teamMembersCollapsed, setTeamMembersCollapsed] = useState(false);
+  const [tcfHubCollapsed, setTcfHubCollapsed] = useState(false);
+  const [contentCollapsed, setContentCollapsed] = useState(false);
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -1278,12 +1292,14 @@ export default function ContentScheduler() {
     setView(targetView);
     setListFilters(filters);
     scrollToTop();
+    try { localStorage.setItem("tcf_current_view", targetView); } catch {}
   };
 
   const navigate = (targetView) => {
     setView(targetView);
     setViewingUserId(null);
     scrollToTop();
+    try { localStorage.setItem("tcf_current_view", targetView); } catch {}
   };
 
   const handleGoalsUpdate = (updated) => setGoals(updated);
@@ -1559,165 +1575,177 @@ export default function ContentScheduler() {
           />
 
           {/* ── TCF HUB section ── */}
-          <SidebarSectionLabel label="TCF Hub" visible={sidebarOpen} />
+          <SidebarSectionLabel label="TCF Hub" visible={sidebarOpen} collapsed={tcfHubCollapsed} onToggle={() => setTcfHubCollapsed((v) => !v)} />
 
-          <NavBtn
-            icon="🏫"
-            label="About TCF"
-            active={view === "tcfinfo"}
-            onClick={() => navigate("tcfinfo")}
-            sidebarOpen={sidebarOpen}
-          />
+          {!tcfHubCollapsed && (
+            <>
+              <NavBtn
+                icon="🏫"
+                label="About TCF"
+                active={view === "tcfinfo"}
+                onClick={() => navigate("tcfinfo")}
+                sidebarOpen={sidebarOpen}
+              />
 
-          <NavBtn
-            icon="🗺️"
-            label="Member Journey"
-            active={view === "memberjourney"}
-            onClick={() => navigate("memberjourney")}
-            sidebarOpen={sidebarOpen}
-          />
+              <NavBtn
+                icon="🗺️"
+                label="Member Journey"
+                active={view === "memberjourney"}
+                onClick={() => navigate("memberjourney")}
+                sidebarOpen={sidebarOpen}
+              />
 
-          <NavBtn
-            icon="📅"
-            label="Event Planning"
-            active={view === "events"}
-            onClick={() => navigate("events")}
-            sidebarOpen={sidebarOpen}
-          />
+              <NavBtn
+                icon="📅"
+                label="Event Planning"
+                active={view === "events"}
+                onClick={() => navigate("events")}
+                sidebarOpen={sidebarOpen}
+              />
 
-          <NavBtn
-            icon="💬"
-            label="Slack"
-            active={view === "slack"}
-            onClick={() => navigate("slack")}
-            sidebarOpen={sidebarOpen}
-          />
+              <NavBtn
+                icon="💬"
+                label="Slack"
+                active={view === "slack"}
+                onClick={() => navigate("slack")}
+                sidebarOpen={sidebarOpen}
+              />
 
-          <NavBtn
-            icon="📋"
-            label="Bulletin Board"
-            active={view === "bulletin"}
-            onClick={() => navigate("bulletin")}
-            sidebarOpen={sidebarOpen}
-          />
+              <NavBtn
+                icon="📋"
+                label="Bulletin Board"
+                active={view === "bulletin"}
+                onClick={() => navigate("bulletin")}
+                sidebarOpen={sidebarOpen}
+              />
+            </>
+          )}
 
           {/* ── CONTENT section ── */}
-          <SidebarSectionLabel label="Content & Marketing" visible={sidebarOpen} />
+          <SidebarSectionLabel label="Content & Marketing" visible={sidebarOpen} collapsed={contentCollapsed} onToggle={() => setContentCollapsed((v) => !v)} />
 
-          {orderedContentViews.map((v, idx) => (
-            <DraggableNavItem
-              key={v.id}
-              v={v}
-              idx={idx}
-              active={view === v.id}
-              sidebarOpen={sidebarOpen}
-              dragIndexRef={dragIndexRef}
-              orderedContentViews={orderedContentViews}
-              onNavigate={() => { navigate(v.id); }}
-              onReorder={(ids) => {
-                setContentViewOrder(ids);
-                try { localStorage.setItem("tcf_nav_order", JSON.stringify(ids)); } catch {}
-              }}
-            />
-          ))}
-
-          {/* Campaigns header + New Campaign button */}
-          {sidebarOpen ? (
-            <div style={{ padding: "0 4px", marginTop: "6px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 6px", marginBottom: "2px" }}>
-                <div style={{ fontSize: "10px", color: C.muted, fontWeight: "700", letterSpacing: "0.08em", textTransform: "uppercase" }}>Campaigns</div>
-                <button
-                  onClick={() => setCampaignModalOpen(true)}
-                  style={{ fontSize: "11px", color: C.accent, background: "none", border: "none", cursor: "pointer", fontWeight: "700", padding: "0 2px" }}
-                  title="New Campaign"
-                >
-                  + New
-                </button>
-              </div>
-              {campaigns.slice(0, 8).map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => handleNavigate("list", { campaign: c.name })}
-                  style={{ width: "100%", textAlign: "left", fontSize: "12px", color: listFilters.campaign === c.name ? C.accentBright : C.muted, padding: "5px 8px", borderRadius: "6px", cursor: "pointer", border: "none", background: listFilters.campaign === c.name ? C.accentLight : "transparent", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", transition: "all 0.15s" }}
-                  onMouseEnter={(e) => { if (listFilters.campaign !== c.name) e.currentTarget.style.background = C.hover; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = listFilters.campaign === c.name ? C.accentLight : "transparent"; }}
-                >
-                  🎯 {c.name}
-                </button>
+          {!contentCollapsed && (
+            <>
+              {orderedContentViews.map((v, idx) => (
+                <DraggableNavItem
+                  key={v.id}
+                  v={v}
+                  idx={idx}
+                  active={view === v.id}
+                  sidebarOpen={sidebarOpen}
+                  dragIndexRef={dragIndexRef}
+                  orderedContentViews={orderedContentViews}
+                  onNavigate={() => { navigate(v.id); }}
+                  onReorder={(ids) => {
+                    setContentViewOrder(ids);
+                    try { localStorage.setItem("tcf_nav_order", JSON.stringify(ids)); } catch {}
+                  }}
+                />
               ))}
-              {campaigns.length === 0 && (
+
+              {/* Campaigns header + New Campaign button */}
+              {sidebarOpen ? (
+                <div style={{ padding: "0 4px", marginTop: "6px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 6px", marginBottom: "2px" }}>
+                    <div style={{ fontSize: "10px", color: C.muted, fontWeight: "700", letterSpacing: "0.08em", textTransform: "uppercase" }}>Campaigns</div>
+                    <button
+                      onClick={() => setCampaignModalOpen(true)}
+                      style={{ fontSize: "11px", color: C.accent, background: "none", border: "none", cursor: "pointer", fontWeight: "700", padding: "0 2px" }}
+                      title="New Campaign"
+                    >
+                      + New
+                    </button>
+                  </div>
+                  {campaigns.slice(0, 8).map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => handleNavigate("list", { campaign: c.name })}
+                      style={{ width: "100%", textAlign: "left", fontSize: "12px", color: listFilters.campaign === c.name ? C.accentBright : C.muted, padding: "5px 8px", borderRadius: "6px", cursor: "pointer", border: "none", background: listFilters.campaign === c.name ? C.accentLight : "transparent", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", transition: "all 0.15s" }}
+                      onMouseEnter={(e) => { if (listFilters.campaign !== c.name) e.currentTarget.style.background = C.hover; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = listFilters.campaign === c.name ? C.accentLight : "transparent"; }}
+                    >
+                      🎯 {c.name}
+                    </button>
+                  ))}
+                  {campaigns.length === 0 && (
+                    <button
+                      onClick={() => setCampaignModalOpen(true)}
+                      style={{ width: "100%", textAlign: "left", fontSize: "12px", color: C.muted, padding: "5px 8px", borderRadius: "6px", cursor: "pointer", border: "none", background: "transparent", fontStyle: "italic" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      + New Campaign
+                    </button>
+                  )}
+                </div>
+              ) : (
                 <button
                   onClick={() => setCampaignModalOpen(true)}
-                  style={{ width: "100%", textAlign: "left", fontSize: "12px", color: C.muted, padding: "5px 8px", borderRadius: "6px", cursor: "pointer", border: "none", background: "transparent", fontStyle: "italic" }}
+                  title="New Campaign"
+                  style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "9px 4px", borderRadius: "8px", border: "none", background: "transparent", color: C.muted, fontSize: "16px", cursor: "pointer", transition: "all 0.15s" }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
-                  + New Campaign
+                  🎯
                 </button>
               )}
-            </div>
-          ) : (
-            <button
-              onClick={() => setCampaignModalOpen(true)}
-              title="New Campaign"
-              style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "9px 4px", borderRadius: "8px", border: "none", background: "transparent", color: C.muted, fontSize: "16px", cursor: "pointer", transition: "all 0.15s" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            >
-              🎯
-            </button>
+            </>
           )}
 
           {/* ── INTERNAL section ── */}
-          <SidebarSectionLabel label="Internal" visible={sidebarOpen} />
+          <SidebarSectionLabel label="Internal" visible={sidebarOpen} collapsed={internalCollapsed} onToggle={() => setInternalCollapsed((v) => !v)} />
 
-          <NavBtn
-            icon={INTERNAL_VIEW.icon}
-            label={INTERNAL_VIEW.label}
-            active={view === "internal"}
-            onClick={() => navigate("internal")}
-            sidebarOpen={sidebarOpen}
-          />
+          {!internalCollapsed && (
+            <>
+              <NavBtn
+                icon={INTERNAL_VIEW.icon}
+                label={INTERNAL_VIEW.label}
+                active={view === "internal"}
+                onClick={() => navigate("internal")}
+                sidebarOpen={sidebarOpen}
+              />
 
-          <NavBtn
-            icon="🏛"
-            label="Memberships"
-            active={view === "memberships"}
-            onClick={() => navigate("memberships")}
-            sidebarOpen={sidebarOpen}
-          />
+              <NavBtn
+                icon="🏛"
+                label="Memberships"
+                active={view === "memberships"}
+                onClick={() => navigate("memberships")}
+                sidebarOpen={sidebarOpen}
+              />
 
-          <NavBtn
-            icon="📍"
-            label="Locations"
-            active={view === "locations"}
-            onClick={() => navigate("locations")}
-            sidebarOpen={sidebarOpen}
-          />
+              <NavBtn
+                icon="📍"
+                label="Locations"
+                active={view === "locations"}
+                onClick={() => navigate("locations")}
+                sidebarOpen={sidebarOpen}
+              />
 
-          <NavBtn
-            icon="📦"
-            label="Inventory"
-            active={view === "inventory"}
-            onClick={() => navigate("inventory")}
-            sidebarOpen={sidebarOpen}
-          />
+              <NavBtn
+                icon="📦"
+                label="Inventory"
+                active={view === "inventory"}
+                onClick={() => navigate("inventory")}
+                sidebarOpen={sidebarOpen}
+              />
 
-          <NavBtn
-            icon="✅"
-            label="Task Tracker"
-            active={view === "teamtasks"}
-            onClick={() => navigate("teamtasks")}
-            sidebarOpen={sidebarOpen}
-          />
+              <NavBtn
+                icon="✅"
+                label="Task Tracker"
+                active={view === "teamtasks"}
+                onClick={() => navigate("teamtasks")}
+                sidebarOpen={sidebarOpen}
+              />
 
-          <NavBtn
-            icon="🎓"
-            label="Training"
-            active={view === "training"}
-            onClick={() => navigate("training")}
-            sidebarOpen={sidebarOpen}
-          />
+              <NavBtn
+                icon="🎓"
+                label="Training"
+                active={view === "training"}
+                onClick={() => navigate("training")}
+                sidebarOpen={sidebarOpen}
+              />
+            </>
+          )}
 
           {/* ── Admin tools ── */}
           <div style={{ borderTop: `1px solid ${C.border}`, margin: "10px 0", padding: "10px 0 0" }}>
@@ -1893,6 +1921,7 @@ export default function ContentScheduler() {
                   onOpenPost={(post) => { openEdit(post); }}
                   onOpenAsset={(asset) => { setView("assets"); }}
                   onOpenSlack={() => { setView("slack"); }}
+                  onNavigate={navigate}
                 />
               )}
               {view === "profile" && (

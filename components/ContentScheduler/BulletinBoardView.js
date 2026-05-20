@@ -42,19 +42,123 @@ function textInput(extra = {}) {
   };
 }
 
+// ─── Member Count Tracker ─────────────────────────────────────────────────────
+
+function MemberCountTracker({ token, isAdmin, memberCount, memberGoal, memberGoalDate, onUpdate }) {
+  const [editing, setEditing] = useState(false);
+  const [draftCount, setDraftCount] = useState(memberCount);
+  const [draftGoal, setDraftGoal] = useState(memberGoal);
+  const [draftDate, setDraftDate] = useState(memberGoalDate);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setDraftCount(memberCount);
+    setDraftGoal(memberGoal);
+    setDraftDate(memberGoalDate);
+  }, [memberCount, memberGoal, memberGoalDate]);
+
+  const pct = memberGoal > 0 ? Math.min(100, Math.round((memberCount / memberGoal) * 100)) : 0;
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const res = await apiFetch("/api/bulletin", {
+        method: "PUT",
+        body: JSON.stringify({ memberCount: Number(draftCount), memberGoal: Number(draftGoal), memberGoalDate: draftDate }),
+      }, token);
+      const data = await res.json();
+      onUpdate(data);
+      setEditing(false);
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "20px 24px", marginBottom: "20px", boxShadow: C.shadow }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ fontSize: "20px" }}>👥</span>
+          <span style={{ fontSize: "15px", fontWeight: "800", color: C.text }}>Member Growth</span>
+        </div>
+        {isAdmin && !editing && (
+          <button
+            onClick={() => setEditing(true)}
+            style={{ padding: "5px 12px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}
+          >
+            ✏️ Edit
+          </button>
+        )}
+      </div>
+
+      {editing ? (
+        <div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "12px" }}>
+            <div>
+              <label style={{ fontSize: "10px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: "4px" }}>Current Members</label>
+              <input
+                type="number"
+                value={draftCount}
+                onChange={(e) => setDraftCount(e.target.value)}
+                style={{ ...textInput({ width: "100%" }) }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: "10px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: "4px" }}>Goal</label>
+              <input
+                type="number"
+                value={draftGoal}
+                onChange={(e) => setDraftGoal(e.target.value)}
+                style={{ ...textInput({ width: "100%" }) }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: "10px", color: C.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: "4px" }}>Goal Date</label>
+              <input
+                value={draftDate}
+                onChange={(e) => setDraftDate(e.target.value)}
+                placeholder="e.g. September 2026"
+                style={{ ...textInput({ width: "100%" }) }}
+              />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+            <button onClick={() => setEditing(false)} style={{ padding: "6px 14px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", cursor: "pointer" }}>Cancel</button>
+            <button onClick={save} disabled={saving} style={{ padding: "6px 16px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>{saving ? "Saving…" : "Save"}</button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: "10px" }}>
+            <span style={{ fontSize: "32px", fontWeight: "900", color: C.accent, lineHeight: 1 }}>{memberCount}</span>
+            <span style={{ fontSize: "16px", color: C.muted, fontWeight: "600" }}>/ {memberGoal} members</span>
+            <span style={{ fontSize: "12px", color: C.muted, marginLeft: "auto" }}>Goal by {memberGoalDate}</span>
+          </div>
+          <div style={{ height: "10px", background: C.cardBg, borderRadius: "99px", overflow: "hidden", border: `1px solid ${C.border}` }}>
+            <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${C.accent}, #8B5CF6)`, borderRadius: "99px", transition: "width 0.4s ease" }} />
+          </div>
+          <div style={{ marginTop: "6px", fontSize: "11px", color: C.muted, fontWeight: "600" }}>{pct}% of goal reached · {Math.max(0, memberGoal - memberCount)} to go</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── New Announcement Form (admin) ────────────────────────────────────────────
 
 function NewPostForm({ token, onSave, onClose }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [pinned, setPinned] = useState(false);
+  const [showOnWorkspace, setShowOnWorkspace] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
     if (!content.trim()) return;
     setSaving(true);
     try {
-      const res = await apiFetch("/api/bulletin", { method: "POST", body: JSON.stringify({ type: "post", title: title.trim(), content: content.trim(), pinned }) }, token);
+      const res = await apiFetch("/api/bulletin", {
+        method: "POST",
+        body: JSON.stringify({ type: "post", title: title.trim(), content: content.trim(), pinned, showOnWorkspace }),
+      }, token);
       const data = await res.json();
       onSave(data);
     } finally { setSaving(false); }
@@ -81,11 +185,17 @@ function NewPostForm({ token, onSave, onClose }) {
           style={{ ...textInput({ width: "100%", resize: "vertical", lineHeight: "1.6" }) }}
         />
       </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: C.muted, cursor: "pointer" }}>
-          <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} style={{ accentColor: C.accent }} />
-          📌 Pin this announcement
-        </label>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
+        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: C.muted, cursor: "pointer" }}>
+            <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} style={{ accentColor: C.accent }} />
+            📌 Pin this announcement
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: C.muted, cursor: "pointer" }}>
+            <input type="checkbox" checked={showOnWorkspace} onChange={(e) => setShowOnWorkspace(e.target.checked)} style={{ accentColor: C.accent }} />
+            🏠 Show on all workspaces
+          </label>
+        </div>
         <div style={{ display: "flex", gap: "8px" }}>
           <button onClick={onClose} style={{ padding: "7px 14px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", cursor: "pointer" }}>Cancel</button>
           <button onClick={submit} disabled={!content.trim() || saving} style={{ padding: "7px 18px", borderRadius: "8px", border: "none", background: content.trim() ? C.accent : C.border, color: "#fff", fontSize: "12px", fontWeight: "600", cursor: content.trim() ? "pointer" : "not-allowed" }}>
@@ -167,7 +277,6 @@ function AnnouncementCard({ post, canDelete, onDelete }) {
         borderLeft: `4px solid ${C.accent}`,
         borderRadius: "12px",
         padding: "18px 20px",
-        boxShadow: C.shadow,
         position: "relative",
         transition: "box-shadow 0.15s",
         boxShadow: hov ? C.shadowMd : C.shadow,
@@ -175,6 +284,9 @@ function AnnouncementCard({ post, canDelete, onDelete }) {
     >
       {post.pinned && (
         <div style={{ position: "absolute", top: "12px", right: "14px", fontSize: "14px" }} title="Pinned">📌</div>
+      )}
+      {post.showOnWorkspace && (
+        <div style={{ position: "absolute", top: post.pinned ? "36px" : "12px", right: "14px", fontSize: "11px", color: C.accent, fontWeight: "700" }} title="Shown on all workspaces">🏠 Workspace</div>
       )}
       <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
         <MemberInitials name={post.authorName} size={36} />
@@ -232,7 +344,7 @@ function ShoutoutCard({ shoutout, canDelete, onDelete }) {
             <span style={{ fontSize: "12px", fontWeight: "700", color: "#F59E0B" }}>{shoutout.toName}</span>
             <span style={{ fontSize: "11px", color: C.muted, marginLeft: "auto" }}>{timeAgo(shoutout.createdAt)}</span>
           </div>
-          <div style={{ fontSize: "13px", color: C.text, lineHeight: "1.6", fontStyle: "italic", paddingLeft: "4px", borderLeft: "2px solid rgba(245,158,11,0.4)", paddingLeft: "10px" }}>
+          <div style={{ fontSize: "13px", color: C.text, lineHeight: "1.6", fontStyle: "italic", borderLeft: "2px solid rgba(245,158,11,0.4)", paddingLeft: "10px" }}>
             "{shoutout.message}"
           </div>
         </div>
@@ -252,7 +364,7 @@ function ShoutoutCard({ shoutout, canDelete, onDelete }) {
 // ─── Main BulletinBoardView ───────────────────────────────────────────────────
 
 export default function BulletinBoardView({ token, currentUser, teamMembers = [] }) {
-  const [data, setData] = useState({ posts: [], shoutouts: [] });
+  const [data, setData] = useState({ posts: [], shoutouts: [], memberCount: 356, memberGoal: 400, memberGoalDate: "September 2026" });
   const [loading, setLoading] = useState(true);
   const [showPostForm, setShowPostForm] = useState(false);
   const [showShoutoutForm, setShowShoutoutForm] = useState(false);
@@ -264,7 +376,7 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
     setLoading(true);
     apiFetch("/api/bulletin", {}, token)
       .then((r) => r.json())
-      .then((d) => setData(d || { posts: [], shoutouts: [] }))
+      .then((d) => setData(d || { posts: [], shoutouts: [], memberCount: 356, memberGoal: 400, memberGoalDate: "September 2026" }))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [token]);
@@ -282,6 +394,10 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
       const updated = await res.json();
       setData(updated);
     } catch {}
+  };
+
+  const handleMemberUpdate = (updated) => {
+    setData((prev) => ({ ...prev, memberCount: updated.memberCount, memberGoal: updated.memberGoal, memberGoalDate: updated.memberGoalDate }));
   };
 
   const posts = data.posts || [];
@@ -310,6 +426,18 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
         <h1 style={{ margin: "0 0 6px", fontSize: "24px", fontWeight: "800", color: C.text }}>📋 Team Bulletin Board</h1>
         <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>Announcements from leadership and shoutouts from the team.</p>
       </div>
+
+      {/* Member Count Tracker */}
+      {!loading && (
+        <MemberCountTracker
+          token={token}
+          isAdmin={isAdmin}
+          memberCount={data.memberCount ?? 356}
+          memberGoal={data.memberGoal ?? 400}
+          memberGoalDate={data.memberGoalDate ?? "September 2026"}
+          onUpdate={handleMemberUpdate}
+        />
+      )}
 
       {/* Action buttons */}
       <div style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap" }}>
