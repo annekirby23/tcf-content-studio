@@ -3354,6 +3354,8 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
             </div>
           </div>
         </div>
+      </div>
+
       {/* Workspace Announcements */}
       {bulletinData && (() => {
         const now = Date.now();
