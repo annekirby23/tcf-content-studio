@@ -1756,7 +1756,7 @@ export default function ContentScheduler() {
                 </div>
               )}
               {view === "teamtasks" && <TeamTaskTracker token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
-              {view === "training" && <TrainingView token={authToken} currentUser={currentUser} />
+              {view === "training" && <TrainingView token={authToken} currentUser={currentUser} />}
             </>
           )}
         </div>
