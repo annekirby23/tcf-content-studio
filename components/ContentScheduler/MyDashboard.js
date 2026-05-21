@@ -882,18 +882,6 @@ function DailyRoutinesSection({ token, viewingUserId, currentUserId, sectionTitl
       .catch(() => {});
   }, [token, viewingUserId]);
 
-  // Member resources assigned to this user
-  const [assignedResources, setAssignedResources] = useState([]);
-  useEffect(() => {
-    apiFetch("/api/memberresources", {}, token)
-      .then((r) => r.json())
-      .then((data) => {
-        const all = Array.isArray(data) ? data : [];
-        setAssignedResources(all.filter((r) => r.assignedMemberId === viewingUserId));
-      })
-      .catch(() => {});
-  }, [token, viewingUserId]);
-
   const toggleOpsItem = (checklistId, itemId) => {
     setOpsCompletions((prev) => {
       const cl = prev[checklistId] || {};
@@ -3224,6 +3212,18 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
   }, [token, effectiveViewingUserId, readOnly]);
 
   const sectionTitles = { ...DEFAULT_SECTION_TITLES, ...(profile?.sectionTitles || {}) };
+
+  // Member resources assigned to this user
+  const [assignedResources, setAssignedResources] = useState([]);
+  useEffect(() => {
+    apiFetch("/api/memberresources", {}, token)
+      .then((r) => r.json())
+      .then((data) => {
+        const all = Array.isArray(data) ? data : [];
+        setAssignedResources(all.filter((r) => r.assignedMemberId === effectiveViewingUserId));
+      })
+      .catch(() => {});
+  }, [token, effectiveViewingUserId]);
 
   // ── Collapsible workspace cards ───────────────────────────────────────────
   const CARD_STORAGE_KEY = `tcf_cards_${effectiveViewingUserId}`;
