@@ -143,7 +143,7 @@ function ItemDetailModal({ item, token, onSave, onDelete, onClose }) {
 
 // ─── Draggable Item Row ──────────────────────────────────────────────────────
 
-function ItemRow({ item, idx, sectionItems, onDrop, onDragStart, dragOverId, setDragOverId, onClick }) {
+function ItemRow({ item, idx, sectionItems, onDrop, onDragStart, dragOverId, setDragOverId, onClick, selected, onToggleSelect, onStatusChange }) {
   const stCfg = STATUS_COLORS[item.orderStatus] || STATUS_COLORS["Not Started"];
   const nwCfg = NEEDED_COLORS[item.neededWhen];
   const isDragOver = dragOverId === item.id;
@@ -159,15 +159,24 @@ function ItemRow({ item, idx, sectionItems, onDrop, onDragStart, dragOverId, set
       style={{
         display: "flex", alignItems: "center", gap: "10px",
         padding: "11px 16px",
-        background: isDragOver ? C.accentLight : "transparent",
+        background: selected ? C.accentLight : isDragOver ? C.hover : "transparent",
         borderBottom: `1px solid ${C.border}`,
         cursor: "pointer",
         transition: "background 0.1s",
         userSelect: "none",
       }}
-      onMouseEnter={(e) => { if (!isDragOver) e.currentTarget.style.background = C.hover; }}
-      onMouseLeave={(e) => { if (!isDragOver) e.currentTarget.style.background = "transparent"; }}
+      onMouseEnter={(e) => { if (!isDragOver && !selected) e.currentTarget.style.background = C.hover; }}
+      onMouseLeave={(e) => { if (!isDragOver && !selected) e.currentTarget.style.background = "transparent"; }}
     >
+      {/* Checkbox */}
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={() => onToggleSelect(item.id)}
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: "15px", height: "15px", flexShrink: 0, cursor: "pointer", accentColor: C.accent }}
+      />
+
       {/* Drag handle */}
       <span
         style={{ fontSize: "14px", color: C.muted, opacity: 0.35, cursor: "grab", flexShrink: 0, padding: "0 2px" }}
@@ -184,7 +193,23 @@ function ItemRow({ item, idx, sectionItems, onDrop, onDragStart, dragOverId, set
       {/* Badges */}
       <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
         {nwCfg && <Pill label={item.neededWhen} color={nwCfg.color} bg={nwCfg.bg} />}
-        <Pill label={item.orderStatus} color={stCfg.color} bg={stCfg.bg} />
+        {/* Inline status dropdown */}
+        <select
+          value={item.orderStatus || "Not Started"}
+          onChange={(e) => { e.stopPropagation(); onStatusChange(item.id, e.target.value); }}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            fontSize: "10px", fontWeight: "700", padding: "2px 6px", borderRadius: "20px",
+            border: `1px solid ${stCfg.color}40`,
+            background: stCfg.bg, color: stCfg.color,
+            cursor: "pointer", outline: "none", appearance: "none",
+            WebkitAppearance: "none", paddingRight: "16px",
+            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath fill='${encodeURIComponent(stCfg.color)}' d='M0 2l4 4 4-4z'/%3E%3C/svg%3E")`,
+            backgroundRepeat: "no-repeat", backgroundPosition: "right 4px center",
+          }}
+        >
+          {ORDER_STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
         {item.location && <Pill label={`📍 ${item.location}`} color={C.muted} bg={C.cardBg} />}
       </div>
 
@@ -205,6 +230,7 @@ function SectionBlock({ title, emoji, accentColor, items, token, onItemUpdate, o
   const [dragItemId, setDragItemId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
   const [detailItem, setDetailItem] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const filtered = items.filter((item) => {
     if (filterStatus && item.orderStatus !== filterStatus) return false;
@@ -225,6 +251,47 @@ function SectionBlock({ title, emoji, accentColor, items, token, onItemUpdate, o
     setDragItemId(null);
   };
 
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every((i) => selectedIds.has(i.id));
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      setSelectedIds((prev) => { const next = new Set(prev); filtered.forEach((i) => next.delete(i.id)); return next; });
+    } else {
+      setSelectedIds((prev) => { const next = new Set(prev); filtered.forEach((i) => next.add(i.id)); return next; });
+    }
+  };
+
+  const handleStatusChange = async (id, newStatus) => {
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+    const updated = { ...item, orderStatus: newStatus };
+    onItemUpdate(updated);
+    if (detailItem?.id === id) setDetailItem(updated);
+    try {
+      await apiFetch("/api/inventory", { method: "PUT", body: JSON.stringify(updated) }, token);
+    } catch {}
+  };
+
+  const handleBatchDelete = async () => {
+    const ids = [...selectedIds];
+    setSelectedIds(new Set());
+    ids.forEach((id) => onItemDelete(id));
+    try {
+      await Promise.all(ids.map((id) =>
+        apiFetch(`/api/inventory?id=${id}`, { method: "DELETE" }, token)
+      ));
+    } catch {}
+  };
+
+  const selectedCount = filtered.filter((i) => selectedIds.has(i.id)).length;
+
   const r = parseInt(accentColor.slice(1, 3), 16);
   const g = parseInt(accentColor.slice(3, 5), 16);
   const b = parseInt(accentColor.slice(5, 7), 16);
@@ -243,6 +310,27 @@ function SectionBlock({ title, emoji, accentColor, items, token, onItemUpdate, o
           </span>
         </div>
 
+        {/* Batch-delete bar — visible when any items are checked */}
+        {selectedCount > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "9px 16px", background: "#fff1f2", borderBottom: `1px solid #fca5a5` }}>
+            <span style={{ fontSize: "13px", fontWeight: "600", color: "#dc2626", flex: 1 }}>
+              {selectedCount} item{selectedCount !== 1 ? "s" : ""} selected
+            </span>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              style={{ fontSize: "12px", color: C.muted, background: "none", border: "none", cursor: "pointer", fontWeight: "600" }}
+            >
+              Clear
+            </button>
+            <button
+              onClick={handleBatchDelete}
+              style={{ fontSize: "12px", fontWeight: "700", color: "#fff", background: "#dc2626", border: "none", borderRadius: "8px", padding: "6px 14px", cursor: "pointer" }}
+            >
+              🗑 Delete {selectedCount} item{selectedCount !== 1 ? "s" : ""}
+            </button>
+          </div>
+        )}
+
         {/* Items */}
         {filtered.length === 0 ? (
           <div style={{ padding: "32px", textAlign: "center", color: C.muted, fontSize: "13px", fontStyle: "italic" }}>
@@ -250,8 +338,15 @@ function SectionBlock({ title, emoji, accentColor, items, token, onItemUpdate, o
           </div>
         ) : (
           <div>
-            {/* Column headers */}
+            {/* Column headers with select-all checkbox */}
             <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "7px 16px", borderBottom: `1px solid ${C.border}`, background: C.cardBg }}>
+              <input
+                type="checkbox"
+                checked={allFilteredSelected}
+                onChange={toggleSelectAll}
+                style={{ width: "15px", height: "15px", flexShrink: 0, cursor: "pointer", accentColor: C.accent }}
+                title="Select all"
+              />
               <span style={{ width: "18px", flexShrink: 0 }} />
               <span style={{ flex: 1, fontSize: "10px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.06em", color: C.muted }}>Item</span>
               <span style={{ fontSize: "10px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.06em", color: C.muted, minWidth: "200px", textAlign: "right" }}>When · Status · Location</span>
@@ -268,6 +363,9 @@ function SectionBlock({ title, emoji, accentColor, items, token, onItemUpdate, o
                 dragOverId={dragOverId}
                 setDragOverId={setDragOverId}
                 onClick={() => setDetailItem(item)}
+                selected={selectedIds.has(item.id)}
+                onToggleSelect={toggleSelect}
+                onStatusChange={handleStatusChange}
               />
             ))}
           </div>
@@ -282,7 +380,7 @@ function SectionBlock({ title, emoji, accentColor, items, token, onItemUpdate, o
             onItemUpdate(updated);
             setDetailItem(updated);
           }}
-          onDelete={onItemDelete}
+          onDelete={(id) => { onItemDelete(id); setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; }); }}
           onClose={() => setDetailItem(null)}
         />
       )}
