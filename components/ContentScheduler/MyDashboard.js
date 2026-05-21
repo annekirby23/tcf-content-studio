@@ -3160,19 +3160,28 @@ function LocationAndEventTasksBar({ token, userId, onNavigate }) {
   );
 }
 
+// Isolated component so the 1-second tick never re-renders the whole dashboard
+function LiveClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const dateStr = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const timeStr = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" });
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 14px", borderRadius: "20px", background: C.cardBg, border: `1px solid ${C.border}` }}>
+      <span style={{ fontSize: "12px", fontWeight: "700", color: C.text }}>{dateStr}</span>
+      <span style={{ width: "1px", height: "12px", background: C.border, display: "inline-block" }} />
+      <span style={{ fontSize: "12px", fontWeight: "600", color: C.accent, fontVariantNumeric: "tabular-nums", letterSpacing: "0.02em" }}>{timeStr}</span>
+    </div>
+  );
+}
+
 export default function MyDashboard({ currentUser, token, viewingUserId, teamMembers = [], assignedPosts = [], assignedAssets = [], assignedSlackChannels = [], onOpenPost, onOpenAsset, onOpenSlack, onNavigate }) {
   const currentUserId = currentUser?.id;
   const effectiveViewingUserId = viewingUserId || currentUserId;
   const readOnly = effectiveViewingUserId !== currentUserId;
-
-  // Live clock — updates every second, uses local time
-  const [clockNow, setClockNow] = useState(() => new Date());
-  useEffect(() => {
-    const t = setInterval(() => setClockNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  const clockDate = clockNow.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-  const clockTime = clockNow.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" });
 
   // Profile data (header image, processRole, sectionTitles)
   const [profile, setProfile] = useState(null);
@@ -3443,11 +3452,7 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
               </div>
               {/* Date / Time + Photo Dump */}
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 14px", borderRadius: "20px", background: C.cardBg, border: `1px solid ${C.border}` }}>
-                  <span style={{ fontSize: "12px", fontWeight: "700", color: C.text }}>{clockDate}</span>
-                  <span style={{ width: "1px", height: "12px", background: C.border, display: "inline-block" }} />
-                  <span style={{ fontSize: "12px", fontWeight: "600", color: C.accent, fontVariantNumeric: "tabular-nums", letterSpacing: "0.02em" }}>{clockTime}</span>
-                </div>
+                <LiveClock />
               </div>
               {/* Photo Dump button */}
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px", flexWrap: "wrap" }}>
