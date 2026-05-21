@@ -13,8 +13,13 @@ export async function GET(req) {
     const userId = searchParams.get("userId");
 
     const projects = (await kvGet(KEY)) || [];
-    // If a userId is provided, return only that user's projects
-    const filtered = userId ? projects.filter((p) => p.createdById === userId) : projects;
+    // If a userId is provided, return projects the user owns OR is a collaborator on
+    const filtered = userId
+      ? projects.filter((p) =>
+          p.createdById === userId ||
+          (Array.isArray(p.members) && p.members.some((m) => (m.id || m) === userId))
+        )
+      : projects;
     return Response.json(filtered);
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });

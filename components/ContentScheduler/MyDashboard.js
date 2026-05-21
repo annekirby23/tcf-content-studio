@@ -3163,6 +3163,29 @@ function LocationAndEventTasksBar({ token, userId, onNavigate }) {
   );
 }
 
+// ── CCard — collapsible workspace card shell ──────────────────────────────────
+// MUST live outside MyDashboard so React doesn't treat it as a new component type
+// on every parent re-render (which would cause full unmount/remount and page jumping).
+function CCard({ collapsed, onToggle, title, padding = "20px", children }) {
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", boxShadow: C.shadow, overflow: "hidden" }}>
+      <div
+        onClick={onToggle}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "7px 16px", background: C.cardBg,
+          borderBottom: collapsed ? "none" : `1px solid ${C.border}`,
+          cursor: "pointer", userSelect: "none",
+        }}
+      >
+        <span style={{ fontSize: "10px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>{title}</span>
+        <span style={{ fontSize: "11px", color: C.muted, fontWeight: "700" }}>{collapsed ? "+" : "−"}</span>
+      </div>
+      {!collapsed && <div style={{ padding }}>{children}</div>}
+    </div>
+  );
+}
+
 // Shows just the current local date — updates once per minute, isolated so it never re-renders the whole dashboard
 function LiveDate() {
   const [now, setNow] = useState(() => new Date());
@@ -3261,34 +3284,12 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
     try { localStorage.setItem(CARD_STORAGE_KEY, JSON.stringify(all)); } catch {}
   };
 
-  // Helper: wraps a workspace section in a collapsible card shell
-  // Always shows a thin top strip with the section label and toggle button.
-  // When collapsed → only the strip is visible.
-  // When expanded → strip sits above the section content (no overlap with section buttons).
-  const CCard = ({ cardKey, title, padding = "20px", children }) => {
-    const collapsed = !!cardCollapsed[cardKey];
-    return (
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", boxShadow: C.shadow, overflow: "hidden" }}>
-        {/* Always-visible strip — click anywhere to toggle */}
-        <div
-          onClick={() => toggleCard(cardKey)}
-          style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "7px 16px",
-            background: C.cardBg,
-            borderBottom: collapsed ? "none" : `1px solid ${C.border}`,
-            cursor: "pointer", userSelect: "none",
-          }}
-        >
-          <span style={{ fontSize: "10px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>{title}</span>
-          <span style={{ fontSize: "11px", color: C.muted, fontWeight: "700" }}>{collapsed ? "+" : "−"}</span>
-        </div>
-        {!collapsed && (
-          <div style={{ padding }}>{children}</div>
-        )}
-      </div>
-    );
-  };
+  // Helper: generates collapsed + onToggle props for CCard (which lives outside this component)
+  const cc = (key, padding) => ({
+    collapsed: !!cardCollapsed[key],
+    onToggle: () => toggleCard(key),
+    ...(padding ? { padding } : {}),
+  });
 
   const saveSectionTitle = async (key, value) => {
     const updated = { ...sectionTitles, [key]: value };
@@ -3622,7 +3623,7 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
 
       {/* Daily Routines — full width */}
       <div style={{ marginBottom: "20px" }}>
-        <CCard cardKey="dailyRoutines" title={sectionTitles.dailyRoutines} padding="20px 24px">
+        <CCard {...cc("dailyRoutines", "20px 24px")} title={sectionTitles.dailyRoutines}>
           <DailyRoutinesSection
             token={token}
             viewingUserId={effectiveViewingUserId}
@@ -3635,7 +3636,7 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
 
       {/* My Tasks — full width */}
       <div style={{ marginBottom: "20px" }}>
-        <CCard cardKey="tasks" title={sectionTitles.tasks} padding="20px 24px">
+        <CCard {...cc("tasks", "20px 24px")} title={sectionTitles.tasks}>
           <TasksColumn
             key={effectiveViewingUserId}
             token={token}
@@ -3655,7 +3656,7 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
 
         {/* LEFT column — Assigned to Me */}
         <div style={{ width: "340px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "16px" }}>
-          <CCard cardKey="assignedContent" title={sectionTitles.assignedContent}>
+          <CCard {...cc("assignedContent")} title={sectionTitles.assignedContent}>
             <AssignedContentSection
               assignedPosts={assignedPosts}
               assignedAssets={assignedAssets}
@@ -3753,7 +3754,7 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
         {/* RIGHT column */}
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "16px" }}>
 
-          <CCard cardKey="projects" title={sectionTitles.projects}>
+          <CCard {...cc("projects")} title={sectionTitles.projects}>
             <ProjectsSection
               token={token}
               viewingUserId={effectiveViewingUserId}
@@ -3764,7 +3765,7 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
             />
           </CCard>
 
-          <CCard cardKey="notes" title={sectionTitles.notes}>
+          <CCard {...cc("notes")} title={sectionTitles.notes}>
             <NotesSection
               token={token}
               viewingUserId={effectiveViewingUserId}
@@ -3774,7 +3775,7 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
             />
           </CCard>
 
-          <CCard cardKey="links" title={sectionTitles.links}>
+          <CCard {...cc("links")} title={sectionTitles.links}>
             <LinksSection
               token={token}
               viewingUserId={effectiveViewingUserId}
@@ -3784,7 +3785,7 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
             />
           </CCard>
 
-          <CCard cardKey="blockSchedule" title={sectionTitles.blockSchedule}>
+          <CCard {...cc("blockSchedule")} title={sectionTitles.blockSchedule}>
             <BlockScheduleSection
               token={token}
               viewingUserId={effectiveViewingUserId}
@@ -3794,7 +3795,7 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
             />
           </CCard>
 
-          <CCard cardKey="processRole" title={sectionTitles.processRole}>
+          <CCard {...cc("processRole")} title={sectionTitles.processRole}>
             <ProcessRoleSection
               token={token}
               viewingUserId={effectiveViewingUserId}
