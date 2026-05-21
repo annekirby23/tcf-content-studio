@@ -496,6 +496,9 @@ function MailPackagesTab({ token, currentUser, teamMembers, reference, setRefere
     });
   });
   const [saving, setSaving] = useState(false);
+  const [howToText, setHowToText] = useState(reference?.mail?.description || "");
+  const [editingHowTo, setEditingHowTo] = useState(false);
+  const [howToSaving, setHowToSaving] = useState(false);
 
   // Keep local state in sync when reference changes from outside
   useEffect(() => {
@@ -529,6 +532,25 @@ function MailPackagesTab({ token, currentUser, teamMembers, reference, setRefere
       alert("Save failed: " + e.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveHowTo(text) {
+    setHowToSaving(true);
+    try {
+      const existing = reference?.mail || {};
+      const res = await apiFetch(
+        "/api/dailyops/reference",
+        { method: "PUT", body: JSON.stringify({ mail: { ...existing, description: text } }) },
+        token
+      );
+      const data = await res.json();
+      setReference(data);
+    } catch (e) {
+      alert("Save failed: " + e.message);
+    } finally {
+      setHowToSaving(false);
+      setEditingHowTo(false);
     }
   }
 
@@ -587,6 +609,40 @@ function MailPackagesTab({ token, currentUser, teamMembers, reference, setRefere
           <p style={{ margin: "4px 0 0", fontSize: "13px", color: C.muted }}>Manage mailbox assignments per location.</p>
         </div>
         {saving && <span style={{ fontSize: "12px", color: C.muted, fontStyle: "italic" }}>Saving…</span>}
+      </div>
+
+      {/* How To Process Mail */}
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "16px 18px", marginBottom: "20px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: editingHowTo ? "10px" : howToText ? "10px" : "0" }}>
+          <span style={{ fontSize: "13px", fontWeight: "700", color: C.text }}>📋 How To Process Mail</span>
+          {isAdmin && !editingHowTo && (
+            <button onClick={() => setEditingHowTo(true)} style={{ fontSize: "12px", color: C.accent, background: "none", border: "none", cursor: "pointer", fontWeight: "600", padding: "2px 6px" }}>
+              {howToText ? "Edit" : "+ Add Instructions"}
+            </button>
+          )}
+        </div>
+        {editingHowTo ? (
+          <div>
+            <textarea
+              autoFocus
+              value={howToText}
+              onChange={(e) => setHowToText(e.target.value)}
+              rows={5}
+              style={{ ...textInput({ width: "100%", fontFamily: "inherit" }), resize: "vertical", lineHeight: 1.6 }}
+              placeholder="Enter step-by-step mail processing instructions for the team…"
+            />
+            <div style={{ display: "flex", gap: "8px", marginTop: "10px", justifyContent: "flex-end" }}>
+              <button onClick={() => { setHowToText(reference?.mail?.description || ""); setEditingHowTo(false); }} style={{ padding: "7px 14px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => saveHowTo(howToText)} disabled={howToSaving} style={{ padding: "7px 16px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", opacity: howToSaving ? 0.6 : 1 }}>
+                {howToSaving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        ) : howToText ? (
+          <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{howToText}</p>
+        ) : (
+          <p style={{ margin: 0, fontSize: "13px", color: C.muted, fontStyle: "italic" }}>No instructions added yet.{isAdmin ? " Click \"+ Add Instructions\" to get started." : ""}</p>
+        )}
       </div>
 
       {locations.map((loc) => {

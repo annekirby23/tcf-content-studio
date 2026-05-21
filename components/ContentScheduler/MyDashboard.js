@@ -2216,7 +2216,7 @@ function computeOverlapLayout(dayBlocks) {
   return result;
 }
 
-function BlockModal({ block, onClose, onSave, onDelete }) {
+function BlockModal({ block, onClose, onSave, onDelete, onDuplicate }) {
   const isNew = !block?.id;
   const primaryDay = block?.day ?? (Array.isArray(block?.days) ? block.days[0] : 0);
   const [label, setLabel] = useState(block?.label || "");
@@ -2306,9 +2306,12 @@ function BlockModal({ block, onClose, onSave, onDelete }) {
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: "18px" }}>
-          <div>
+          <div style={{ display: "flex", gap: "8px" }}>
             {!isNew && (
               <button onClick={() => { onDelete(block.id); onClose(); }} style={{ padding: "8px 14px", borderRadius: "8px", border: "1px solid #EF4444", background: "none", color: "#EF4444", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>🗑 Delete</button>
+            )}
+            {!isNew && onDuplicate && (
+              <button onClick={() => { onDuplicate(block); onClose(); }} style={{ padding: "8px 14px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>⧉ Duplicate</button>
             )}
           </div>
           <div style={{ display: "flex", gap: "8px" }}>
@@ -2364,7 +2367,7 @@ function BlockScheduleSection({ token, viewingUserId, currentUserId, sectionTitl
   };
   const handleDeleteBlock = (id) => persist(blocks.filter((b) => b.id !== id));
 
-  // Duplicate a block and immediately enter drag mode on the copy
+  // Duplicate via drag (used inline on block – kept for potential future use)
   const handleDuplicate = (e, b) => {
     e.preventDefault();
     e.stopPropagation();
@@ -2372,13 +2375,20 @@ function BlockScheduleSection({ token, viewingUserId, currentUserId, sectionTitl
     const newBlock = { ...b, id: newId };
     const newBlocks = [...blocks, newBlock];
     setBlocks(newBlocks);
-    // Fire-and-forget API save; the onUp drag handler will save the final position
     apiFetch("/api/blockschedule", { method: "PUT", body: JSON.stringify({ blocks: newBlocks }) }, token).catch(() => {});
-    // Start move drag on the new duplicate block
     dragRef.current = { blockId: newId, origBlock: newBlock, mode: "move", startX: e.clientX, startY: e.clientY };
     setDragBlock({ ...newBlock });
     document.body.style.userSelect = "none";
     document.body.style.cursor = "grabbing";
+  };
+
+  // Duplicate from modal (no drag — just create a copy)
+  const handleDuplicateFromModal = (b) => {
+    const newId = `blk_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+    const newBlock = { ...b, id: newId };
+    const newBlocks = [...blocks, newBlock];
+    setBlocks(newBlocks);
+    apiFetch("/api/blockschedule", { method: "PUT", body: JSON.stringify({ blocks: newBlocks }) }, token).catch(() => {});
   };
 
   const yFor = (t) => ((timeToMinutes(t) - GRID_START) / 60) * HOUR_HEIGHT;
@@ -2489,16 +2499,6 @@ function BlockScheduleSection({ token, viewingUserId, currentUserId, sectionTitl
           <div style={{ fontSize: "8px", color: "rgba(255,255,255,0.85)", lineHeight: 1.2 }}>
             {formatBlockTime(display.startTime)}–{formatBlockTime(display.endTime)}
           </div>
-        )}
-        {/* Duplicate button */}
-        {!readOnly && height > 24 && (
-          <button
-            onMouseDown={(e) => { e.stopPropagation(); handleDuplicate(e, b); }}
-            title="Duplicate block"
-            style={{ position: "absolute", top: "2px", right: "3px", width: "13px", height: "13px", border: "none", borderRadius: "3px", background: "rgba(255,255,255,0.28)", color: "#fff", fontSize: "9px", cursor: "copy", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, lineHeight: 1, fontWeight: "900" }}
-          >
-            ⧉
-          </button>
         )}
         {/* Resize handle */}
         {!readOnly && (
@@ -2639,6 +2639,7 @@ function BlockScheduleSection({ token, viewingUserId, currentUserId, sectionTitl
           onClose={() => setEditBlock(null)}
           onSave={handleSaveBlock}
           onDelete={handleDeleteBlock}
+          onDuplicate={handleDuplicateFromModal}
         />
       )}
     </div>
@@ -3209,29 +3210,29 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
   };
 
   // Helper: wraps a workspace section in a collapsible card shell
-  // When collapsed → shows a slim header bar with title + ▼
-  // When expanded → shows full content with a small ▲ in the top-right corner
+  // Always shows a thin top strip with the section label and toggle button.
+  // When collapsed → only the strip is visible.
+  // When expanded → strip sits above the section content (no overlap with section buttons).
   const CCard = ({ cardKey, title, padding = "20px", children }) => {
     const collapsed = !!cardCollapsed[cardKey];
     return (
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", boxShadow: C.shadow, overflow: "hidden" }}>
-        {collapsed ? (
-          <div
-            onClick={() => toggleCard(cardKey)}
-            style={{ padding: "13px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
-          >
-            <span style={{ fontSize: "13px", fontWeight: "700", color: C.muted }}>{title}</span>
-            <span style={{ fontSize: "11px", color: C.muted, fontWeight: "600" }}>▼ expand</span>
-          </div>
-        ) : (
-          <div style={{ position: "relative" }}>
-            <button
-              onClick={() => toggleCard(cardKey)}
-              title="Collapse"
-              style={{ position: "absolute", top: "12px", right: "14px", zIndex: 5, background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "11px", fontWeight: "600", padding: "2px 6px", borderRadius: "4px", lineHeight: 1 }}
-            >▲</button>
-            <div style={{ padding }}>{children}</div>
-          </div>
+        {/* Always-visible strip — click anywhere to toggle */}
+        <div
+          onClick={() => toggleCard(cardKey)}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "7px 16px",
+            background: C.cardBg,
+            borderBottom: collapsed ? "none" : `1px solid ${C.border}`,
+            cursor: "pointer", userSelect: "none",
+          }}
+        >
+          <span style={{ fontSize: "10px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>{title}</span>
+          <span style={{ fontSize: "11px", color: C.muted, fontWeight: "700" }}>{collapsed ? "+" : "−"}</span>
+        </div>
+        {!collapsed && (
+          <div style={{ padding }}>{children}</div>
         )}
       </div>
     );

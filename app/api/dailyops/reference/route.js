@@ -13,6 +13,7 @@ const DEFAULT_REFERENCE = {
   parking: { description: "", steps: [], notes: "" },
   daypasser: { description: "", steps: [], notes: "" },
   guests: { description: "", steps: [], notes: "" },
+  mailLocations: [],
 };
 
 export async function GET(req) {
@@ -58,6 +59,26 @@ export async function PUT(req) {
           body: String(tpl.body || "").trim(),
         }));
       }
+    }
+
+    if (body.mailLocations !== undefined && Array.isArray(body.mailLocations)) {
+      existing.mailLocations = body.mailLocations.map((loc) => ({
+        id: String(loc.id || ""),
+        name: String(loc.name || ""),
+        assignedMemberId: String(loc.assignedMemberId || ""),
+        assignedMemberName: String(loc.assignedMemberName || ""),
+        mailboxes: Array.isArray(loc.mailboxes)
+          ? loc.mailboxes.map((b) => ({
+              id: b.id || crypto.randomBytes(8).toString("hex"),
+              number: String(b.number || ""),
+              contact: String(b.contact || ""),
+              googleBizProfile: Boolean(b.googleBizProfile),
+              signCreated: Boolean(b.signCreated),
+              crizDetails: String(b.crizDetails || ""),
+              memberAlerted: Boolean(b.memberAlerted),
+            }))
+          : [],
+      }));
     }
 
     await kvSet(KEY, existing);
