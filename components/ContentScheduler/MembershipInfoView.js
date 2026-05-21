@@ -118,6 +118,30 @@ function WaitingListCard({ list, isAdmin, token, onUpdate }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newEntry, setNewEntry] = useState({ name: "", email: "", date: "", notes: "" });
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ name: "", email: "", date: "", notes: "" });
+  const [editSaving, setEditSaving] = useState(false);
+
+  function startEdit(entry) {
+    setEditingId(entry.id);
+    setEditForm({ name: entry.name || "", email: entry.email || "", date: entry.date || "", notes: entry.notes || "" });
+  }
+
+  async function handleEdit() {
+    if (!editForm.name.trim()) return;
+    setEditSaving(true);
+    const updated = list.map((e) => e.id === editingId ? { ...e, ...editForm, name: editForm.name.trim() } : e);
+    try {
+      const res = await apiFetch("/api/membershipinfo", { method: "PUT", body: JSON.stringify({ waitingList: updated }) }, token);
+      const data = await res.json();
+      onUpdate(data);
+      setEditingId(null);
+    } catch (e) {
+      alert("Save failed: " + e.message);
+    } finally {
+      setEditSaving(false);
+    }
+  }
 
   async function handleAdd() {
     if (!newEntry.name.trim()) return;
@@ -204,32 +228,66 @@ function WaitingListCard({ list, isAdmin, token, onUpdate }) {
               </tr>
             </thead>
             <tbody>
-              {list.map((entry, i) => (
-                <tr key={entry.id} style={{ background: i % 2 === 0 ? "transparent" : C.cardBg }}>
-                  <td style={{ padding: "10px", fontSize: "13px", color: C.text, fontWeight: "600", borderBottom: `1px solid ${C.border}` }}>{entry.name}</td>
-                  <td style={{ padding: "10px", fontSize: "12px", color: C.muted, borderBottom: `1px solid ${C.border}` }}>{entry.email}</td>
-                  <td style={{ padding: "10px", fontSize: "12px", color: C.muted, borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{entry.date}</td>
-                  <td style={{ padding: "10px", fontSize: "12px", color: C.muted, borderBottom: `1px solid ${C.border}`, maxWidth: "160px" }}>{entry.notes}</td>
-                  <td style={{ padding: "10px", borderBottom: `1px solid ${C.border}` }}>
-                    {isAdmin ? (
-                      <select
-                        value={entry.status || "Waiting"}
-                        onChange={(e) => handleStatusChange(entry.id, e.target.value)}
-                        style={{ padding: "4px 8px", border: `1px solid ${C.border}`, borderRadius: "6px", background: C.inputBg, color: C.text, fontSize: "12px", fontFamily: "inherit", outline: "none" }}
-                      >
-                        {Object.keys(WAIT_STATUSES).map((s) => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    ) : (
-                      <StatusBadge status={entry.status || "Waiting"} statusMap={WAIT_STATUSES} />
-                    )}
-                  </td>
-                  <td style={{ padding: "10px", borderBottom: `1px solid ${C.border}` }}>
-                    {isAdmin && (
-                      <button onClick={() => handleRemove(entry.id)} style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer", fontSize: "16px", padding: "0 4px" }}>×</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {list.map((entry, i) => {
+                const isEditing = editingId === entry.id;
+                const rowBg = i % 2 === 0 ? "transparent" : C.cardBg;
+                const cellBase = { padding: "8px 10px", borderBottom: `1px solid ${C.border}` };
+                const inlineInput = { padding: "5px 8px", border: `1px solid ${C.border}`, borderRadius: "6px", background: C.inputBg, color: C.text, fontSize: "12px", fontFamily: "inherit", outline: "none", width: "100%", boxSizing: "border-box" };
+
+                if (isEditing) {
+                  return (
+                    <tr key={entry.id} style={{ background: `${C.accentLight}` }}>
+                      <td style={cellBase}><input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} autoFocus style={inlineInput} placeholder="Full name" /></td>
+                      <td style={cellBase}><input type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} style={inlineInput} placeholder="Email" /></td>
+                      <td style={cellBase}><input type="date" value={editForm.date} onChange={(e) => setEditForm((f) => ({ ...f, date: e.target.value }))} style={inlineInput} /></td>
+                      <td style={cellBase}><input value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} style={inlineInput} placeholder="Notes" /></td>
+                      <td style={cellBase}>
+                        <select
+                          value={entry.status || "Waiting"}
+                          onChange={(e) => handleStatusChange(entry.id, e.target.value)}
+                          style={{ padding: "4px 8px", border: `1px solid ${C.border}`, borderRadius: "6px", background: C.inputBg, color: C.text, fontSize: "12px", fontFamily: "inherit", outline: "none" }}
+                        >
+                          {Object.keys(WAIT_STATUSES).map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </td>
+                      <td style={{ ...cellBase, whiteSpace: "nowrap" }}>
+                        <button onClick={handleEdit} disabled={editSaving || !editForm.name.trim()} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", fontSize: "13px", fontWeight: "700", padding: "0 4px", opacity: editSaving || !editForm.name.trim() ? 0.5 : 1 }}>{editSaving ? "…" : "✓"}</button>
+                        <button onClick={() => setEditingId(null)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: "13px", padding: "0 4px" }}>✕</button>
+                      </td>
+                    </tr>
+                  );
+                }
+
+                return (
+                  <tr key={entry.id} style={{ background: rowBg }}>
+                    <td style={{ ...cellBase, fontSize: "13px", color: C.text, fontWeight: "600" }}>{entry.name}</td>
+                    <td style={{ ...cellBase, fontSize: "12px", color: C.muted }}>{entry.email}</td>
+                    <td style={{ ...cellBase, fontSize: "12px", color: C.muted, whiteSpace: "nowrap" }}>{entry.date}</td>
+                    <td style={{ ...cellBase, fontSize: "12px", color: C.muted, maxWidth: "160px" }}>{entry.notes}</td>
+                    <td style={cellBase}>
+                      {isAdmin ? (
+                        <select
+                          value={entry.status || "Waiting"}
+                          onChange={(e) => handleStatusChange(entry.id, e.target.value)}
+                          style={{ padding: "4px 8px", border: `1px solid ${C.border}`, borderRadius: "6px", background: C.inputBg, color: C.text, fontSize: "12px", fontFamily: "inherit", outline: "none" }}
+                        >
+                          {Object.keys(WAIT_STATUSES).map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      ) : (
+                        <StatusBadge status={entry.status || "Waiting"} statusMap={WAIT_STATUSES} />
+                      )}
+                    </td>
+                    <td style={{ ...cellBase, whiteSpace: "nowrap" }}>
+                      {isAdmin && (
+                        <>
+                          <button onClick={() => startEdit(entry)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: "13px", padding: "0 4px" }} title="Edit">✏️</button>
+                          <button onClick={() => handleRemove(entry.id)} style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer", fontSize: "16px", padding: "0 4px" }} title="Remove">×</button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
