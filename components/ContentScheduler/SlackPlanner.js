@@ -429,17 +429,28 @@ function IdeaCard({ idea, currentUser, token, onDelete, onUpdate, onMakePost, te
 
 // ─── AI Engagement Suggestions ────────────────────────────────────────────────
 
-function EngagementSuggestions({ channel, token }) {
-  const [suggestions, setSuggestions] = useState("");
-  const [loading, setLoading] = useState(false);
+function EngagementSuggestions({ channel, token, currentUser }) {
+  const [logs, setLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
 
-  const generate = async () => {
-    setLoading(true);
+  // Load saved suggestions whenever channel changes
+  useEffect(() => {
+    setLogsLoading(true);
     setError("");
-    setSuggestions("");
+    fetch(`/api/slack/engagement?channelId=${channel.id}`, { headers: { "x-session": token } })
+      .then((r) => r.json())
+      .then((data) => setLogs(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setLogsLoading(false));
+  }, [channel.id, token]);
+
+  const generate = async () => {
+    setGenerating(true);
+    setError("");
     try {
-      const res = await fetch("/api/workspace-ai", {
+      const aiRes = await fetch("/api/workspace-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-session": token },
         body: JSON.stringify({
@@ -447,29 +458,70 @@ function EngagementSuggestions({ channel, token }) {
           prompt: `You are a community engagement expert for a coworking space called TCF. Give 5 specific, actionable suggestions to increase activity and engagement for the Slack channel "#${channel.name}".\n\nChannel purpose: ${channel.purpose || channel.description || "Not specified"}\nCurrent engagement level: ${channel.engagementLevel || "unknown"}\nNotes: ${channel.notes || "None"}\n\nFormat as a numbered list. Keep each suggestion concise (2-3 sentences). Focus on realistic tactics that a small community team can execute.`,
         }),
       });
-      const data = await res.json();
-      setSuggestions(data.result || "");
+      const aiData = await aiRes.json();
+      const text = aiData.result || "";
+      if (!text) { setError("AI returned an empty response. Try again."); return; }
+
+      // Save to log
+      const saveRes = await fetch("/api/slack/engagement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-session": token },
+        body: JSON.stringify({ channelId: channel.id, channelName: channel.name, text }),
+      });
+      const saved = await saveRes.json();
+      setLogs((prev) => [saved, ...prev]);
     } catch {
       setError("Failed to generate suggestions.");
-    } finally { setLoading(false); }
+    } finally { setGenerating(false); }
+  };
+
+  const deleteLog = async (id) => {
+    await fetch(`/api/slack/engagement?id=${id}`, { method: "DELETE", headers: { "x-session": token } });
+    setLogs((prev) => prev.filter((l) => l.id !== id));
   };
 
   return (
-    <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: suggestions ? 12 : 0 }}>
+    <div style={{ marginBottom: 20 }}>
+      {/* Header + generate button */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>💡 Engagement Suggestions</div>
         <button
           onClick={generate}
-          disabled={loading}
-          style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#8B5CF6", color: "#fff", fontSize: 12, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1, display: "flex", alignItems: "center", gap: 6 }}
+          disabled={generating}
+          style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#8B5CF6", color: "#fff", fontSize: 12, fontWeight: 700, cursor: generating ? "not-allowed" : "pointer", opacity: generating ? 0.7 : 1, display: "flex", alignItems: "center", gap: 6 }}
         >
-          {loading ? <><Spinner /><span>Generating…</span></> : "✨ Get AI Suggestions"}
+          {generating ? <><Spinner /><span>Generating…</span></> : "✨ Get AI Suggestions"}
         </button>
       </div>
-      {error && <div style={{ fontSize: 12, color: "#EF4444", marginTop: 8 }}>{error}</div>}
-      {suggestions && (
-        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.75, whiteSpace: "pre-wrap", marginTop: 12, padding: "12px 14px", background: C.card, borderRadius: 10, border: `1px solid ${C.border}` }}>
-          {suggestions}
+
+      {error && <div style={{ fontSize: 12, color: "#EF4444", marginBottom: 12 }}>{error}</div>}
+
+      {/* Saved logs */}
+      {logsLoading ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: 24 }}><Spinner /></div>
+      ) : logs.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "32px 0", fontSize: 13, color: C.muted }}>
+          No suggestions yet — click ✨ to generate and save the first one.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {logs.map((log) => (
+            <div key={log.id} style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 14px", borderBottom: `1px solid ${C.border}`, background: C.card }}>
+                <span style={{ fontSize: 11, color: C.muted }}>
+                  Generated by <strong style={{ color: C.text }}>{log.generatedBy}</strong> · {relativeTime(log.createdAt)}
+                </span>
+                <button
+                  onClick={() => deleteLog(log.id)}
+                  style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 13, padding: "0 2px" }}
+                  title="Remove this suggestion"
+                >🗑</button>
+              </div>
+              <div style={{ padding: "12px 14px", fontSize: 13, color: C.text, lineHeight: 1.75, whiteSpace: "pre-wrap" }}>
+                {log.text}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -752,7 +804,7 @@ export default function SlackPlanner({ currentUser, token, onMakePost, teamMembe
 
               {/* Engagement Tips tab */}
               {rightTab === "engagement" && (
-                <EngagementSuggestions channel={selectedChannel} token={token} />
+                <EngagementSuggestions channel={selectedChannel} token={token} currentUser={currentUser} />
               )}
             </div>
           )}
