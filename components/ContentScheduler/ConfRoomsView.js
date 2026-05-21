@@ -426,11 +426,463 @@ ${embedCode}
   );
 }
 
+// ─── Step List Editor ─────────────────────────────────────────────────────────
+
+function StepListEditor({ steps, onChange }) {
+  const addStep = () => onChange([...steps, ""]);
+  const update = (i, val) => { const n = [...steps]; n[i] = val; onChange(n); };
+  const remove = (i) => onChange(steps.filter((_, idx) => idx !== i));
+  const move = (i, dir) => {
+    const n = [...steps]; const j = i + dir;
+    if (j < 0 || j >= n.length) return;
+    [n[i], n[j]] = [n[j], n[i]]; onChange(n);
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      {steps.map((step, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2px", paddingTop: "6px" }}>
+            <button onClick={() => move(i, -1)} disabled={i === 0} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "10px", padding: "1px 3px", opacity: i === 0 ? 0.3 : 1 }}>▲</button>
+            <button onClick={() => move(i, 1)} disabled={i === steps.length - 1} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "10px", padding: "1px 3px", opacity: i === steps.length - 1 ? 0.3 : 1 }}>▼</button>
+          </div>
+          <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: C.accent, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "700", flexShrink: 0, marginTop: "8px" }}>{i + 1}</div>
+          <textarea
+            value={step}
+            onChange={(e) => update(i, e.target.value)}
+            rows={2}
+            style={{ ...textInput({ flex: 1, resize: "vertical", fontFamily: "inherit", lineHeight: "1.5" }) }}
+            placeholder={`Step ${i + 1}…`}
+          />
+          <button onClick={() => remove(i)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: "16px", paddingTop: "8px" }}>✕</button>
+        </div>
+      ))}
+      <button
+        onClick={addStep}
+        style={{ alignSelf: "flex-start", padding: "6px 14px", borderRadius: "8px", border: `1px dashed ${C.border}`, background: "none", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer", marginTop: "4px" }}
+      >
+        + Add Step
+      </button>
+    </div>
+  );
+}
+
+// ─── Comm Card Modal ──────────────────────────────────────────────────────────
+
+const CARD_TYPES = [
+  { id: "email",   label: "📧 Email Template",    desc: "Pre-written email for client communication" },
+  { id: "howto",   label: "📋 How-To Guide",       desc: "Step-by-step process for the team" },
+  { id: "general", label: "💬 Notes / Questions",  desc: "Intake questions, general notes, checklists" },
+];
+
+const EMAIL_CATEGORIES = ["Inquiry Response", "Booking Confirmation", "Follow-Up", "Cancellation", "Day-Of Instructions", "Other"];
+const HOWTO_CATEGORIES = ["Booking Process", "Room Setup", "AV & Tech", "Catering", "Policies", "Other"];
+const GENERAL_CATEGORIES = ["Intake Questions", "Pricing FAQ", "Rules & Policies", "Quick Reference", "Other"];
+
+function CommCardModal({ card, onClose, onSave, onDelete }) {
+  const isNew = !card?.id;
+  const [type, setType] = useState(card?.type || "email");
+  const [title, setTitle] = useState(card?.title || "");
+  const [category, setCategory] = useState(card?.category || "");
+  const [subject, setSubject] = useState(card?.subject || "");
+  const [overview, setOverview] = useState(card?.overview || "");
+  const [body, setBody] = useState(card?.body || "");
+  const [steps, setSteps] = useState(card?.steps || []);
+  const [notes, setNotes] = useState(card?.notes || "");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const cats = type === "email" ? EMAIL_CATEGORIES : type === "howto" ? HOWTO_CATEGORIES : GENERAL_CATEGORIES;
+
+  const handleSave = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    await onSave({ ...card, type, title, category, subject, overview, body, steps, notes });
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", backdropFilter: "blur(4px)", zIndex: 3000 }} />
+      <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: "min(700px,95vw)", maxHeight: "90vh", overflowY: "auto", background: C.card, borderRadius: "20px", boxShadow: "0 24px 64px rgba(0,0,0,0.3)", zIndex: 3001, padding: "28px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "22px" }}>
+          <h2 style={{ margin: 0, fontSize: "17px", fontWeight: "800", color: C.text }}>{isNew ? "New Card" : "Edit Card"}</h2>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: C.muted }}>✕</button>
+        </div>
+
+        {/* Type selector */}
+        <div style={{ marginBottom: "18px" }}>
+          <label style={labelStyle}>Card Type</label>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {CARD_TYPES.map((ct) => (
+              <button
+                key={ct.id}
+                onClick={() => { setType(ct.id); setCategory(""); }}
+                style={{ padding: "8px 16px", borderRadius: "10px", border: `2px solid ${type === ct.id ? C.accent : C.border}`, background: type === ct.id ? C.accentLight : C.cardBg, color: type === ct.id ? C.accentBright : C.text, fontSize: "12px", fontWeight: "700", cursor: "pointer" }}
+              >
+                {ct.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: "11px", color: C.muted, marginTop: "6px" }}>{CARD_TYPES.find((ct) => ct.id === type)?.desc}</div>
+        </div>
+
+        {/* Title + Category */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
+          <div>
+            <label style={labelStyle}>Title *</label>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ ...textInput({ width: "100%" }) }} placeholder="Card title…" />
+          </div>
+          <div>
+            <label style={labelStyle}>Category</label>
+            <select value={category} onChange={(e) => setCategory(e.target.value)} style={{ ...textInput({ width: "100%" }) }}>
+              <option value="">— Select category —</option>
+              {cats.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Email subject */}
+        {type === "email" && (
+          <div style={{ marginBottom: "14px" }}>
+            <label style={labelStyle}>Email Subject Line</label>
+            <input value={subject} onChange={(e) => setSubject(e.target.value)} style={{ ...textInput({ width: "100%" }) }} placeholder="e.g. Booking Confirmation — [Room Name]" />
+          </div>
+        )}
+
+        {/* Overview / intro */}
+        <div style={{ marginBottom: "14px" }}>
+          <label style={labelStyle}>{type === "email" ? "Email Body" : type === "howto" ? "Overview / Intro" : "Content"}</label>
+          <div style={{ fontSize: "11px", color: C.muted, marginBottom: "6px" }}>Supports paragraphs — press Enter for line breaks.</div>
+          <textarea
+            value={type === "email" ? body : overview}
+            onChange={(e) => type === "email" ? setBody(e.target.value) : setOverview(e.target.value)}
+            rows={type === "email" ? 10 : 4}
+            style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.6" }) }}
+            placeholder={type === "email" ? "Write your email template here…\nUse [Room Name], [Date], [Time], [Client Name] as placeholders." : "Brief overview of this process…"}
+          />
+        </div>
+
+        {/* Steps (how-to only) */}
+        {type === "howto" && (
+          <div style={{ marginBottom: "14px" }}>
+            <label style={labelStyle}>Step-by-Step Instructions</label>
+            <StepListEditor steps={steps} onChange={setSteps} />
+          </div>
+        )}
+
+        {/* Notes callout (howto + general) */}
+        {(type === "howto" || type === "general") && (
+          <div style={{ marginBottom: "14px" }}>
+            <label style={labelStyle}>Notes & Tips</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.5", borderColor: "#fbbf24", background: "#fffbeb" }) }}
+              placeholder="Any extra tips, warnings, or reminders for the team…"
+            />
+          </div>
+        )}
+
+        {/* Footer */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "24px", paddingTop: "18px", borderTop: `1px solid ${C.border}` }}>
+          <div style={{ display: "flex", gap: "8px" }}>
+            {!isNew && (
+              <button onClick={() => { onDelete(card.id); onClose(); }} style={{ padding: "9px 18px", borderRadius: "10px", border: `1px solid #fca5a5`, background: "#fff1f2", color: "#dc2626", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>
+                🗑 Delete
+              </button>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button onClick={onClose} style={{ padding: "9px 18px", borderRadius: "10px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
+            <button onClick={handleSave} disabled={saving || !title.trim()} style={{ padding: "9px 20px", borderRadius: "10px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", opacity: saving || !title.trim() ? 0.6 : 1 }}>
+              {saving ? "Saving…" : isNew ? "Create Card" : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Comm Card Display ────────────────────────────────────────────────────────
+
+const TYPE_CONFIG = {
+  email:   { icon: "📧", accent: "#6366f1", accentLight: "#eef2ff", label: "Email Template" },
+  howto:   { icon: "📋", accent: "#10b981", accentLight: "#ecfdf5", label: "How-To Guide" },
+  general: { icon: "💬", accent: "#f59e0b", accentLight: "#fffbeb", label: "Notes / Questions" },
+};
+
+function CommCard({ card, isAdmin, onEdit }) {
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const cfg = TYPE_CONFIG[card.type] || TYPE_CONFIG.general;
+
+  const copyText = card.type === "email"
+    ? (card.subject ? `Subject: ${card.subject}\n\n${card.body}` : card.body)
+    : (card.overview || "");
+
+  const handleCopy = () => {
+    if (!copyText) return;
+    navigator.clipboard.writeText(copyText).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", overflow: "hidden", boxShadow: C.shadow }}>
+      {/* Accent bar */}
+      <div style={{ height: "4px", background: cfg.accent }} />
+
+      {/* Header */}
+      <div style={{ padding: "16px 18px 12px", display: "flex", alignItems: "flex-start", gap: "12px" }}>
+        <span style={{ fontSize: "22px", flexShrink: 0 }}>{cfg.icon}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "4px" }}>
+            <span style={{ fontSize: "14px", fontWeight: "700", color: C.text }}>{card.title}</span>
+            {card.category && (
+              <span style={{ fontSize: "10px", fontWeight: "700", color: cfg.accent, background: cfg.accentLight, padding: "2px 8px", borderRadius: "20px", textTransform: "uppercase", letterSpacing: "0.06em" }}>{card.category}</span>
+            )}
+          </div>
+          {card.type === "email" && card.subject && (
+            <div style={{ fontSize: "12px", color: C.muted, fontStyle: "italic" }}>Subject: {card.subject}</div>
+          )}
+          {card.type === "howto" && card.overview && !expanded && (
+            <div style={{ fontSize: "12px", color: C.muted, marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "360px" }}>{card.overview}</div>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+          {copyText && (
+            <button
+              onClick={handleCopy}
+              style={{ padding: "5px 12px", borderRadius: "8px", border: `1px solid ${C.border}`, background: copied ? "#ecfdf5" : C.cardBg, color: copied ? "#10b981" : C.muted, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}
+            >
+              {copied ? "✓ Copied" : "📋 Copy"}
+            </button>
+          )}
+          {isAdmin && (
+            <button onClick={() => onEdit(card)} style={{ padding: "5px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}>
+              ✏️ Edit
+            </button>
+          )}
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            style={{ padding: "5px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}
+          >
+            {expanded ? "▲ Collapse" : "▼ Expand"}
+          </button>
+        </div>
+      </div>
+
+      {/* Expanded content */}
+      {expanded && (
+        <div style={{ padding: "0 18px 18px" }}>
+          {/* Email body */}
+          {card.type === "email" && card.body && (
+            <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", fontSize: "13px", color: C.text, lineHeight: "1.7", whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
+              {card.body}
+            </div>
+          )}
+
+          {/* How-to: overview + steps + notes */}
+          {card.type === "howto" && (
+            <>
+              {card.overview && (
+                <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "14px", fontSize: "13px", color: C.text, lineHeight: "1.7", whiteSpace: "pre-wrap", marginBottom: "14px" }}>
+                  {card.overview}
+                </div>
+              )}
+              {card.steps && card.steps.length > 0 && (
+                <div style={{ marginBottom: "14px" }}>
+                  <div style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "10px" }}>Steps</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {card.steps.map((s, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                        <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "#10b981", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "700", flexShrink: 0, marginTop: "1px" }}>{i + 1}</div>
+                        <div style={{ flex: 1, fontSize: "13px", color: C.text, lineHeight: "1.6", paddingTop: "3px", whiteSpace: "pre-wrap" }}>{s}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {card.notes && (
+                <div style={{ background: "#fffbeb", border: "1px solid #fbbf24", borderRadius: "10px", padding: "12px 14px", fontSize: "13px", color: "#92400e", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                  <span style={{ fontWeight: "700" }}>💡 Notes: </span>{card.notes}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* General / intake questions */}
+          {card.type === "general" && (
+            <>
+              {card.overview && (
+                <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "14px", fontSize: "13px", color: C.text, lineHeight: "1.7", whiteSpace: "pre-wrap", marginBottom: card.notes ? "14px" : "0" }}>
+                  {card.overview}
+                </div>
+              )}
+              {card.notes && (
+                <div style={{ background: "#fffbeb", border: "1px solid #fbbf24", borderRadius: "10px", padding: "12px 14px", fontSize: "13px", color: "#92400e", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                  <span style={{ fontWeight: "700" }}>💡 Notes: </span>{card.notes}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Communications Tab ───────────────────────────────────────────────────────
+
+function CommTab({ token, currentUser }) {
+  const isAdmin = currentUser?.role === "admin";
+  const [cards, setCards] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modalCard, setModalCard] = useState(null);
+  const [filterType, setFilterType] = useState("all");
+
+  useEffect(() => {
+    apiFetch("/api/confrooms/comms", {}, token)
+      .then((r) => r.json())
+      .then((data) => {
+        setCards(Array.isArray(data.cards) ? data.cards : []);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  const save = async (updated) => {
+    let newCards;
+    if (updated.id && cards.find((c) => c.id === updated.id)) {
+      newCards = cards.map((c) => c.id === updated.id ? updated : c);
+    } else {
+      newCards = [...cards, updated];
+    }
+    setCards(newCards);
+    await apiFetch("/api/confrooms/comms", { method: "PUT", body: JSON.stringify({ cards: newCards }) }, token);
+  };
+
+  const remove = async (id) => {
+    const newCards = cards.filter((c) => c.id !== id);
+    setCards(newCards);
+    await apiFetch("/api/confrooms/comms", { method: "PUT", body: JSON.stringify({ cards: newCards }) }, token);
+  };
+
+  const filtered = filterType === "all" ? cards : cards.filter((c) => c.type === filterType);
+
+  const emailCards = filtered.filter((c) => c.type === "email");
+  const howtoCards = filtered.filter((c) => c.type === "howto");
+  const generalCards = filtered.filter((c) => c.type === "general");
+
+  const FILTER_TABS = [
+    { id: "all",     label: "All Cards" },
+    { id: "email",   label: "📧 Email Templates" },
+    { id: "howto",   label: "📋 How-To Guides" },
+    { id: "general", label: "💬 Notes & Questions" },
+  ];
+
+  const SectionHeader = ({ icon, title, accent, count }) => (
+    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px", marginTop: "8px" }}>
+      <div style={{ width: "3px", height: "20px", borderRadius: "2px", background: accent }} />
+      <span style={{ fontSize: "13px", fontWeight: "800", color: C.text }}>{icon} {title}</span>
+      <span style={{ fontSize: "11px", color: C.muted, fontWeight: "600" }}>({count})</span>
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Sub-filter bar + Add button */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
+        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+          {FILTER_TABS.map((ft) => (
+            <button
+              key={ft.id}
+              onClick={() => setFilterType(ft.id)}
+              style={{ padding: "6px 14px", borderRadius: "20px", border: `1px solid ${filterType === ft.id ? C.accent : C.border}`, background: filterType === ft.id ? C.accentLight : "none", color: filterType === ft.id ? C.accentBright : C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
+            >
+              {ft.label}
+            </button>
+          ))}
+        </div>
+        {isAdmin && (
+          <button
+            onClick={() => setModalCard({})}
+            style={{ padding: "9px 18px", borderRadius: "10px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer" }}
+          >
+            + New Card
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "48px", color: C.muted }}>Loading…</div>
+      ) : cards.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "48px", background: C.cardBg, borderRadius: "12px", border: `1px dashed ${C.border}`, color: C.muted }}>
+          <div style={{ fontSize: "40px", marginBottom: "10px" }}>📨</div>
+          <div style={{ fontSize: "15px", fontWeight: "600", marginBottom: "6px" }}>No communications yet</div>
+          <div style={{ fontSize: "13px" }}>Add email templates, how-to guides, and intake questions for the team.</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+          {(filterType === "all" || filterType === "email") && emailCards.length > 0 && (
+            <div>
+              <SectionHeader icon="📧" title="Email Templates" accent="#6366f1" count={emailCards.length} />
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {emailCards.map((c) => <CommCard key={c.id} card={c} isAdmin={isAdmin} onEdit={(card) => setModalCard(card)} />)}
+              </div>
+            </div>
+          )}
+          {(filterType === "all" || filterType === "howto") && howtoCards.length > 0 && (
+            <div>
+              <SectionHeader icon="📋" title="How-To Guides" accent="#10b981" count={howtoCards.length} />
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {howtoCards.map((c) => <CommCard key={c.id} card={c} isAdmin={isAdmin} onEdit={(card) => setModalCard(card)} />)}
+              </div>
+            </div>
+          )}
+          {(filterType === "all" || filterType === "general") && generalCards.length > 0 && (
+            <div>
+              <SectionHeader icon="💬" title="Notes & Questions" accent="#f59e0b" count={generalCards.length} />
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {generalCards.map((c) => <CommCard key={c.id} card={c} isAdmin={isAdmin} onEdit={(card) => setModalCard(card)} />)}
+              </div>
+            </div>
+          )}
+          {filtered.length === 0 && (
+            <div style={{ textAlign: "center", padding: "32px", background: C.cardBg, borderRadius: "12px", border: `1px dashed ${C.border}`, color: C.muted, fontSize: "13px" }}>
+              No cards of this type yet.
+            </div>
+          )}
+        </div>
+      )}
+
+      {modalCard !== null && (
+        <CommCardModal
+          card={Object.keys(modalCard).length === 0 ? null : modalCard}
+          onClose={() => setModalCard(null)}
+          onSave={save}
+          onDelete={remove}
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── Main ConfRoomsView ────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: "rooms", label: "🏢 Rooms" },
-  { id: "skedda", label: "📅 Book on Skedda" },
+  { id: "rooms",    label: "🏢 Rooms" },
+  { id: "comms",    label: "📨 Communications" },
+  { id: "skedda",   label: "📅 Book on Skedda" },
   { id: "honeybook", label: "📋 HoneyBook Request" },
 ];
 
@@ -498,7 +950,7 @@ export default function ConfRoomsView({ token, currentUser }) {
           <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: C.text }}>🏢 Conference Rooms</h1>
           <p style={{ margin: "4px 0 0", fontSize: "13px", color: C.muted }}>Capacity, pricing, amenities, and booking info for all rooms.</p>
         </div>
-        {tab === "rooms" && (
+        {tab === "rooms" && currentUser?.role === "admin" && (
           <button onClick={() => setModalRoom(false)} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer" }}>
             + Add Room
           </button>
@@ -570,6 +1022,11 @@ export default function ConfRoomsView({ token, currentUser }) {
             </div>
           )}
         </>
+      )}
+
+      {/* ── COMMUNICATIONS TAB ── */}
+      {tab === "comms" && (
+        <CommTab token={token} currentUser={currentUser} />
       )}
 
       {/* ── SKEDDA TAB ── */}
