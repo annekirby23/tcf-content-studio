@@ -253,6 +253,8 @@ function TasksSection({ tasks, teamMembers, rohoTeam, isAdmin, currentUser, onUp
   const [assigneeId, setAssigneeId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState("medium");
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
 
   const assigneeOptions = rohoTeam.length > 0 ? rohoTeam : teamMembers;
 
@@ -266,6 +268,22 @@ function TasksSection({ tasks, teamMembers, rohoTeam, isAdmin, currentUser, onUp
     }];
     onUpdate(next);
     setText(""); setAssigneeId(""); setDueDate(""); setPriority("medium"); setShowForm(false);
+  }
+
+  function startEdit(t) {
+    setEditingId(t.id);
+    setEditForm({ text: t.text, assigneeId: t.assigneeId || "", dueDate: t.dueDate || "", priority: t.priority || "medium" });
+    setShowForm(false);
+  }
+
+  function saveEdit(id) {
+    const member = assigneeOptions.find((m) => (m.userId || m.id) === editForm.assigneeId);
+    onUpdate(tasks.map((t) => t.id === id ? {
+      ...t, text: editForm.text, assigneeId: editForm.assigneeId,
+      assigneeName: member ? member.name : t.assigneeName,
+      dueDate: editForm.dueDate, priority: editForm.priority,
+    } : t));
+    setEditingId(null);
   }
 
   function toggleDone(id) {
@@ -340,33 +358,65 @@ function TasksSection({ tasks, teamMembers, rohoTeam, isAdmin, currentUser, onUp
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
           {open.map((t) => (
-            <div key={t.id} style={{ display:"flex", alignItems:"flex-start", gap:"10px",
-              padding:"11px 14px", background:C.cardBg, borderRadius:"10px",
-              border:`1px solid ${C.border}`, borderLeft:`3px solid ${PRIORITY_COLORS[t.priority] || C.border}` }}>
-              <input type="checkbox" checked={false} onChange={() => toggleDone(t.id)}
-                style={{ accentColor:ROHO_ACCENT, width:"15px", height:"15px", marginTop:"2px", flexShrink:0, cursor:"pointer" }} />
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:"13px", color:C.text, lineHeight:"1.5" }}>{t.text}</div>
-                <div style={{ display:"flex", gap:"8px", marginTop:"5px", flexWrap:"wrap", alignItems:"center" }}>
-                  {t.assigneeName && (
-                    <div style={{ display:"flex", alignItems:"center", gap:"5px" }}>
-                      <Avatar name={t.assigneeName} size={16} />
-                      <span style={{ fontSize:"11px", color:C.muted, fontWeight:"600" }}>{t.assigneeName}</span>
+            <div key={t.id} style={{ background:C.cardBg, borderRadius:"10px", border:`1px solid ${editingId === t.id ? ROHO_ACCENT : C.border}`, borderLeft:`3px solid ${PRIORITY_COLORS[t.priority] || C.border}`, overflow:"hidden" }}>
+              {editingId === t.id ? (
+                <div style={{ padding:"12px 14px", display:"flex", flexDirection:"column", gap:"10px" }}>
+                  <input value={editForm.text} onChange={(e) => setEditForm((f) => ({ ...f, text: e.target.value }))} autoFocus
+                    style={textInput({ width:"100%" })} placeholder="Task description…" />
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"8px" }}>
+                    <div>
+                      <label style={labelStyle}>Assign To</label>
+                      <select value={editForm.assigneeId} onChange={(e) => setEditForm((f) => ({ ...f, assigneeId: e.target.value }))} style={textInput({ width:"100%" })}>
+                        <option value="">Unassigned</option>
+                        {assigneeOptions.map((m) => <option key={m.userId||m.id} value={m.userId||m.id}>{m.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Due Date</label>
+                      <input type="date" value={editForm.dueDate} onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))} style={textInput({ width:"100%" })} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Priority</label>
+                      <select value={editForm.priority} onChange={(e) => setEditForm((f) => ({ ...f, priority: e.target.value }))} style={textInput({ width:"100%" })}>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display:"flex", gap:"8px", justifyContent:"flex-end" }}>
+                    <button onClick={() => setEditingId(null)} style={{ padding:"6px 14px", borderRadius:"8px", border:`1px solid ${C.border}`, background:"none", color:C.muted, fontSize:"12px", fontWeight:"600", cursor:"pointer" }}>Cancel</button>
+                    <button onClick={() => saveEdit(t.id)} disabled={!editForm.text?.trim()} style={{ padding:"6px 16px", borderRadius:"8px", border:"none", background:ROHO_ACCENT, color:"#fff", fontSize:"12px", fontWeight:"700", cursor:"pointer", opacity:editForm.text?.trim() ? 1 : 0.5 }}>Save</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display:"flex", alignItems:"flex-start", gap:"10px", padding:"11px 14px" }}>
+                  <input type="checkbox" checked={false} onChange={() => toggleDone(t.id)}
+                    style={{ accentColor:ROHO_ACCENT, width:"15px", height:"15px", marginTop:"2px", flexShrink:0, cursor:"pointer" }} />
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:"13px", color:C.text, lineHeight:"1.5" }}>{t.text}</div>
+                    <div style={{ display:"flex", gap:"8px", marginTop:"5px", flexWrap:"wrap", alignItems:"center" }}>
+                      {t.assigneeName && (
+                        <div style={{ display:"flex", alignItems:"center", gap:"5px" }}>
+                          <Avatar name={t.assigneeName} size={16} />
+                          <span style={{ fontSize:"11px", color:C.muted, fontWeight:"600" }}>{t.assigneeName}</span>
+                        </div>
+                      )}
+                      {t.dueDate && (
+                        <span style={{ fontSize:"11px", color:t.dueDate < localDateStr() ? "#EF4444" : C.muted }}>
+                          📅 {fmtDate(t.dueDate)}
+                        </span>
+                      )}
+                      <Chip label={t.priority} color={PRIORITY_COLORS[t.priority]} />
+                    </div>
+                  </div>
+                  {(isAdmin || t.assigneeId === currentUser?.id) && (
+                    <div style={{ display:"flex", gap:"4px", flexShrink:0 }}>
+                      <button onClick={() => startEdit(t)} style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:"13px", padding:"2px 6px" }}>✏️</button>
+                      <button onClick={() => deleteTask(t.id)} style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:"13px", padding:"2px 4px" }}>✕</button>
                     </div>
                   )}
-                  {t.dueDate && (
-                    <span style={{ fontSize:"11px", color:t.dueDate < localDateStr() ? "#EF4444" : C.muted }}>
-                      📅 {fmtDate(t.dueDate)}
-                    </span>
-                  )}
-                  <Chip label={t.priority} color={PRIORITY_COLORS[t.priority]} />
                 </div>
-              </div>
-              {(isAdmin || t.assigneeId === currentUser?.id) && (
-                <button onClick={() => deleteTask(t.id)}
-                  style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:"13px", padding:"2px 4px", flexShrink:0 }}>
-                  ✕
-                </button>
               )}
             </div>
           ))}
@@ -468,6 +518,8 @@ function MeetingNotesSection({ notes, isAdmin, currentUser, onUpdate }) {
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(localDateStr());
   const [content, setContent] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
 
   function addNote() {
     if (!title.trim()) return;
@@ -478,6 +530,19 @@ function MeetingNotesSection({ notes, isAdmin, currentUser, onUpdate }) {
     }, ...notes];
     onUpdate(next);
     setTitle(""); setDate(localDateStr()); setContent(""); setShowForm(false);
+  }
+
+  function startEdit(n) {
+    setEditingId(n.id);
+    setExpandedId(n.id);
+    setEditForm({ title: n.title, date: n.date, content: n.content || "" });
+    setShowForm(false);
+  }
+
+  function saveEdit(id) {
+    if (!editForm.title?.trim()) return;
+    onUpdate(notes.map((n) => n.id === id ? { ...n, ...editForm, title: editForm.title.trim() } : n));
+    setEditingId(null);
   }
 
   function deleteNote(id) {
@@ -539,34 +604,67 @@ function MeetingNotesSection({ notes, isAdmin, currentUser, onUpdate }) {
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
           {notes.map((n) => (
-            <div key={n.id} style={{ background:C.cardBg, borderRadius:"12px", border:`1px solid ${C.border}`, overflow:"hidden" }}>
-              <div
-                onClick={() => setExpandedId(expandedId === n.id ? null : n.id)}
-                style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
-                  padding:"13px 16px", cursor:"pointer", userSelect:"none" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-                  <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:ROHO_ACCENT, flexShrink:0 }} />
-                  <div>
-                    <div style={{ fontSize:"13px", fontWeight:"700", color:C.text }}>{n.title}</div>
-                    <div style={{ fontSize:"11px", color:C.muted, marginTop:"1px" }}>
-                      {fmtDate(n.date)} {n.authorName && `· ${n.authorName}`}
+            <div key={n.id} style={{ background:C.cardBg, borderRadius:"12px", border:`1px solid ${editingId === n.id ? ROHO_ACCENT : C.border}`, overflow:"hidden" }}>
+              {editingId === n.id ? (
+                <div style={{ padding:"16px", display:"flex", flexDirection:"column", gap:"12px" }}>
+                  <div style={{ display:"flex", gap:"10px" }}>
+                    <div style={{ flex:1 }}>
+                      <label style={labelStyle}>Meeting Title *</label>
+                      <input value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} autoFocus
+                        style={textInput({ width:"100%" })} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Date</label>
+                      <input type="date" value={editForm.date} onChange={(e) => setEditForm((f) => ({ ...f, date: e.target.value }))} style={textInput({})} />
                     </div>
                   </div>
+                  <div>
+                    <label style={labelStyle}>Notes</label>
+                    <textarea value={editForm.content} onChange={(e) => setEditForm((f) => ({ ...f, content: e.target.value }))} rows={8}
+                      style={{ ...textInput({ width:"100%", resize:"vertical", lineHeight:"1.75" }) }} />
+                  </div>
+                  <div style={{ display:"flex", gap:"8px", justifyContent:"flex-end" }}>
+                    <button onClick={() => setEditingId(null)} style={{ padding:"7px 14px", borderRadius:"8px", border:`1px solid ${C.border}`, background:"none", color:C.muted, fontSize:"13px", fontWeight:"600", cursor:"pointer" }}>Cancel</button>
+                    <button onClick={() => saveEdit(n.id)} disabled={!editForm.title?.trim()} style={{ padding:"7px 18px", borderRadius:"8px", border:"none", background:ROHO_ACCENT, color:"#fff", fontSize:"13px", fontWeight:"700", cursor:"pointer", opacity:editForm.title?.trim() ? 1 : 0.5 }}>Save</button>
+                  </div>
                 </div>
-                <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-                  {isAdmin && (
-                    <button onClick={(e) => { e.stopPropagation(); deleteNote(n.id); }}
-                      style={{ background:"none", border:"none", color:"#EF4444", cursor:"pointer", fontSize:"13px", padding:"2px 4px" }}>
-                      ✕
-                    </button>
+              ) : (
+                <>
+                  <div
+                    onClick={() => setExpandedId(expandedId === n.id ? null : n.id)}
+                    style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
+                      padding:"13px 16px", cursor:"pointer", userSelect:"none" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                      <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:ROHO_ACCENT, flexShrink:0 }} />
+                      <div>
+                        <div style={{ fontSize:"13px", fontWeight:"700", color:C.text }}>{n.title}</div>
+                        <div style={{ fontSize:"11px", color:C.muted, marginTop:"1px" }}>
+                          {fmtDate(n.date)} {n.authorName && `· ${n.authorName}`}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                      {isAdmin && (
+                        <>
+                          <button onClick={(e) => { e.stopPropagation(); startEdit(n); }}
+                            style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:"13px", padding:"2px 6px" }}>
+                            ✏️
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); deleteNote(n.id); }}
+                            style={{ background:"none", border:"none", color:"#EF4444", cursor:"pointer", fontSize:"13px", padding:"2px 4px" }}>
+                            ✕
+                          </button>
+                        </>
+                      )}
+                      <span style={{ fontSize:"11px", color:C.muted }}>{expandedId === n.id ? "▲" : "▼"}</span>
+                    </div>
+                  </div>
+                  {expandedId === n.id && n.content && (
+                    <div style={{ padding:"0 16px 16px", borderTop:`1px solid ${C.border}` }}>
+                      <p style={{ margin:"12px 0 0", fontSize:"13px", color:C.text, lineHeight:"1.8", whiteSpace:"pre-wrap" }}>{n.content}</p>
+                    </div>
                   )}
-                  <span style={{ fontSize:"11px", color:C.muted }}>{expandedId === n.id ? "▲" : "▼"}</span>
-                </div>
-              </div>
-              {expandedId === n.id && n.content && (
-                <div style={{ padding:"0 16px 16px", borderTop:`1px solid ${C.border}` }}>
-                  <p style={{ margin:"12px 0 0", fontSize:"13px", color:C.text, lineHeight:"1.8", whiteSpace:"pre-wrap" }}>{n.content}</p>
-                </div>
+                </>
               )}
             </div>
           ))}
@@ -582,6 +680,8 @@ function SpaceNeedsSection({ needs, isAdmin, currentUser, onUpdate }) {
   const [text, setText] = useState("");
   const [priority, setPriority] = useState("medium");
   const [notes, setNotes] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
 
   function addNeed() {
     if (!text.trim()) return;
@@ -592,6 +692,18 @@ function SpaceNeedsSection({ needs, isAdmin, currentUser, onUpdate }) {
     }, ...(needs || [])];
     onUpdate(next);
     setText(""); setPriority("medium"); setNotes(""); setShowForm(false);
+  }
+
+  function startEdit(n) {
+    setEditingId(n.id);
+    setEditForm({ text: n.text, priority: n.priority, notes: n.notes || "" });
+    setShowForm(false);
+  }
+
+  function saveEdit(id) {
+    if (!editForm.text?.trim()) return;
+    onUpdate((needs||[]).map((n) => n.id === id ? { ...n, text: editForm.text.trim(), priority: editForm.priority, notes: editForm.notes } : n));
+    setEditingId(null);
   }
 
   function updateStatus(id, status) {
@@ -664,32 +776,60 @@ function SpaceNeedsSection({ needs, isAdmin, currentUser, onUpdate }) {
         <div>
           <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
             {open.map((n) => (
-              <div key={n.id} style={{ display:"flex", gap:"12px", alignItems:"flex-start",
-                padding:"12px 16px", background:C.cardBg, borderRadius:"10px",
-                border:`1px solid ${C.border}`, borderLeft:`3px solid ${PRIORITY_COLORS[n.priority] || C.border}` }}>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:"13px", fontWeight:"600", color:C.text, marginBottom:"4px" }}>{n.text}</div>
-                  {n.notes && <p style={{ margin:"0 0 6px", fontSize:"12px", color:C.muted, lineHeight:"1.5" }}>{n.notes}</p>}
-                  <div style={{ display:"flex", gap:"8px", flexWrap:"wrap", alignItems:"center" }}>
-                    <Chip label={STATUS_LABELS[n.status] || n.status} color={STATUS_COLORS[n.status] || C.accent} />
-                    <Chip label={n.priority} color={PRIORITY_COLORS[n.priority]} />
-                    {n.reportedBy && <span style={{ fontSize:"11px", color:C.muted }}>by {n.reportedBy}</span>}
+              <div key={n.id} style={{ background:C.cardBg, borderRadius:"10px", border:`1px solid ${editingId === n.id ? ROHO_ACCENT : C.border}`, borderLeft:`3px solid ${PRIORITY_COLORS[n.priority] || C.border}`, overflow:"hidden" }}>
+                {editingId === n.id ? (
+                  <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:"10px" }}>
+                    <div>
+                      <label style={labelStyle}>What's needed? *</label>
+                      <input value={editForm.text} onChange={(e) => setEditForm((f) => ({ ...f, text: e.target.value }))} autoFocus
+                        style={textInput({ width:"100%" })} />
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 2fr", gap:"10px" }}>
+                      <div>
+                        <label style={labelStyle}>Priority</label>
+                        <select value={editForm.priority} onChange={(e) => setEditForm((f) => ({ ...f, priority: e.target.value }))} style={textInput({ width:"100%" })}>
+                          <option value="high">High</option>
+                          <option value="medium">Medium</option>
+                          <option value="low">Low</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Additional Notes</label>
+                        <input value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} style={textInput({ width:"100%" })} />
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", gap:"8px", justifyContent:"flex-end" }}>
+                      <button onClick={() => setEditingId(null)} style={{ padding:"6px 14px", borderRadius:"8px", border:`1px solid ${C.border}`, background:"none", color:C.muted, fontSize:"12px", fontWeight:"600", cursor:"pointer" }}>Cancel</button>
+                      <button onClick={() => saveEdit(n.id)} disabled={!editForm.text?.trim()} style={{ padding:"6px 16px", borderRadius:"8px", border:"none", background:ROHO_ACCENT, color:"#fff", fontSize:"12px", fontWeight:"700", cursor:"pointer", opacity:editForm.text?.trim() ? 1 : 0.5 }}>Save</button>
+                    </div>
                   </div>
-                </div>
-                <div style={{ display:"flex", gap:"6px", alignItems:"center", flexShrink:0 }}>
-                  <select value={n.status} onChange={(e) => updateStatus(n.id, e.target.value)}
-                    style={{ ...textInput({ fontSize:"11px", padding:"4px 8px" }), cursor:"pointer" }}>
-                    <option value="open">Open</option>
-                    <option value="in-progress">In Progress</option>
-                    <option value="done">Done</option>
-                  </select>
-                  {isAdmin && (
-                    <button onClick={() => deleteNeed(n.id)}
-                      style={{ background:"none", border:"none", color:"#EF4444", cursor:"pointer", fontSize:"14px", padding:"2px 4px" }}>
-                      ✕
-                    </button>
-                  )}
-                </div>
+                ) : (
+                  <div style={{ display:"flex", gap:"12px", alignItems:"flex-start", padding:"12px 16px" }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:"13px", fontWeight:"600", color:C.text, marginBottom:"4px" }}>{n.text}</div>
+                      {n.notes && <p style={{ margin:"0 0 6px", fontSize:"12px", color:C.muted, lineHeight:"1.5" }}>{n.notes}</p>}
+                      <div style={{ display:"flex", gap:"8px", flexWrap:"wrap", alignItems:"center" }}>
+                        <Chip label={STATUS_LABELS[n.status] || n.status} color={STATUS_COLORS[n.status] || C.accent} />
+                        <Chip label={n.priority} color={PRIORITY_COLORS[n.priority]} />
+                        {n.reportedBy && <span style={{ fontSize:"11px", color:C.muted }}>by {n.reportedBy}</span>}
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", gap:"6px", alignItems:"center", flexShrink:0 }}>
+                      <select value={n.status} onChange={(e) => updateStatus(n.id, e.target.value)}
+                        style={{ ...textInput({ fontSize:"11px", padding:"4px 8px" }), cursor:"pointer" }}>
+                        <option value="open">Open</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="done">Done</option>
+                      </select>
+                      {isAdmin && (
+                        <>
+                          <button onClick={() => startEdit(n)} style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:"13px", padding:"2px 6px" }}>✏️</button>
+                          <button onClick={() => deleteNeed(n.id)} style={{ background:"none", border:"none", color:"#EF4444", cursor:"pointer", fontSize:"14px", padding:"2px 4px" }}>✕</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

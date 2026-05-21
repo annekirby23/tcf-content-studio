@@ -761,14 +761,19 @@ function CommTab({ token, currentUser }) {
   }, [token]);
 
   const save = async (updated) => {
+    // Assign a temporary client-side id so the card is immediately editable
+    const withId = updated.id ? updated : { ...updated, id: `c_${Date.now().toString(36)}` };
     let newCards;
-    if (updated.id && cards.find((c) => c.id === updated.id)) {
-      newCards = cards.map((c) => c.id === updated.id ? updated : c);
+    if (withId.id && cards.find((c) => c.id === withId.id)) {
+      newCards = cards.map((c) => c.id === withId.id ? withId : c);
     } else {
-      newCards = [...cards, updated];
+      newCards = [...cards, withId];
     }
     setCards(newCards);
-    await apiFetch("/api/confrooms/comms", { method: "PUT", body: JSON.stringify({ cards: newCards }) }, token);
+    // Use server-returned cards so IDs are canonical
+    const res = await apiFetch("/api/confrooms/comms", { method: "PUT", body: JSON.stringify({ cards: newCards }) }, token);
+    const data = await res.json();
+    if (Array.isArray(data.cards)) setCards(data.cards);
   };
 
   const remove = async (id) => {
