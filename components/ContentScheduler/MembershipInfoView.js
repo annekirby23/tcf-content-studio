@@ -700,6 +700,7 @@ function TierCard({ tier, isAdmin, onEdit }) {
 
 function MembershipTiersSection({ tiers, isAdmin, token, onUpdate }) {
   const [modalTier, setModalTier] = useState(null); // null = closed, false = new, object = edit
+  const [collapsed, setCollapsed] = useState(false);
 
   async function saveTiers(updated) {
     const res = await apiFetch("/api/membershipinfo", { method: "PUT", body: JSON.stringify({ membershipTiers: updated }) }, token);
@@ -723,30 +724,40 @@ function MembershipTiersSection({ tiers, isAdmin, token, onUpdate }) {
   }
 
   return (
-    <div style={{ marginBottom: "28px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-        <div>
-          <h3 style={{ margin: "0 0 4px", fontSize: "16px", fontWeight: "800", color: C.text }}>🏷️ Membership Tiers</h3>
-          <p style={{ margin: 0, fontSize: "13px", color: C.muted }}>All available membership plans and pricing.</p>
-        </div>
-        {isAdmin && (
-          <button onClick={() => setModalTier(false)} style={{ padding: "9px 18px", borderRadius: "10px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer" }}>
-            + Add Tier
-          </button>
-        )}
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", boxShadow: C.shadow, overflow: "hidden", marginBottom: "28px" }}>
+      {/* Header row — always visible, clickable to collapse */}
+      <div
+        onClick={() => setCollapsed((v) => !v)}
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 16px", background: C.cardBg, borderBottom: collapsed ? "none" : `1px solid ${C.border}`, cursor: "pointer", userSelect: "none" }}
+      >
+        <span style={{ fontSize: "10px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>🏷️ Membership Tiers</span>
+        <span style={{ fontSize: "11px", color: C.muted, fontWeight: "700" }}>{collapsed ? "+" : "−"}</span>
       </div>
 
-      {tiers.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "40px 24px", background: C.card, borderRadius: "14px", border: `1px dashed ${C.border}`, color: C.muted }}>
-          <div style={{ fontSize: "36px", marginBottom: "10px" }}>🏷️</div>
-          <div style={{ fontSize: "14px", fontWeight: "600", marginBottom: "6px" }}>No tiers yet</div>
-          {isAdmin && <div style={{ fontSize: "13px" }}>Click &ldquo;+ Add Tier&rdquo; to create your first membership plan.</div>}
-        </div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "16px" }}>
-          {tiers.map((tier) => (
-            <TierCard key={tier.id} tier={tier} isAdmin={isAdmin} onEdit={() => setModalTier(tier)} />
-          ))}
+      {!collapsed && (
+        <div style={{ padding: "20px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+            <p style={{ margin: 0, fontSize: "13px", color: C.muted }}>All available membership plans and pricing.</p>
+            {isAdmin && (
+              <button onClick={(e) => { e.stopPropagation(); setModalTier(false); }} style={{ padding: "9px 18px", borderRadius: "10px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer" }}>
+                + Add Tier
+              </button>
+            )}
+          </div>
+
+          {tiers.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px 24px", background: C.cardBg, borderRadius: "14px", border: `1px dashed ${C.border}`, color: C.muted }}>
+              <div style={{ fontSize: "36px", marginBottom: "10px" }}>🏷️</div>
+              <div style={{ fontSize: "14px", fontWeight: "600", marginBottom: "6px" }}>No tiers yet</div>
+              {isAdmin && <div style={{ fontSize: "13px" }}>Click &ldquo;+ Add Tier&rdquo; to create your first membership plan.</div>}
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "16px" }}>
+              {tiers.map((tier) => (
+                <TierCard key={tier.id} tier={tier} isAdmin={isAdmin} onEdit={() => setModalTier(tier)} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
