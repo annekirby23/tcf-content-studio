@@ -228,7 +228,7 @@ function PostEventModal({ event, onSave, onCancel }) {
 
 // ─── Upcoming Event Card ──────────────────────────────────────────────────────
 
-function UpcomingCard({ event, teamMembers, onEdit, onMarkPast, onDelete }) {
+function UpcomingCard({ event, teamMembers, onEdit, onMarkPast, onDelete, onDuplicate }) {
   const [expanded, setExpanded] = useState(false);
   const attendingMembers = teamMembers.filter((m) => (event.attendees || []).includes(m.id));
   const countdown = daysUntil(event.date);
@@ -258,6 +258,7 @@ function UpcomingCard({ event, teamMembers, onEdit, onMarkPast, onDelete }) {
             </div>
           </div>
           <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            <button onClick={() => onDuplicate(event)} style={{ padding: "5px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: 12, fontWeight: 600, cursor: "pointer" }} title="Duplicate this event">⧉ Copy</button>
             <button onClick={() => onEdit(event)} style={{ padding: "5px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>✏️ Edit</button>
             <button onClick={() => onMarkPast(event)} style={{ padding: "5px 10px", borderRadius: 8, border: "none", background: "#10B981", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>✓ Done</button>
           </div>
@@ -308,7 +309,7 @@ function UpcomingCard({ event, teamMembers, onEdit, onMarkPast, onDelete }) {
 
 // ─── Past Event Card ──────────────────────────────────────────────────────────
 
-function PastCard({ event, teamMembers, onEdit, onDelete }) {
+function PastCard({ event, teamMembers, onEdit, onDelete, onDuplicate }) {
   const [expanded, setExpanded] = useState(false);
   const attendingMembers = teamMembers.filter((m) => (event.attendees || []).includes(m.id));
   const ratingColor = event.rating >= 4 ? "#10B981" : event.rating >= 3 ? "#F59E0B" : event.rating ? "#EF4444" : C.muted;
@@ -326,7 +327,10 @@ function PastCard({ event, teamMembers, onEdit, onDelete }) {
               {event.location && <span style={{ fontSize: 12, color: C.muted }}>📍 {event.location}</span>}
             </div>
           </div>
-          <button onClick={() => onEdit(event)} style={{ padding: "5px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>✏️ Edit</button>
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            <button onClick={() => onDuplicate(event)} style={{ padding: "5px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: 12, fontWeight: 600, cursor: "pointer" }} title="Duplicate as new upcoming event">⧉ Copy</button>
+            <button onClick={() => onEdit(event)} style={{ padding: "5px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>✏️ Edit</button>
+          </div>
         </div>
 
         {/* Rating */}
@@ -427,6 +431,24 @@ export default function NetworkingView({ token, currentUser, teamMembers = [] })
     setTab("past");
   }
 
+  async function handleDuplicate(event) {
+    const res = await apiFetch("/api/networking", {
+      method: "POST",
+      body: JSON.stringify({
+        name: event.name,
+        date: "",
+        location: event.location,
+        description: event.description,
+        notes: event.notes,
+        attendees: event.attendees || [],
+      }),
+    }, token);
+    if (!res.ok) return;
+    const created = await res.json();
+    setEvents((prev) => [created, ...prev]);
+    setTab("upcoming");
+  }
+
   async function handleDelete(id) {
     if (!confirm("Remove this event?")) return;
     await apiFetch(`/api/networking?id=${id}`, { method: "DELETE" }, token);
@@ -487,6 +509,7 @@ export default function NetworkingView({ token, currentUser, teamMembers = [] })
                 onEdit={openEdit}
                 onMarkPast={setPostEventTarget}
                 onDelete={handleDelete}
+                onDuplicate={handleDuplicate}
               />
             ))}
           </div>
@@ -507,6 +530,7 @@ export default function NetworkingView({ token, currentUser, teamMembers = [] })
                 teamMembers={teamMembers}
                 onEdit={openEdit}
                 onDelete={handleDelete}
+                onDuplicate={handleDuplicate}
               />
             ))}
           </div>
