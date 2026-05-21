@@ -1688,20 +1688,23 @@ function ProjectCard({ project, onToggleTask, onAddTask, onDelete, onAddStatusUp
   );
 }
 
-function ProjectsSection({ token, sectionTitle, onSaveTitle, teamMembers = [] }) {
+function ProjectsSection({ token, viewingUserId, currentUserId, sectionTitle, onSaveTitle, teamMembers = [] }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
 
+  const readOnly = viewingUserId !== currentUserId;
+  const fetchUserId = viewingUserId || currentUserId;
+
   useEffect(() => {
     setLoading(true);
-    apiFetch("/api/projects", {}, token)
+    apiFetch(`/api/projects?userId=${fetchUserId}`, {}, token)
       .then((r) => r.json())
       .then((data) => setProjects(Array.isArray(data) ? data : []))
       .catch(() => setProjects([]))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, fetchUserId]);
 
   const handleCreate = async (data) => {
     const tempId = genId();
@@ -1777,8 +1780,8 @@ function ProjectsSection({ token, sectionTitle, onSaveTitle, teamMembers = [] })
   return (
     <div style={{ marginBottom: "24px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-        <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={false} />
-        <AddBtn onClick={() => setShowModal(true)} label="+ New Project" />
+        <EditableSectionTitle title={sectionTitle} onSave={onSaveTitle} readOnly={readOnly} />
+        {!readOnly && <AddBtn onClick={() => setShowModal(true)} label="+ New Project" />}
       </div>
 
       {loading ? (
@@ -3753,6 +3756,8 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
           <CCard cardKey="projects" title={sectionTitles.projects}>
             <ProjectsSection
               token={token}
+              viewingUserId={effectiveViewingUserId}
+              currentUserId={currentUserId}
               sectionTitle={sectionTitles.projects}
               onSaveTitle={(v) => saveSectionTitle("projects", v)}
               teamMembers={teamMembers}

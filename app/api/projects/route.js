@@ -9,8 +9,13 @@ export async function GET(req) {
     const user = await getSession(req);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
+    const { searchParams } = new URL(req.url);
+    const userId = searchParams.get("userId");
+
     const projects = (await kvGet(KEY)) || [];
-    return Response.json(projects);
+    // If a userId is provided, return only that user's projects
+    const filtered = userId ? projects.filter((p) => p.createdById === userId) : projects;
+    return Response.json(filtered);
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });
   }
