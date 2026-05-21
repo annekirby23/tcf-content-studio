@@ -196,14 +196,6 @@ function WaitingListCard({ list, isAdmin, token, onUpdate }) {
               <input value={newEntry.name} onChange={(e) => setNewEntry((d) => ({ ...d, name: e.target.value }))} style={textInput({ width: "100%" })} placeholder="Full name" />
             </div>
             <div>
-              <label style={labelStyle}>Email</label>
-              <input type="email" value={newEntry.email} onChange={(e) => setNewEntry((d) => ({ ...d, email: e.target.value }))} style={textInput({ width: "100%" })} placeholder="email@example.com" />
-            </div>
-            <div>
-              <label style={labelStyle}>Date Added</label>
-              <input type="date" value={newEntry.date} onChange={(e) => setNewEntry((d) => ({ ...d, date: e.target.value }))} style={textInput({ width: "100%" })} />
-            </div>
-            <div>
               <label style={labelStyle}>Notes</label>
               <input value={newEntry.notes} onChange={(e) => setNewEntry((d) => ({ ...d, notes: e.target.value }))} style={textInput({ width: "100%" })} placeholder="Optional notes" />
             </div>
@@ -224,14 +216,6 @@ function WaitingListCard({ list, isAdmin, token, onUpdate }) {
               <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} autoFocus style={textInput({ width: "100%" })} placeholder="Full name" />
             </div>
             <div>
-              <label style={labelStyle}>Email</label>
-              <input type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} style={textInput({ width: "100%" })} placeholder="email@example.com" />
-            </div>
-            <div>
-              <label style={labelStyle}>Date Added</label>
-              <input type="date" value={editForm.date} onChange={(e) => setEditForm((f) => ({ ...f, date: e.target.value }))} style={textInput({ width: "100%" })} />
-            </div>
-            <div>
               <label style={labelStyle}>Notes</label>
               <input value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} style={textInput({ width: "100%" })} placeholder="Optional notes" />
             </div>
@@ -250,7 +234,7 @@ function WaitingListCard({ list, isAdmin, token, onUpdate }) {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                {["Name", "Email", "Date", "Notes", "Status", ""].map((h) => (
+                {["Name", "Notes", "Status", ""].map((h) => (
                   <th key={h} style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", padding: "6px 10px", textAlign: "left", borderBottom: `1px solid ${C.border}` }}>{h}</th>
                 ))}
               </tr>
@@ -259,9 +243,7 @@ function WaitingListCard({ list, isAdmin, token, onUpdate }) {
               {list.map((entry, i) => (
                 <tr key={entry.id} style={{ background: i % 2 === 0 ? "transparent" : C.cardBg }}>
                   <td style={{ padding: "10px", fontSize: "13px", color: C.text, fontWeight: "600", borderBottom: `1px solid ${C.border}` }}>{entry.name}</td>
-                  <td style={{ padding: "10px", fontSize: "12px", color: C.muted, borderBottom: `1px solid ${C.border}` }}>{entry.email}</td>
-                  <td style={{ padding: "10px", fontSize: "12px", color: C.muted, borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{entry.date}</td>
-                  <td style={{ padding: "10px", fontSize: "12px", color: C.muted, borderBottom: `1px solid ${C.border}`, maxWidth: "160px" }}>{entry.notes}</td>
+                  <td style={{ padding: "10px", fontSize: "12px", color: C.muted, borderBottom: `1px solid ${C.border}` }}>{entry.notes}</td>
                   <td style={{ padding: "10px", borderBottom: `1px solid ${C.border}` }}>
                     {isAdmin ? (
                       <select
