@@ -882,6 +882,18 @@ function DailyRoutinesSection({ token, viewingUserId, currentUserId, sectionTitl
       .catch(() => {});
   }, [token, viewingUserId]);
 
+  // Member resources assigned to this user
+  const [assignedResources, setAssignedResources] = useState([]);
+  useEffect(() => {
+    apiFetch("/api/memberresources", {}, token)
+      .then((r) => r.json())
+      .then((data) => {
+        const all = Array.isArray(data) ? data : [];
+        setAssignedResources(all.filter((r) => r.assignedMemberId === viewingUserId));
+      })
+      .catch(() => {});
+  }, [token, viewingUserId]);
+
   const toggleOpsItem = (checklistId, itemId) => {
     setOpsCompletions((prev) => {
       const cl = prev[checklistId] || {};
@@ -3160,20 +3172,18 @@ function LocationAndEventTasksBar({ token, userId, onNavigate }) {
   );
 }
 
-// Isolated component so the 1-second tick never re-renders the whole dashboard
-function LiveClock() {
+// Shows just the current local date — updates once per minute, isolated so it never re-renders the whole dashboard
+function LiveDate() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
+    const t = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(t);
   }, []);
-  const dateStr = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-  const timeStr = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" });
+  const dateStr = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 14px", borderRadius: "20px", background: C.cardBg, border: `1px solid ${C.border}` }}>
+    <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "5px 14px", borderRadius: "20px", background: C.cardBg, border: `1px solid ${C.border}` }}>
+      <span style={{ fontSize: "12px", fontWeight: "600", color: C.muted }}>📅</span>
       <span style={{ fontSize: "12px", fontWeight: "700", color: C.text }}>{dateStr}</span>
-      <span style={{ width: "1px", height: "12px", background: C.border, display: "inline-block" }} />
-      <span style={{ fontSize: "12px", fontWeight: "600", color: C.accent, fontVariantNumeric: "tabular-nums", letterSpacing: "0.02em" }}>{timeStr}</span>
     </div>
   );
 }
@@ -3450,9 +3460,9 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
                   <p style={{ margin: 0, fontSize: "13px", color: C.muted }}>Read-only view</p>
                 )}
               </div>
-              {/* Date / Time + Photo Dump */}
+              {/* Date + Photo Dump */}
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
-                <LiveClock />
+                <LiveDate />
               </div>
               {/* Photo Dump button */}
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px", flexWrap: "wrap" }}>
@@ -3637,6 +3647,43 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
               onOpenSlack={onOpenSlack}
             />
           </CCard>
+
+          {/* Member Resources assigned to this user */}
+          {assignedResources.length > 0 && (
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", boxShadow: C.shadow, overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 16px", background: C.cardBg, borderBottom: `1px solid ${C.border}` }}>
+                <span style={{ fontSize: "10px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>My Resources</span>
+              </div>
+              <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                {assignedResources.map((res) => (
+                  <div key={res.id} style={{ display: "flex", alignItems: "flex-start", gap: "12px", padding: "12px", background: C.cardBg, borderRadius: "10px", border: `1px solid ${C.border}` }}>
+                    <span style={{ fontSize: "22px", flexShrink: 0 }}>{res.icon || "🤝"}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "13px", fontWeight: "700", color: C.text, marginBottom: "2px" }}>{res.name}</div>
+                      {res.tagline && <div style={{ fontSize: "11px", color: C.muted, marginBottom: "6px" }}>{res.tagline}</div>}
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                        {res.waiverUrl && (
+                          <a href={res.waiverUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: "11px", fontWeight: "600", color: C.accent, textDecoration: "none", padding: "2px 8px", borderRadius: "6px", border: `1px solid ${C.accent}`, background: C.accentLight }}>
+                            📄 Waiver
+                          </a>
+                        )}
+                        {res.howTo && (
+                          <span style={{ fontSize: "11px", fontWeight: "600", color: C.muted, padding: "2px 8px", borderRadius: "6px", border: `1px solid ${C.border}`, background: C.card }}>
+                            📋 Has How-To
+                          </span>
+                        )}
+                        {res.vendors && (
+                          <span style={{ fontSize: "11px", color: C.muted, padding: "2px 8px", borderRadius: "6px", border: `1px solid ${C.border}`, background: C.card }}>
+                            🏢 {res.vendors}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* RIGHT column */}

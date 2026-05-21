@@ -289,26 +289,69 @@ function ChecklistCard({ checklist, onClick }) {
 }
 
 // ── Reference Card ────────────────────────────────────────────────────────────
+// ── Block-style step editor ───────────────────────────────────────────────────
+function StepListEditor({ steps, onChange }) {
+  const addStep = () => onChange([...steps, ""]);
+  const update = (i, val) => { const n = [...steps]; n[i] = val; onChange(n); };
+  const remove = (i) => onChange(steps.filter((_, idx) => idx !== i));
+  const move = (i, dir) => {
+    const n = [...steps];
+    const j = i + dir;
+    if (j < 0 || j >= n.length) return;
+    [n[i], n[j]] = [n[j], n[i]];
+    onChange(n);
+  };
+  return (
+    <div>
+      {steps.map((step, i) => (
+        <div key={i} style={{ display: "flex", gap: "8px", alignItems: "flex-start", marginBottom: "8px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2px", paddingTop: "10px" }}>
+            <button onClick={() => move(i, -1)} disabled={i === 0} style={{ background: "none", border: "none", cursor: i === 0 ? "default" : "pointer", color: i === 0 ? C.border : C.muted, fontSize: "10px", lineHeight: 1, padding: "1px 3px" }}>▲</button>
+            <button onClick={() => move(i, 1)} disabled={i === steps.length - 1} style={{ background: "none", border: "none", cursor: i === steps.length - 1 ? "default" : "pointer", color: i === steps.length - 1 ? C.border : C.muted, fontSize: "10px", lineHeight: 1, padding: "1px 3px" }}>▼</button>
+          </div>
+          <div style={{ width: "26px", height: "26px", borderRadius: "50%", background: C.accent, color: "#fff", fontSize: "11px", fontWeight: "800", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: "8px" }}>
+            {i + 1}
+          </div>
+          <textarea
+            value={step}
+            onChange={(e) => update(i, e.target.value)}
+            rows={2}
+            style={{ ...textInput({ flex: 1, resize: "vertical", lineHeight: "1.6", fontFamily: "inherit" }) }}
+            placeholder={`Step ${i + 1} — describe this step clearly…`}
+          />
+          <button onClick={() => remove(i)} style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer", fontSize: "15px", paddingTop: "10px", lineHeight: 1, flexShrink: 0 }} title="Remove step">✕</button>
+        </div>
+      ))}
+      <button
+        onClick={addStep}
+        style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 14px", borderRadius: "8px", border: `1px dashed ${C.accent}`, background: `${C.accent}10`, color: C.accent, fontSize: "13px", fontWeight: "600", cursor: "pointer", marginTop: "4px" }}
+      >
+        + Add Step
+      </button>
+    </div>
+  );
+}
+
 function ReferenceCard({ sectionKey, icon, title, data, isAdmin, token, onSaved }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState({ description: "", steps: "", notes: "" });
+  const [draftDesc, setDraftDesc] = useState("");
+  const [draftSteps, setDraftSteps] = useState([]);
+  const [draftNotes, setDraftNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setDraft({
-      description: data?.description || "",
-      steps: Array.isArray(data?.steps) ? data.steps.join("\n") : (data?.steps || ""),
-      notes: data?.notes || "",
-    });
+    setDraftDesc(data?.description || "");
+    setDraftSteps(Array.isArray(data?.steps) ? [...data.steps] : []);
+    setDraftNotes(data?.notes || "");
   }, [data]);
 
   async function handleSave() {
     setSaving(true);
     try {
-      const steps = draft.steps.split("\n").map((s) => s.trim()).filter(Boolean);
+      const steps = draftSteps.map((s) => s.trim()).filter(Boolean);
       const res = await apiFetch("/api/dailyops/reference", {
         method: "PUT",
-        body: JSON.stringify({ [sectionKey]: { description: draft.description, steps, notes: draft.notes } }),
+        body: JSON.stringify({ [sectionKey]: { description: draftDesc, steps, notes: draftNotes } }),
       }, token);
       const updated = await res.json();
       onSaved(updated);
@@ -321,10 +364,12 @@ function ReferenceCard({ sectionKey, icon, title, data, isAdmin, token, onSaved 
   }
 
   const steps = Array.isArray(data?.steps) ? data.steps : [];
+  const hasContent = data?.description || steps.length > 0 || data?.notes;
 
   return (
-    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "22px", boxShadow: C.shadow }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", overflow: "hidden", boxShadow: C.shadow }}>
+      {/* Card header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: `1px solid ${C.border}`, background: C.cardBg }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <span style={{ fontSize: "22px" }}>{icon}</span>
           <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: C.text }}>{title}</h3>
@@ -335,43 +380,98 @@ function ReferenceCard({ sectionKey, icon, title, data, isAdmin, token, onSaved 
       </div>
 
       {editing ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "20px" }}>
+          {/* Overview */}
           <div>
-            <label style={labelStyle}>Description</label>
-            <textarea value={draft.description} onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))} rows={3} style={textInput({ width: "100%", resize: "vertical" })} placeholder="Overview or description…" />
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+              <div style={{ width: "3px", height: "16px", background: C.accent, borderRadius: "2px" }} />
+              <label style={{ ...labelStyle, margin: 0 }}>Overview / Description</label>
+            </div>
+            <textarea
+              value={draftDesc}
+              onChange={(e) => setDraftDesc(e.target.value)}
+              rows={4}
+              style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.7" }) }}
+              placeholder="Provide context or an overview for the team. Supports paragraphs and line breaks."
+            />
           </div>
+
+          {/* Steps */}
           <div>
-            <label style={labelStyle}>Steps (one per line)</label>
-            <textarea value={draft.steps} onChange={(e) => setDraft((d) => ({ ...d, steps: e.target.value }))} rows={5} style={textInput({ width: "100%", resize: "vertical" })} placeholder="Step 1&#10;Step 2&#10;Step 3" />
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+              <div style={{ width: "3px", height: "16px", background: "#10B981", borderRadius: "2px" }} />
+              <label style={{ ...labelStyle, margin: 0 }}>Step-by-Step Process</label>
+            </div>
+            <StepListEditor steps={draftSteps} onChange={setDraftSteps} />
           </div>
+
+          {/* Notes */}
           <div>
-            <label style={labelStyle}>Notes</label>
-            <textarea value={draft.notes} onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))} rows={2} style={textInput({ width: "100%", resize: "vertical" })} placeholder="Additional notes…" />
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+              <div style={{ width: "3px", height: "16px", background: "#F59E0B", borderRadius: "2px" }} />
+              <label style={{ ...labelStyle, margin: 0 }}>💡 Notes & Tips</label>
+            </div>
+            <textarea
+              value={draftNotes}
+              onChange={(e) => setDraftNotes(e.target.value)}
+              rows={3}
+              style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.7" }), background: "rgba(245,158,11,0.05)", borderColor: "rgba(245,158,11,0.3)" }}
+              placeholder="Add any tips, reminders, or exceptions the team should know about…"
+            />
           </div>
-          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+
+          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", paddingTop: "4px" }}>
             <button onClick={() => setEditing(false)} style={{ padding: "8px 16px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
             <button onClick={handleSave} disabled={saving} style={{ padding: "8px 20px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer" }}>{saving ? "Saving…" : "Save"}</button>
           </div>
         </div>
-      ) : (
-        <div>
-          {data?.description && <p style={{ margin: "0 0 12px", fontSize: "14px", color: C.text, lineHeight: "1.7", whiteSpace: "pre-wrap" }}>{data.description}</p>}
-          {steps.length > 0 && (
-            <ol style={{ margin: "0 0 12px", paddingLeft: "18px" }}>
-              {steps.map((step, i) => (
-                <li key={i} style={{ fontSize: "13px", color: C.text, lineHeight: "1.7", marginBottom: "4px" }}>{step}</li>
-              ))}
-            </ol>
-          )}
-          {data?.notes && (
-            <div style={{ background: C.cardBg, borderRadius: "8px", padding: "10px 14px", border: `1px solid ${C.border}` }}>
-              <span style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>Notes</span>
-              <p style={{ margin: "4px 0 0", fontSize: "13px", color: C.muted, lineHeight: "1.6" }}>{data.notes}</p>
+      ) : hasContent ? (
+        <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "18px" }}>
+          {/* Overview block */}
+          {data?.description && (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                <div style={{ width: "3px", height: "14px", background: C.accent, borderRadius: "2px" }} />
+                <span style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>Overview</span>
+              </div>
+              <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: "1.75", whiteSpace: "pre-wrap" }}>{data.description}</p>
             </div>
           )}
-          {!data?.description && steps.length === 0 && !data?.notes && (
-            <p style={{ margin: 0, fontSize: "13px", color: C.muted, fontStyle: "italic" }}>{isAdmin ? "Click Edit to add content." : "No content yet."}</p>
+
+          {/* Steps block */}
+          {steps.length > 0 && (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                <div style={{ width: "3px", height: "14px", background: "#10B981", borderRadius: "2px" }} />
+                <span style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>Process</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {steps.map((step, i) => (
+                  <div key={i} style={{ display: "flex", gap: "12px", alignItems: "flex-start", padding: "10px 14px", background: C.cardBg, borderRadius: "10px", border: `1px solid ${C.border}` }}>
+                    <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "#10B981", color: "#fff", fontSize: "11px", fontWeight: "800", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      {i + 1}
+                    </div>
+                    <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: "1.65", whiteSpace: "pre-wrap", paddingTop: "3px" }}>{step}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
+
+          {/* Notes callout */}
+          {data?.notes && (
+            <div style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "10px", padding: "12px 16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                <span style={{ fontSize: "14px" }}>💡</span>
+                <span style={{ fontSize: "11px", fontWeight: "700", color: "#B45309", textTransform: "uppercase", letterSpacing: "0.07em" }}>Notes & Tips</span>
+              </div>
+              <p style={{ margin: 0, fontSize: "13px", color: "#92400E", lineHeight: "1.7", whiteSpace: "pre-wrap" }}>{data.notes}</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{ padding: "32px 20px", textAlign: "center" }}>
+          <p style={{ margin: 0, fontSize: "13px", color: C.muted, fontStyle: "italic" }}>{isAdmin ? "Click Edit to add content." : "No content yet."}</p>
         </div>
       )}
     </div>
@@ -496,9 +596,11 @@ function MailPackagesTab({ token, currentUser, teamMembers, reference, setRefere
     });
   });
   const [saving, setSaving] = useState(false);
-  const [howToText, setHowToText] = useState(reference?.mail?.description || "");
   const [editingHowTo, setEditingHowTo] = useState(false);
   const [howToSaving, setHowToSaving] = useState(false);
+  const [howToDesc, setHowToDesc] = useState(reference?.mail?.description || "");
+  const [howToSteps, setHowToSteps] = useState(Array.isArray(reference?.mail?.steps) ? reference.mail.steps : []);
+  const [howToNotes, setHowToNotes] = useState(reference?.mail?.notes || "");
 
   // Keep local state in sync when reference changes from outside
   useEffect(() => {
@@ -535,22 +637,22 @@ function MailPackagesTab({ token, currentUser, teamMembers, reference, setRefere
     }
   }
 
-  async function saveHowTo(text) {
+  async function saveHowTo() {
     setHowToSaving(true);
     try {
-      const existing = reference?.mail || {};
+      const steps = howToSteps.map((s) => s.trim()).filter(Boolean);
       const res = await apiFetch(
         "/api/dailyops/reference",
-        { method: "PUT", body: JSON.stringify({ mail: { ...existing, description: text } }) },
+        { method: "PUT", body: JSON.stringify({ mail: { description: howToDesc, steps, notes: howToNotes } }) },
         token
       );
       const data = await res.json();
       setReference(data);
+      setEditingHowTo(false);
     } catch (e) {
       alert("Save failed: " + e.message);
     } finally {
       setHowToSaving(false);
-      setEditingHowTo(false);
     }
   }
 
@@ -611,37 +713,94 @@ function MailPackagesTab({ token, currentUser, teamMembers, reference, setRefere
         {saving && <span style={{ fontSize: "12px", color: C.muted, fontStyle: "italic" }}>Saving…</span>}
       </div>
 
-      {/* How To Process Mail */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "16px 18px", marginBottom: "20px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: editingHowTo ? "10px" : howToText ? "10px" : "0" }}>
-          <span style={{ fontSize: "13px", fontWeight: "700", color: C.text }}>📋 How To Process Mail</span>
+      {/* How To Process Mail — block-style card */}
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", overflow: "hidden", marginBottom: "20px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: `1px solid ${C.border}`, background: C.cardBg }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontSize: "20px" }}>📋</span>
+            <span style={{ fontSize: "15px", fontWeight: "800", color: C.text }}>How To Process Mail</span>
+          </div>
           {isAdmin && !editingHowTo && (
-            <button onClick={() => setEditingHowTo(true)} style={{ fontSize: "12px", color: C.accent, background: "none", border: "none", cursor: "pointer", fontWeight: "600", padding: "2px 6px" }}>
-              {howToText ? "Edit" : "+ Add Instructions"}
-            </button>
+            <button
+              onClick={() => { setHowToDesc(reference?.mail?.description || ""); setHowToSteps(Array.isArray(reference?.mail?.steps) ? [...reference.mail.steps] : []); setHowToNotes(reference?.mail?.notes || ""); setEditingHowTo(true); }}
+              style={{ padding: "6px 12px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
+            >✏️ Edit</button>
           )}
         </div>
+
         {editingHowTo ? (
-          <div>
-            <textarea
-              autoFocus
-              value={howToText}
-              onChange={(e) => setHowToText(e.target.value)}
-              rows={5}
-              style={{ ...textInput({ width: "100%", fontFamily: "inherit" }), resize: "vertical", lineHeight: 1.6 }}
-              placeholder="Enter step-by-step mail processing instructions for the team…"
-            />
-            <div style={{ display: "flex", gap: "8px", marginTop: "10px", justifyContent: "flex-end" }}>
-              <button onClick={() => { setHowToText(reference?.mail?.description || ""); setEditingHowTo(false); }} style={{ padding: "7px 14px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
-              <button onClick={() => saveHowTo(howToText)} disabled={howToSaving} style={{ padding: "7px 16px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", opacity: howToSaving ? 0.6 : 1 }}>
-                {howToSaving ? "Saving…" : "Save"}
-              </button>
+          <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                <div style={{ width: "3px", height: "16px", background: C.accent, borderRadius: "2px" }} />
+                <label style={{ ...labelStyle, margin: 0 }}>Overview / Description</label>
+              </div>
+              <textarea autoFocus value={howToDesc} onChange={(e) => setHowToDesc(e.target.value)} rows={4}
+                style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.7" }) }}
+                placeholder="Describe the mail process — context, key points, any general rules…" />
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+                <div style={{ width: "3px", height: "16px", background: "#10B981", borderRadius: "2px" }} />
+                <label style={{ ...labelStyle, margin: 0 }}>Step-by-Step Process</label>
+              </div>
+              <StepListEditor steps={howToSteps} onChange={setHowToSteps} />
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                <div style={{ width: "3px", height: "16px", background: "#F59E0B", borderRadius: "2px" }} />
+                <label style={{ ...labelStyle, margin: 0 }}>💡 Notes & Tips</label>
+              </div>
+              <textarea value={howToNotes} onChange={(e) => setHowToNotes(e.target.value)} rows={3}
+                style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.7" }), background: "rgba(245,158,11,0.05)", borderColor: "rgba(245,158,11,0.3)" }}
+                placeholder="Edge cases, reminders, or tips for the team…" />
+            </div>
+            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+              <button onClick={() => setEditingHowTo(false)} style={{ padding: "8px 16px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
+              <button onClick={saveHowTo} disabled={howToSaving} style={{ padding: "8px 20px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", opacity: howToSaving ? 0.6 : 1 }}>{howToSaving ? "Saving…" : "Save"}</button>
             </div>
           </div>
-        ) : howToText ? (
-          <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{howToText}</p>
+        ) : (reference?.mail?.description || (Array.isArray(reference?.mail?.steps) && reference.mail.steps.length > 0) || reference?.mail?.notes) ? (
+          <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "18px" }}>
+            {reference?.mail?.description && (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                  <div style={{ width: "3px", height: "14px", background: C.accent, borderRadius: "2px" }} />
+                  <span style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>Overview</span>
+                </div>
+                <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: "1.75", whiteSpace: "pre-wrap" }}>{reference.mail.description}</p>
+              </div>
+            )}
+            {Array.isArray(reference?.mail?.steps) && reference.mail.steps.length > 0 && (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                  <div style={{ width: "3px", height: "14px", background: "#10B981", borderRadius: "2px" }} />
+                  <span style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>Process</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {reference.mail.steps.map((step, i) => (
+                    <div key={i} style={{ display: "flex", gap: "12px", alignItems: "flex-start", padding: "10px 14px", background: C.cardBg, borderRadius: "10px", border: `1px solid ${C.border}` }}>
+                      <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "#10B981", color: "#fff", fontSize: "11px", fontWeight: "800", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</div>
+                      <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: "1.65", whiteSpace: "pre-wrap", paddingTop: "3px" }}>{step}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {reference?.mail?.notes && (
+              <div style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "10px", padding: "12px 16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                  <span style={{ fontSize: "14px" }}>💡</span>
+                  <span style={{ fontSize: "11px", fontWeight: "700", color: "#B45309", textTransform: "uppercase", letterSpacing: "0.07em" }}>Notes & Tips</span>
+                </div>
+                <p style={{ margin: 0, fontSize: "13px", color: "#92400E", lineHeight: "1.7", whiteSpace: "pre-wrap" }}>{reference.mail.notes}</p>
+              </div>
+            )}
+          </div>
         ) : (
-          <p style={{ margin: 0, fontSize: "13px", color: C.muted, fontStyle: "italic" }}>No instructions added yet.{isAdmin ? " Click \"+ Add Instructions\" to get started." : ""}</p>
+          <div style={{ padding: "24px 20px" }}>
+            <p style={{ margin: 0, fontSize: "13px", color: C.muted, fontStyle: "italic" }}>{isAdmin ? "Click Edit to add mail processing instructions." : "No instructions added yet."}</p>
+          </div>
         )}
       </div>
 
