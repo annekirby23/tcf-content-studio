@@ -831,7 +831,7 @@ export default function MembershipInfoView({ token, currentUser }) {
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div style={{ paddingBottom: "14px", borderBottom: `1px solid ${C.border}` }}>
                 <div style={{ fontSize: "12px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>Sign-Up Form</div>
-                {info?.signupFormDetails && <p style={{ margin: "0 0 10px", fontSize: "13px", color: C.text, lineHeight: "1.7" }}>{info.signupFormDetails}</p>}
+                {info?.signupFormDetails && <p style={{ margin: "0 0 10px", fontSize: "13px", color: C.text, lineHeight: "1.7", whiteSpace: "pre-wrap" }}>{info.signupFormDetails}</p>}
                 {info?.signupFormUrl ? <LinkButton url={info.signupFormUrl} label="Open Form" /> : <span style={{ fontSize: "13px", color: C.muted, fontStyle: "italic" }}>No URL set.</span>}
               </div>
               <div>
@@ -903,7 +903,7 @@ export default function MembershipInfoView({ token, currentUser }) {
             }
           >
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {info?.membershipTerms && <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: "1.7" }}>{info.membershipTerms}</p>}
+              {info?.membershipTerms && <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: "1.7", whiteSpace: "pre-wrap" }}>{info.membershipTerms}</p>}
               {info?.membershipTermsUrl ? <LinkButton url={info.membershipTermsUrl} label="View Terms" /> : <span style={{ fontSize: "13px", color: C.muted, fontStyle: "italic" }}>No terms URL set.</span>}
             </div>
           </InfoCard>
@@ -932,7 +932,7 @@ export default function MembershipInfoView({ token, currentUser }) {
             }
           >
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {info?.billingDetails && <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: "1.7" }}>{info.billingDetails}</p>}
+              {info?.billingDetails && <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: "1.7", whiteSpace: "pre-wrap" }}>{info.billingDetails}</p>}
               {info?.billingUrl ? <LinkButton url={info.billingUrl} label="Manage Billing" /> : <span style={{ fontSize: "13px", color: C.muted, fontStyle: "italic" }}>No billing URL set.</span>}
             </div>
           </InfoCard>
@@ -964,7 +964,7 @@ export default function MembershipInfoView({ token, currentUser }) {
             }
           >
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {info?.endingInfo && <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: "1.7" }}>{info.endingInfo}</p>}
+              {info?.endingInfo && <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: "1.7", whiteSpace: "pre-wrap" }}>{info.endingInfo}</p>}
               {info?.endingUrl ? <LinkButton url={info.endingUrl} label="View Process" /> : <span style={{ fontSize: "13px", color: C.muted, fontStyle: "italic" }}>No process URL set.</span>}
             </div>
           </InfoCard>

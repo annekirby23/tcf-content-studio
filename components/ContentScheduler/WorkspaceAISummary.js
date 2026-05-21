@@ -104,9 +104,11 @@ export default function WorkspaceAISummary({ token, currentUser, viewingUserId, 
     setSummaryLoading(true);
     setSummaryError("");
     try {
+      const now = new Date();
+      const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
       const res = await apiFetch("/api/workspace-ai", {
         method: "POST",
-        body: JSON.stringify({ type: "summary", userName: ownerName, userId: viewingUserId }),
+        body: JSON.stringify({ type: "summary", userName: ownerName, userId: viewingUserId, localDate, localHour: now.getHours() }),
       }, token);
       const data = await res.json();
       if (data.error) { setSummaryError(data.error); return; }

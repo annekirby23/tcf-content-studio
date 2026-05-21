@@ -8,8 +8,10 @@ function getClient() {
   return new Anthropic({ apiKey });
 }
 
-function today() {
-  return new Date().toISOString().split("T")[0];
+// Falls back to server UTC date if client didn't send one
+function serverLocalDate() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
 }
 
 export async function POST(req) {
@@ -23,16 +25,23 @@ export async function POST(req) {
 
     // ── Daily Summary ─────────────────────────────────────────────────────────
     if (type === "summary") {
-      const { userName, userId } = body;
+      const { userName, userId, localDate, localHour } = body;
       const teamTasks = (await kvGet("tcf:teamtasks")) || [];
       const events = (await kvGet("tcf:events")) || [];
+
+      // Use the client's local date so timezone differences don't cause off-by-one errors
+      const todayStr = localDate || serverLocalDate();
+      const hour = typeof localHour === "number" ? localHour : new Date().getHours();
+
+      // Pick greeting based on actual time of day
+      const timeOfDay = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
+      const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
       // Tasks assigned to this user
       const myTasks = teamTasks.filter(
         (t) => t.status !== "done" && (t.assignees || []).some((a) => a.id === userId)
       );
 
-      const todayStr = today();
       const overdue = myTasks.filter((t) => t.dueDate && t.dueDate < todayStr);
       const dueToday = myTasks.filter((t) => t.dueDate === todayStr);
       const upcoming = myTasks
@@ -52,7 +61,7 @@ export async function POST(req) {
         .map((e) => `- ${e.title} on ${e.date}`)
         .join("\n") || "None";
 
-      const prompt = `You are a warm, encouraging team assistant at TCF, a community fitness organization. You're greeting ${userName} at the start of their day.
+      const prompt = `You are a warm, encouraging team assistant at TCF, a coworking community organization. You are greeting ${userName} in the ${timeOfDay}.
 
 Their current tasks:
 ${taskLines}
@@ -61,12 +70,13 @@ Upcoming team events:
 ${upcomingEvents}
 
 Today's date: ${todayStr}
+Current time of day: ${timeOfDay} (hour ${hour})
 
 Write a personalized daily briefing for ${userName} with exactly two parts:
 
 **TASKS** (2-4 sentences): Mention their most urgent/overdue items first, then what's coming up. Be specific about due dates. Keep it practical and motivating — not alarming.
 
-**MESSAGE** (1-2 sentences): A genuine, specific, uplifting note to start the day. Make it feel personal and real, not generic. Reference the work they have ahead if relevant.
+**MESSAGE** (1-2 sentences): Start with "${greeting}, ${userName}!" then add a genuine, specific note appropriate for the ${timeOfDay}. Make it feel personal and real, not generic.
 
 Use plain text, no markdown headers. Separate the two parts with a blank line. Keep the whole thing under 150 words.`;
 

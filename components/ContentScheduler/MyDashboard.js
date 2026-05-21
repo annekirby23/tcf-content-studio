@@ -21,20 +21,25 @@ function genId() {
   return `local_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
+// Use local date (not UTC) to avoid off-by-one issues across timezones
+function localDateStr() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+}
+
 function isToday(dateStr) {
   if (!dateStr) return false;
-  return dateStr === new Date().toISOString().split("T")[0];
+  return dateStr === localDateStr();
 }
 
 function isOverdue(dateStr) {
   if (!dateStr) return false;
-  return dateStr < new Date().toISOString().split("T")[0];
+  return dateStr < localDateStr();
 }
 
 function isUpcoming(dateStr) {
   if (!dateStr) return false;
-  const today = new Date().toISOString().split("T")[0];
-  return dateStr > today;
+  return dateStr > localDateStr();
 }
 
 function formatDate(dateStr) {
@@ -3082,7 +3087,7 @@ function LocationAndEventTasksBar({ token, userId, onNavigate }) {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
             {assignedTeamTasks.slice(0, 5).map((task) => {
-              const isOverdue = task.dueDate && task.dueDate < new Date().toISOString().split("T")[0];
+              const isOverdue = task.dueDate && task.dueDate < localDateStr();
               const priColors = { high: "#EF4444", medium: "#F59E0B", low: "#10B981", critical: "#7C3AED" };
               const borderColor = priColors[task.priority] || C.accent;
               return (
@@ -3159,6 +3164,15 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
   const currentUserId = currentUser?.id;
   const effectiveViewingUserId = viewingUserId || currentUserId;
   const readOnly = effectiveViewingUserId !== currentUserId;
+
+  // Live clock — updates every second, uses local time
+  const [clockNow, setClockNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setClockNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const clockDate = clockNow.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const clockTime = clockNow.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" });
 
   // Profile data (header image, processRole, sectionTitles)
   const [profile, setProfile] = useState(null);
@@ -3427,8 +3441,16 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
                   <p style={{ margin: 0, fontSize: "13px", color: C.muted }}>Read-only view</p>
                 )}
               </div>
-              {/* Photo Dump button */}
+              {/* Date / Time + Photo Dump */}
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 14px", borderRadius: "20px", background: C.cardBg, border: `1px solid ${C.border}` }}>
+                  <span style={{ fontSize: "12px", fontWeight: "700", color: C.text }}>{clockDate}</span>
+                  <span style={{ width: "1px", height: "12px", background: C.border, display: "inline-block" }} />
+                  <span style={{ fontSize: "12px", fontWeight: "600", color: C.accent, fontVariantNumeric: "tabular-nums", letterSpacing: "0.02em" }}>{clockTime}</span>
+                </div>
+              </div>
+              {/* Photo Dump button */}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px", flexWrap: "wrap" }}>
                 {profile?.photoDriveUrl ? (
                   <a
                     href={profile.photoDriveUrl}

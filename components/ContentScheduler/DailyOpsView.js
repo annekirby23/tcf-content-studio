@@ -355,7 +355,7 @@ function ReferenceCard({ sectionKey, icon, title, data, isAdmin, token, onSaved 
         </div>
       ) : (
         <div>
-          {data?.description && <p style={{ margin: "0 0 12px", fontSize: "14px", color: C.text, lineHeight: "1.7" }}>{data.description}</p>}
+          {data?.description && <p style={{ margin: "0 0 12px", fontSize: "14px", color: C.text, lineHeight: "1.7", whiteSpace: "pre-wrap" }}>{data.description}</p>}
           {steps.length > 0 && (
             <ol style={{ margin: "0 0 12px", paddingLeft: "18px" }}>
               {steps.map((step, i) => (
