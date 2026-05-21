@@ -80,6 +80,9 @@ export async function PUT(req) {
         features: Array.isArray(tier.features) ? tier.features.map((f) => String(f).trim()).filter(Boolean) : [],
         highlight: Boolean(tier.highlight),
         color: String(tier.color || "#6366F1").trim(),
+        instructions: String(tier.instructions || ""),
+        emailSubject: String(tier.emailSubject || "").trim(),
+        emailBody: String(tier.emailBody || ""),
       }));
     }
 

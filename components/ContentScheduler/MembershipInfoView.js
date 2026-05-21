@@ -383,8 +383,15 @@ const TIER_COLORS = [
 
 const BILLING_OPTIONS = ["monthly", "annually", "weekly", "one-time", "custom"];
 
+const TIER_MODAL_TABS = [
+  { id: "details", label: "Details" },
+  { id: "instructions", label: "Instructions" },
+  { id: "email", label: "Email Template" },
+];
+
 function TierModal({ tier, onSave, onDelete, onClose }) {
   const isNew = !tier?.id;
+  const [activeTab, setActiveTab] = useState("details");
   const [name, setName] = useState(tier?.name || "");
   const [price, setPrice] = useState(tier?.price || "");
   const [billingFrequency, setBillingFrequency] = useState(tier?.billingFrequency || "monthly");
@@ -392,6 +399,9 @@ function TierModal({ tier, onSave, onDelete, onClose }) {
   const [featuresText, setFeaturesText] = useState((tier?.features || []).join("\n"));
   const [highlight, setHighlight] = useState(tier?.highlight || false);
   const [color, setColor] = useState(tier?.color || "#6366F1");
+  const [instructions, setInstructions] = useState(tier?.instructions || "");
+  const [emailSubject, setEmailSubject] = useState(tier?.emailSubject || "");
+  const [emailBody, setEmailBody] = useState(tier?.emailBody || "");
 
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
@@ -402,69 +412,114 @@ function TierModal({ tier, onSave, onDelete, onClose }) {
   function handleSave() {
     if (!name.trim()) return;
     const features = featuresText.split("\n").map((f) => f.trim()).filter(Boolean);
-    onSave({ id: tier?.id, name: name.trim(), price: price.trim(), billingFrequency, description: description.trim(), features, highlight, color });
+    onSave({ id: tier?.id, name: name.trim(), price: price.trim(), billingFrequency, description: description.trim(), features, highlight, color, instructions, emailSubject: emailSubject.trim(), emailBody });
   }
+
+  const tabBtnStyle = (id) => ({
+    padding: "7px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600",
+    background: activeTab === id ? C.accent : "none",
+    color: activeTab === id ? "#fff" : C.muted,
+  });
+
+  const bigTextArea = (value, onChange, placeholder, rows = 10) => (
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      rows={rows}
+      style={{ ...textInput({ width: "100%", fontFamily: "inherit", lineHeight: "1.75", resize: "vertical" }) }}
+      placeholder={placeholder}
+    />
+  );
 
   return (
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", backdropFilter: "blur(4px)", zIndex: 3000 }} />
-      <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: "520px", maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto", background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", zIndex: 3001, boxShadow: "0 20px 60px rgba(0,0,0,0.3)", padding: "28px" }}>
-        <h3 style={{ margin: "0 0 20px", fontSize: "17px", fontWeight: "800", color: C.text }}>{isNew ? "Add Membership Tier" : "Edit Membership Tier"}</h3>
+      <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: "580px", maxWidth: "95vw", maxHeight: "92vh", overflowY: "auto", background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", zIndex: 3001, boxShadow: "0 20px 60px rgba(0,0,0,0.3)", padding: "28px" }}>
+        <h3 style={{ margin: "0 0 18px", fontSize: "17px", fontWeight: "800", color: C.text }}>{isNew ? "Add Membership Tier" : `Edit — ${name || "Tier"}`}</h3>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-          {/* Name */}
-          <div>
-            <label style={labelStyle}>Tier Name *</label>
-            <input autoFocus value={name} onChange={(e) => setName(e.target.value)} style={textInput({ width: "100%" })} placeholder="Hot Desk, Dedicated Desk, Private Office…" />
-          </div>
+        {/* Tab strip */}
+        <div style={{ display: "flex", gap: "4px", marginBottom: "20px", background: C.cardBg, padding: "4px", borderRadius: "10px", border: `1px solid ${C.border}` }}>
+          {TIER_MODAL_TABS.map((t) => (
+            <button key={t.id} onClick={() => setActiveTab(t.id)} style={tabBtnStyle(t.id)}>{t.label}</button>
+          ))}
+        </div>
 
-          {/* Price + Frequency */}
-          <div style={{ display: "flex", gap: "12px" }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Price</label>
-              <input value={price} onChange={(e) => setPrice(e.target.value)} style={textInput({ width: "100%" })} placeholder="$250, $99, Free…" />
+        {/* ── Details tab ── */}
+        {activeTab === "details" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            <div>
+              <label style={labelStyle}>Tier Name *</label>
+              <input autoFocus value={name} onChange={(e) => setName(e.target.value)} style={textInput({ width: "100%" })} placeholder="Hot Desk, Dedicated Desk, Private Office…" />
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Billing Frequency</label>
-              <select value={billingFrequency} onChange={(e) => setBillingFrequency(e.target.value)} style={textInput({ width: "100%", color: C.text })}>
-                {BILLING_OPTIONS.map((o) => <option key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</option>)}
-              </select>
-            </div>
-          </div>
 
-          {/* Description */}
-          <div>
-            <label style={labelStyle}>Description</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} style={textInput({ width: "100%", resize: "vertical" })} placeholder="Brief description of who this tier is for…" />
-          </div>
-
-          {/* Features */}
-          <div>
-            <label style={labelStyle}>Features / Inclusions <span style={{ fontWeight: "400", textTransform: "none", fontSize: "10px" }}>(one per line)</span></label>
-            <textarea value={featuresText} onChange={(e) => setFeaturesText(e.target.value)} rows={5} style={textInput({ width: "100%", resize: "vertical", lineHeight: "1.7" })} placeholder={"24/7 access\nHigh-speed WiFi\nMail handling\nLounge access"} />
-          </div>
-
-          {/* Color + Highlight */}
-          <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Accent Color</label>
-              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                {TIER_COLORS.map((tc) => (
-                  <button
-                    key={tc.value}
-                    onClick={() => setColor(tc.value)}
-                    title={tc.label}
-                    style={{ width: "26px", height: "26px", borderRadius: "50%", background: tc.value, border: color === tc.value ? `3px solid ${C.text}` : `2px solid transparent`, cursor: "pointer", flexShrink: 0 }}
-                  />
-                ))}
+            <div style={{ display: "flex", gap: "12px" }}>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Price</label>
+                <input value={price} onChange={(e) => setPrice(e.target.value)} style={textInput({ width: "100%" })} placeholder="$250, $99, Free…" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Billing Frequency</label>
+                <select value={billingFrequency} onChange={(e) => setBillingFrequency(e.target.value)} style={textInput({ width: "100%", color: C.text })}>
+                  {BILLING_OPTIONS.map((o) => <option key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</option>)}
+                </select>
               </div>
             </div>
-            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", paddingBottom: "4px" }}>
-              <input type="checkbox" checked={highlight} onChange={(e) => setHighlight(e.target.checked)} style={{ accentColor: C.accent, width: "15px", height: "15px" }} />
-              <span style={{ fontSize: "13px", color: C.text, fontWeight: "600" }}>Mark as Popular</span>
-            </label>
+
+            <div>
+              <label style={labelStyle}>Short Description</label>
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} style={textInput({ width: "100%", resize: "vertical" })} placeholder="Brief description of who this tier is for…" />
+            </div>
+
+            <div>
+              <label style={labelStyle}>Features / Inclusions <span style={{ fontWeight: "400", textTransform: "none", fontSize: "10px" }}>(one per line)</span></label>
+              <textarea value={featuresText} onChange={(e) => setFeaturesText(e.target.value)} rows={5} style={textInput({ width: "100%", resize: "vertical", lineHeight: "1.7" })} placeholder={"24/7 access\nHigh-speed WiFi\nMail handling\nLounge access"} />
+            </div>
+
+            <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Accent Color</label>
+                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                  {TIER_COLORS.map((tc) => (
+                    <button key={tc.value} onClick={() => setColor(tc.value)} title={tc.label}
+                      style={{ width: "26px", height: "26px", borderRadius: "50%", background: tc.value, border: color === tc.value ? `3px solid ${C.text}` : `2px solid transparent`, cursor: "pointer", flexShrink: 0 }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", paddingBottom: "4px" }}>
+                <input type="checkbox" checked={highlight} onChange={(e) => setHighlight(e.target.checked)} style={{ accentColor: C.accent, width: "15px", height: "15px" }} />
+                <span style={{ fontSize: "13px", color: C.text, fontWeight: "600" }}>Mark as Popular</span>
+              </label>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* ── Instructions tab ── */}
+        {activeTab === "instructions" && (
+          <div>
+            <p style={{ margin: "0 0 12px", fontSize: "13px", color: C.muted, lineHeight: 1.6 }}>
+              Add onboarding instructions, process notes, or any internal guidance for this membership tier. Supports full paragraphs and line breaks.
+            </p>
+            {bigTextArea(instructions, setInstructions, "Step 1: Send the welcome email.\n\nStep 2: Assign a desk or office.\n\nStep 3: Add the member to the access system and Slack channel.\n\nStep 4: Schedule a 15-minute orientation walk-through…", 14)}
+          </div>
+        )}
+
+        {/* ── Email Template tab ── */}
+        {activeTab === "email" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            <p style={{ margin: 0, fontSize: "13px", color: C.muted, lineHeight: 1.6 }}>
+              Write the email template for this tier. The team can copy it directly from the tier card.
+            </p>
+            <div>
+              <label style={labelStyle}>Subject Line</label>
+              <input value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} style={textInput({ width: "100%" })} placeholder="Welcome to TCF — your [Tier Name] membership is ready!" />
+            </div>
+            <div>
+              <label style={labelStyle}>Email Body</label>
+              {bigTextArea(emailBody, setEmailBody, "Hi [Name],\n\nWelcome to The Coworking Foundation! We're so glad you're here.\n\nAs a [Tier Name] member, you have access to:\n- …\n\nYour access begins on [Start Date]. Please reach out to us if you have any questions.\n\nWarm regards,\nThe TCF Team", 14)}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: "24px" }}>
           <div>
@@ -483,6 +538,126 @@ function TierModal({ tier, onSave, onDelete, onClose }) {
         </div>
       </div>
     </>
+  );
+}
+
+function TierCard({ tier, isAdmin, onEdit }) {
+  const [expanded, setExpanded] = useState(false);
+  const [copiedInstructions, setCopiedInstructions] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState(false);
+  const accent = tier.color || C.accent;
+  const hasInstructions = !!tier.instructions?.trim();
+  const hasEmail = !!(tier.emailSubject?.trim() || tier.emailBody?.trim());
+  const hasExtra = hasInstructions || hasEmail;
+
+  function copyText(text, setter) {
+    navigator.clipboard?.writeText(text).then(() => {
+      setter(true);
+      setTimeout(() => setter(false), 2000);
+    });
+  }
+
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden", boxShadow: C.shadow, position: "relative", display: "flex", flexDirection: "column" }}>
+      {/* Popular badge */}
+      {tier.highlight && (
+        <div style={{ position: "absolute", top: "12px", right: "12px", background: accent, color: "#fff", fontSize: "10px", fontWeight: "800", padding: "3px 10px", borderRadius: "20px", letterSpacing: "0.06em", textTransform: "uppercase", zIndex: 1 }}>
+          ★ Popular
+        </div>
+      )}
+
+      {/* Color top strip */}
+      <div style={{ height: "6px", background: accent, flexShrink: 0 }} />
+
+      <div style={{ padding: "20px", flex: 1, display: "flex", flexDirection: "column" }}>
+        {/* Name */}
+        <div style={{ fontSize: "16px", fontWeight: "800", color: C.text, marginBottom: "6px" }}>{tier.name}</div>
+
+        {/* Price */}
+        <div style={{ display: "flex", alignItems: "baseline", gap: "6px", marginBottom: "10px" }}>
+          <span style={{ fontSize: "26px", fontWeight: "800", color: accent }}>{tier.price || "—"}</span>
+          {tier.billingFrequency && tier.billingFrequency !== "custom" && (
+            <span style={{ fontSize: "13px", color: C.muted, fontWeight: "500" }}>/ {tier.billingFrequency}</span>
+          )}
+        </div>
+
+        {/* Description */}
+        {tier.description && (
+          <p style={{ margin: "0 0 12px", fontSize: "13px", color: C.muted, lineHeight: "1.6" }}>{tier.description}</p>
+        )}
+
+        {/* Features */}
+        {tier.features && tier.features.length > 0 && (
+          <ul style={{ margin: "0 0 16px", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "6px" }}>
+            {tier.features.map((f, i) => (
+              <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px", color: C.text }}>
+                <span style={{ color: accent, fontWeight: "700", flexShrink: 0, marginTop: "1px" }}>✓</span>
+                {f}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Footer buttons */}
+        <div style={{ display: "flex", gap: "6px", marginTop: "auto" }}>
+          {hasExtra && (
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              style={{ flex: 1, padding: "7px", borderRadius: "8px", border: `1px solid ${expanded ? accent : C.border}`, background: expanded ? `${accent}15` : "none", color: expanded ? accent : C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
+            >
+              {expanded ? "▲ Hide Details" : "▼ View Details"}
+            </button>
+          )}
+          {isAdmin && (
+            <button onClick={onEdit} style={{ flex: hasExtra ? 0 : 1, padding: "7px 12px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>
+              ✏️ {hasExtra ? "" : "Edit Tier"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Expandable details panel */}
+      {expanded && hasExtra && (
+        <div style={{ borderTop: `1px solid ${C.border}`, background: C.cardBg }}>
+          {/* Instructions */}
+          {hasInstructions && (
+            <div style={{ padding: "16px 20px", borderBottom: hasEmail ? `1px solid ${C.border}` : "none" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                <span style={{ fontSize: "12px", fontWeight: "700", color: C.text, textTransform: "uppercase", letterSpacing: "0.06em" }}>📋 Instructions</span>
+                <button
+                  onClick={() => copyText(tier.instructions, setCopiedInstructions)}
+                  style={{ fontSize: "11px", fontWeight: "600", padding: "3px 10px", borderRadius: "6px", border: `1px solid ${C.border}`, background: copiedInstructions ? `${accent}15` : "none", color: copiedInstructions ? accent : C.muted, cursor: "pointer" }}
+                >
+                  {copiedInstructions ? "✓ Copied" : "Copy"}
+                </button>
+              </div>
+              <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: "1.75", whiteSpace: "pre-wrap" }}>{tier.instructions}</p>
+            </div>
+          )}
+
+          {/* Email Template */}
+          {hasEmail && (
+            <div style={{ padding: "16px 20px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                <span style={{ fontSize: "12px", fontWeight: "700", color: C.text, textTransform: "uppercase", letterSpacing: "0.06em" }}>✉️ Email Template</span>
+                <button
+                  onClick={() => copyText(`Subject: ${tier.emailSubject}\n\n${tier.emailBody}`, setCopiedEmail)}
+                  style={{ fontSize: "11px", fontWeight: "600", padding: "3px 10px", borderRadius: "6px", border: `1px solid ${C.border}`, background: copiedEmail ? `${accent}15` : "none", color: copiedEmail ? accent : C.muted, cursor: "pointer" }}
+                >
+                  {copiedEmail ? "✓ Copied" : "Copy"}
+                </button>
+              </div>
+              {tier.emailSubject && (
+                <div style={{ fontSize: "12px", fontWeight: "700", color: C.muted, marginBottom: "8px", padding: "6px 10px", background: C.card, borderRadius: "6px", border: `1px solid ${C.border}` }}>
+                  Subject: {tier.emailSubject}
+                </div>
+              )}
+              <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: "1.75", whiteSpace: "pre-wrap" }}>{tier.emailBody}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -531,59 +706,9 @@ function MembershipTiersSection({ tiers, isAdmin, token, onUpdate }) {
           {isAdmin && <div style={{ fontSize: "13px" }}>Click &ldquo;+ Add Tier&rdquo; to create your first membership plan.</div>}
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "16px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "16px" }}>
           {tiers.map((tier) => (
-            <div
-              key={tier.id}
-              style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden", boxShadow: C.shadow, position: "relative", display: "flex", flexDirection: "column" }}
-            >
-              {/* Popular badge */}
-              {tier.highlight && (
-                <div style={{ position: "absolute", top: "12px", right: "12px", background: tier.color || C.accent, color: "#fff", fontSize: "10px", fontWeight: "800", padding: "3px 10px", borderRadius: "20px", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                  ★ Popular
-                </div>
-              )}
-
-              {/* Color top strip */}
-              <div style={{ height: "6px", background: tier.color || C.accent, flexShrink: 0 }} />
-
-              <div style={{ padding: "20px", flex: 1, display: "flex", flexDirection: "column" }}>
-                {/* Name */}
-                <div style={{ fontSize: "16px", fontWeight: "800", color: C.text, marginBottom: "6px" }}>{tier.name}</div>
-
-                {/* Price */}
-                <div style={{ display: "flex", alignItems: "baseline", gap: "6px", marginBottom: "10px" }}>
-                  <span style={{ fontSize: "26px", fontWeight: "800", color: tier.color || C.accent }}>{tier.price || "—"}</span>
-                  {tier.billingFrequency && tier.billingFrequency !== "custom" && (
-                    <span style={{ fontSize: "13px", color: C.muted, fontWeight: "500" }}>/ {tier.billingFrequency}</span>
-                  )}
-                </div>
-
-                {/* Description */}
-                {tier.description && (
-                  <p style={{ margin: "0 0 12px", fontSize: "13px", color: C.muted, lineHeight: "1.6" }}>{tier.description}</p>
-                )}
-
-                {/* Features */}
-                {tier.features && tier.features.length > 0 && (
-                  <ul style={{ margin: "0 0 16px", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
-                    {tier.features.map((f, i) => (
-                      <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px", color: C.text }}>
-                        <span style={{ color: tier.color || C.accent, fontWeight: "700", flexShrink: 0, marginTop: "1px" }}>✓</span>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                {/* Admin edit button */}
-                {isAdmin && (
-                  <button onClick={() => setModalTier(tier)} style={{ marginTop: "auto", width: "100%", padding: "8px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>
-                    ✏️ Edit Tier
-                  </button>
-                )}
-              </div>
-            </div>
+            <TierCard key={tier.id} tier={tier} isAdmin={isAdmin} onEdit={() => setModalTier(tier)} />
           ))}
         </div>
       )}
