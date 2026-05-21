@@ -374,7 +374,7 @@ function ReferenceCard({ sectionKey, icon, title, data, isAdmin, token, onSaved 
           <span style={{ fontSize: "22px" }}>{icon}</span>
           <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: C.text }}>{title}</h3>
         </div>
-        {isAdmin && !editing && (
+        {!editing && (
           <button onClick={() => setEditing(true)} style={{ padding: "6px 12px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>✏️ Edit</button>
         )}
       </div>
@@ -564,7 +564,7 @@ function EmailTemplateCard({ template, isAdmin, onEdit }) {
           <button onClick={handleCopy} style={{ padding: "6px 12px", borderRadius: "8px", border: `1px solid ${C.border}`, background: copied ? "rgba(16,185,129,0.1)" : "none", color: copied ? "#10B981" : C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>
             {copied ? "✓ Copied!" : "📋 Copy"}
           </button>
-          {isAdmin && <button onClick={onEdit} style={{ padding: "6px 12px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>✏️ Edit</button>}
+          <button onClick={onEdit} style={{ padding: "6px 12px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>✏️ Edit</button>
         </div>
       </div>
       <p style={{ margin: 0, fontSize: "12px", color: C.muted, lineHeight: "1.6", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
@@ -720,7 +720,7 @@ function MailPackagesTab({ token, currentUser, teamMembers, reference, setRefere
             <span style={{ fontSize: "20px" }}>📋</span>
             <span style={{ fontSize: "15px", fontWeight: "800", color: C.text }}>How To Process Mail</span>
           </div>
-          {isAdmin && !editingHowTo && (
+          {!editingHowTo && (
             <button
               onClick={() => { setHowToDesc(reference?.mail?.description || ""); setHowToSteps(Array.isArray(reference?.mail?.steps) ? [...reference.mail.steps] : []); setHowToNotes(reference?.mail?.notes || ""); setEditingHowTo(true); }}
               style={{ padding: "6px 12px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}

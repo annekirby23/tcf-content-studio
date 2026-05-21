@@ -667,11 +667,9 @@ function CommCard({ card, isAdmin, onEdit }) {
               {copied ? "✓ Copied" : "📋 Copy"}
             </button>
           )}
-          {isAdmin && (
-            <button onClick={() => onEdit(card)} style={{ padding: "5px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}>
-              ✏️ Edit
-            </button>
-          )}
+          <button onClick={() => onEdit(card)} style={{ padding: "5px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}>
+            ✏️ Edit
+          </button>
           <button
             onClick={() => setExpanded((v) => !v)}
             style={{ padding: "5px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}
@@ -818,14 +816,12 @@ function CommTab({ token, currentUser }) {
             </button>
           ))}
         </div>
-        {isAdmin && (
-          <button
-            onClick={() => setModalCard({})}
-            style={{ padding: "9px 18px", borderRadius: "10px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer" }}
-          >
-            + New Card
-          </button>
-        )}
+        <button
+          onClick={() => setModalCard({})}
+          style={{ padding: "9px 18px", borderRadius: "10px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer" }}
+        >
+          + New Card
+        </button>
       </div>
 
       {loading ? (

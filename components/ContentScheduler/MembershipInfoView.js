@@ -94,7 +94,7 @@ function InfoCard({ icon, title, children, isAdmin, editContent, onToggleEdit, e
           <span style={{ fontSize: "22px" }}>{icon}</span>
           <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: C.text }}>{title}</h3>
         </div>
-        {isAdmin && !editing && (
+        {!editing && (
           <button onClick={onToggleEdit} style={{ padding: "6px 12px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>✏️ Edit</button>
         )}
       </div>
@@ -183,9 +183,7 @@ function WaitingListCard({ list, isAdmin, token, onUpdate }) {
           <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: C.text }}>Office Waiting List</h3>
           <span style={{ fontSize: "11px", padding: "3px 9px", borderRadius: "20px", background: C.accentLight, color: C.accent, fontWeight: "700" }}>{list.length}</span>
         </div>
-        {isAdmin && (
-          <button onClick={() => setShowAddForm((s) => !s)} style={{ padding: "7px 14px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>+ Add</button>
-        )}
+        <button onClick={() => setShowAddForm((s) => !s)} style={{ padding: "7px 14px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>+ Add</button>
       </div>
 
       {showAddForm && (
@@ -245,24 +243,18 @@ function WaitingListCard({ list, isAdmin, token, onUpdate }) {
                   <td style={{ padding: "10px", fontSize: "13px", color: C.text, fontWeight: "600", borderBottom: `1px solid ${C.border}` }}>{entry.name}</td>
                   <td style={{ padding: "10px", fontSize: "12px", color: C.muted, borderBottom: `1px solid ${C.border}` }}>{entry.notes}</td>
                   <td style={{ padding: "10px", borderBottom: `1px solid ${C.border}` }}>
-                    {isAdmin ? (
-                      <select
-                        value={entry.status || "Waiting"}
-                        onChange={(e) => handleStatusChange(entry.id, e.target.value)}
-                        style={{ padding: "4px 8px", border: `1px solid ${C.border}`, borderRadius: "6px", background: C.inputBg, color: C.text, fontSize: "12px", fontFamily: "inherit", outline: "none" }}
-                      >
-                        {Object.keys(WAIT_STATUSES).map((s) => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    ) : (
-                      <StatusBadge status={entry.status || "Waiting"} statusMap={WAIT_STATUSES} />
-                    )}
+                    <select
+                      value={entry.status || "Waiting"}
+                      onChange={(e) => handleStatusChange(entry.id, e.target.value)}
+                      style={{ padding: "4px 8px", border: `1px solid ${C.border}`, borderRadius: "6px", background: C.inputBg, color: C.text, fontSize: "12px", fontFamily: "inherit", outline: "none" }}
+                    >
+                      {Object.keys(WAIT_STATUSES).map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
                   </td>
                   <td style={{ padding: "10px", borderBottom: `1px solid ${C.border}` }}>
+                    <button onClick={() => startEdit(entry)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: "13px", padding: "0 4px" }} title="Edit">✏️</button>
                     {isAdmin && (
-                      <>
-                        <button onClick={() => startEdit(entry)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: "13px", padding: "0 4px" }} title="Edit">✏️</button>
-                        <button onClick={() => handleRemove(entry.id)} style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer", fontSize: "16px", padding: "0 4px" }} title="Remove">×</button>
-                      </>
+                      <button onClick={() => handleRemove(entry.id)} style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer", fontSize: "16px", padding: "0 4px" }} title="Remove">×</button>
                     )}
                   </td>
                 </tr>
@@ -321,9 +313,7 @@ function DeskRelocationCard({ list, isAdmin, token, onUpdate }) {
           <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: C.text }}>Desk Relocation List</h3>
           <span style={{ fontSize: "11px", padding: "3px 9px", borderRadius: "20px", background: C.accentLight, color: C.accent, fontWeight: "700" }}>{list.length}</span>
         </div>
-        {isAdmin && (
-          <button onClick={() => setShowAddForm((s) => !s)} style={{ padding: "7px 14px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>+ Add</button>
-        )}
+        <button onClick={() => setShowAddForm((s) => !s)} style={{ padding: "7px 14px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>+ Add</button>
       </div>
 
       {showAddForm && (
@@ -378,17 +368,13 @@ function DeskRelocationCard({ list, isAdmin, token, onUpdate }) {
                   <td style={{ padding: "10px", fontSize: "12px", color: C.muted, borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{entry.date}</td>
                   <td style={{ padding: "10px", fontSize: "12px", color: C.muted, borderBottom: `1px solid ${C.border}`, maxWidth: "140px" }}>{entry.notes}</td>
                   <td style={{ padding: "10px", borderBottom: `1px solid ${C.border}` }}>
-                    {isAdmin ? (
-                      <select
-                        value={entry.status || "Requested"}
-                        onChange={(e) => handleStatusChange(entry.id, e.target.value)}
-                        style={{ padding: "4px 8px", border: `1px solid ${C.border}`, borderRadius: "6px", background: C.inputBg, color: C.text, fontSize: "12px", fontFamily: "inherit", outline: "none" }}
-                      >
-                        {Object.keys(RELOC_STATUSES).map((s) => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    ) : (
-                      <StatusBadge status={entry.status || "Requested"} statusMap={RELOC_STATUSES} />
-                    )}
+                    <select
+                      value={entry.status || "Requested"}
+                      onChange={(e) => handleStatusChange(entry.id, e.target.value)}
+                      style={{ padding: "4px 8px", border: `1px solid ${C.border}`, borderRadius: "6px", background: C.inputBg, color: C.text, fontSize: "12px", fontFamily: "inherit", outline: "none" }}
+                    >
+                      {Object.keys(RELOC_STATUSES).map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
                   </td>
                   <td style={{ padding: "10px", borderBottom: `1px solid ${C.border}` }}>
                     {isAdmin && (
@@ -645,11 +631,9 @@ function TierCard({ tier, isAdmin, onEdit }) {
               {expanded ? "▲ Hide Details" : "▼ View Details"}
             </button>
           )}
-          {isAdmin && (
-            <button onClick={onEdit} style={{ flex: hasExtra ? 0 : 1, padding: "7px 12px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>
-              ✏️ {hasExtra ? "" : "Edit Tier"}
-            </button>
-          )}
+          <button onClick={onEdit} style={{ flex: hasExtra ? 0 : 1, padding: "7px 12px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>
+            ✏️ {hasExtra ? "" : "Edit Tier"}
+          </button>
         </div>
       </div>
 

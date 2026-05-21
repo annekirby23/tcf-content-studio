@@ -87,7 +87,7 @@ function Modal({ onClose, children, title, width = 540 }) {
 }
 
 // ── Resource Modal ────────────────────────────────────────────────────────────
-function ResourceModal({ resource, teamMembers, token, onSave, onDelete, onClose }) {
+function ResourceModal({ resource, teamMembers, token, onSave, onDelete, onClose, isAdmin }) {
   const isNew = !resource?.id;
   const [name, setName] = useState(resource?.name || "");
   const [icon, setIcon] = useState(resource?.icon || "📦");
@@ -195,7 +195,7 @@ function ResourceModal({ resource, teamMembers, token, onSave, onDelete, onClose
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} style={textInput({ width: "100%", resize: "vertical" })} placeholder="Internal notes…" />
         </div>
         <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "4px" }}>
-          {!isNew && <button onClick={handleDelete} disabled={deleting} style={{ padding: "9px 18px", borderRadius: "8px", border: "1px solid #EF4444", background: "none", color: "#EF4444", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>{deleting ? "Deleting…" : "Delete"}</button>}
+          {!isNew && isAdmin && <button onClick={handleDelete} disabled={deleting} style={{ padding: "9px 18px", borderRadius: "8px", border: "1px solid #EF4444", background: "none", color: "#EF4444", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>{deleting ? "Deleting…" : "Delete"}</button>}
           <button onClick={onClose} style={{ padding: "9px 18px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
           <button onClick={handleSave} disabled={saving || !name.trim()} style={{ padding: "9px 20px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", opacity: saving || !name.trim() ? 0.6 : 1 }}>{saving ? "Saving…" : "Save"}</button>
         </div>
@@ -277,7 +277,7 @@ function ResourceCard({ resource, isAdmin, onClick }) {
 
         {!resource.description && (
           <p style={{ margin: 0, fontSize: "13px", color: C.muted, fontStyle: "italic" }}>
-            {isAdmin ? "Click to add details." : "No description yet."}
+            No description yet.
           </p>
         )}
       </div>
@@ -378,7 +378,7 @@ export default function MemberResourcesView({ token, currentUser, teamMembers = 
               key={r.id}
               resource={r}
               isAdmin={isAdmin}
-              onClick={() => { if (isAdmin) { setModalResource(r); setShowModal(true); } }}
+              onClick={() => { setModalResource(r); setShowModal(true); }}
             />
           ))}
         </div>
@@ -392,6 +392,7 @@ export default function MemberResourcesView({ token, currentUser, teamMembers = 
           onSave={handleSave}
           onDelete={handleDelete}
           onClose={() => setShowModal(false)}
+          isAdmin={isAdmin}
         />
       )}
     </div>
