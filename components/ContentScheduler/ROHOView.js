@@ -105,7 +105,7 @@ function AboutSection({ about, isAdmin, onSave }) {
       <SectionHead
         icon="🎉"
         title="About ROHO"
-        right={isAdmin && !editing && (
+        right={!editing && (
           <button onClick={() => setEditing(true)}
             style={{ padding:"6px 12px", borderRadius:"8px", border:`1px solid ${C.border}`,
               background:"none", color:C.muted, fontSize:"12px", fontWeight:"600", cursor:"pointer" }}>
@@ -137,7 +137,7 @@ function AboutSection({ about, isAdmin, onSave }) {
         <p style={{ margin:0, fontSize:"13px", color:C.text, lineHeight:"1.85", whiteSpace:"pre-wrap" }}>{about}</p>
       ) : (
         <p style={{ margin:0, fontSize:"13px", color:C.muted, fontStyle:"italic" }}>
-          {isAdmin ? "Click Edit to describe ROHO — its mission, goals, and why it matters." : "No description yet."}
+          Click Edit to describe ROHO — its mission, goals, and why it matters.
         </p>
       )}
     </Card>
@@ -410,12 +410,10 @@ function TasksSection({ tasks, teamMembers, rohoTeam, isAdmin, currentUser, onUp
                       <Chip label={t.priority} color={PRIORITY_COLORS[t.priority]} />
                     </div>
                   </div>
-                  {(isAdmin || t.assigneeId === currentUser?.id) && (
-                    <div style={{ display:"flex", gap:"4px", flexShrink:0 }}>
-                      <button onClick={() => startEdit(t)} style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:"13px", padding:"2px 6px" }}>✏️</button>
-                      <button onClick={() => deleteTask(t.id)} style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:"13px", padding:"2px 4px" }}>✕</button>
-                    </div>
-                  )}
+                  <div style={{ display:"flex", gap:"4px", flexShrink:0 }}>
+                    <button onClick={() => startEdit(t)} style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:"13px", padding:"2px 6px" }}>✏️</button>
+                    <button onClick={() => deleteTask(t.id)} style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:"13px", padding:"2px 4px" }}>✕</button>
+                  </div>
                 </div>
               )}
             </div>
@@ -644,18 +642,14 @@ function MeetingNotesSection({ notes, isAdmin, currentUser, onUpdate }) {
                       </div>
                     </div>
                     <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-                      {isAdmin && (
-                        <>
-                          <button onClick={(e) => { e.stopPropagation(); startEdit(n); }}
-                            style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:"13px", padding:"2px 6px" }}>
-                            ✏️
-                          </button>
-                          <button onClick={(e) => { e.stopPropagation(); deleteNote(n.id); }}
-                            style={{ background:"none", border:"none", color:"#EF4444", cursor:"pointer", fontSize:"13px", padding:"2px 4px" }}>
-                            ✕
-                          </button>
-                        </>
-                      )}
+                      <button onClick={(e) => { e.stopPropagation(); startEdit(n); }}
+                        style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:"13px", padding:"2px 6px" }}>
+                        ✏️
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); deleteNote(n.id); }}
+                        style={{ background:"none", border:"none", color:"#EF4444", cursor:"pointer", fontSize:"13px", padding:"2px 4px" }}>
+                        ✕
+                      </button>
                       <span style={{ fontSize:"11px", color:C.muted }}>{expandedId === n.id ? "▲" : "▼"}</span>
                     </div>
                   </div>
@@ -821,12 +815,8 @@ function SpaceNeedsSection({ needs, isAdmin, currentUser, onUpdate }) {
                         <option value="in-progress">In Progress</option>
                         <option value="done">Done</option>
                       </select>
-                      {isAdmin && (
-                        <>
-                          <button onClick={() => startEdit(n)} style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:"13px", padding:"2px 6px" }}>✏️</button>
-                          <button onClick={() => deleteNeed(n.id)} style={{ background:"none", border:"none", color:"#EF4444", cursor:"pointer", fontSize:"14px", padding:"2px 4px" }}>✕</button>
-                        </>
-                      )}
+                      <button onClick={() => startEdit(n)} style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:"13px", padding:"2px 6px" }}>✏️</button>
+                      <button onClick={() => deleteNeed(n.id)} style={{ background:"none", border:"none", color:"#EF4444", cursor:"pointer", fontSize:"14px", padding:"2px 4px" }}>✕</button>
                     </div>
                   </div>
                 )}
@@ -869,6 +859,8 @@ function EventCoverageSection({ coverage, teamMembers, rohoTeam, isAdmin, curren
   const [date, setDate] = useState("");
   const [location, setLocation] = useState("");
   const [eventNotes, setEventNotes] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
 
   const assigneeOptions = rohoTeam.length > 0 ? rohoTeam : teamMembers;
 
@@ -880,6 +872,21 @@ function EventCoverageSection({ coverage, teamMembers, rohoTeam, isAdmin, curren
     }];
     onUpdate(next);
     setTitle(""); setDate(""); setLocation(""); setEventNotes(""); setShowForm(false);
+  }
+
+  function startEdit(ev) {
+    setEditingId(ev.id);
+    setEditForm({ title: ev.title, date: ev.date || "", location: ev.location || "", notes: ev.notes || "" });
+    setShowForm(false);
+  }
+
+  function saveEdit(id) {
+    if (!editForm.title?.trim()) return;
+    onUpdate((coverage||[]).map((e) => e.id === id ? {
+      ...e, title: editForm.title.trim(), date: editForm.date,
+      location: editForm.location.trim(), notes: editForm.notes,
+    } : e));
+    setEditingId(null);
   }
 
   function deleteEvent(id) {
@@ -919,7 +926,7 @@ function EventCoverageSection({ coverage, teamMembers, rohoTeam, isAdmin, curren
       <SectionHead
         icon="🗓️"
         title="Event Coverage"
-        right={isAdmin && !showForm && (
+        right={!showForm && !editingId && (
           <button onClick={() => setShowForm(true)}
             style={{ padding:"6px 14px", borderRadius:"8px", border:`1px solid ${ROHO_ACCENT}`,
               background:"none", color:ROHO_ACCENT, fontSize:"12px", fontWeight:"700", cursor:"pointer" }}>
@@ -972,33 +979,68 @@ function EventCoverageSection({ coverage, teamMembers, rohoTeam, isAdmin, curren
 
       {(!coverage || coverage.length === 0) ? (
         <p style={{ margin:0, fontSize:"13px", color:C.muted, fontStyle:"italic" }}>
-          {isAdmin ? "No events yet. Click \"+ Add Event\" to set up coverage." : "No events scheduled."}
+          No events yet. Click "+ Add Event" to set up coverage.
         </p>
       ) : (
         <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
           {(coverage||[]).map((ev) => {
             const slots = ev.slots || [];
             return (
-              <div key={ev.id} style={{ background:C.cardBg, borderRadius:"12px", border:`1px solid ${C.border}`,
+              <div key={ev.id} style={{ background:C.cardBg, borderRadius:"12px", border:`1px solid ${editingId === ev.id ? ROHO_ACCENT : C.border}`,
                 borderLeft:`3px solid ${ROHO_ACCENT}`, overflow:"hidden" }}>
-                {/* Event header */}
-                <div style={{ padding:"14px 16px", borderBottom:`1px solid ${C.border}`,
-                  display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:"12px" }}>
-                  <div>
-                    <div style={{ fontSize:"14px", fontWeight:"800", color:C.text }}>{ev.title}</div>
-                    <div style={{ display:"flex", gap:"12px", marginTop:"4px", flexWrap:"wrap" }}>
-                      {ev.date && <span style={{ fontSize:"12px", color:C.muted }}>📅 {fmtDate(ev.date)}</span>}
-                      {ev.location && <span style={{ fontSize:"12px", color:C.muted }}>📍 {ev.location}</span>}
-                      {ev.notes && <span style={{ fontSize:"12px", color:C.muted, fontStyle:"italic" }}>{ev.notes}</span>}
+                {/* Event header — edit mode */}
+                {editingId === ev.id ? (
+                  <div style={{ padding:"14px 16px", borderBottom:`1px solid ${C.border}` }}>
+                    <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:"10px", marginBottom:"10px" }}>
+                      <div>
+                        <label style={labelStyle}>Event Title *</label>
+                        <input value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} autoFocus
+                          style={textInput({ width:"100%" })} />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Date</label>
+                        <input type="date" value={editForm.date} onChange={(e) => setEditForm((f) => ({ ...f, date: e.target.value }))} style={textInput({ width:"100%" })} />
+                      </div>
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 2fr", gap:"10px", marginBottom:"10px" }}>
+                      <div>
+                        <label style={labelStyle}>Location</label>
+                        <input value={editForm.location} onChange={(e) => setEditForm((f) => ({ ...f, location: e.target.value }))} style={textInput({ width:"100%" })} />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Notes</label>
+                        <input value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} style={textInput({ width:"100%" })} />
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", gap:"8px", justifyContent:"flex-end" }}>
+                      <button onClick={() => setEditingId(null)} style={{ padding:"6px 14px", borderRadius:"8px", border:`1px solid ${C.border}`, background:"none", color:C.muted, fontSize:"12px", fontWeight:"600", cursor:"pointer" }}>Cancel</button>
+                      <button onClick={() => saveEdit(ev.id)} disabled={!editForm.title?.trim()} style={{ padding:"6px 16px", borderRadius:"8px", border:"none", background:ROHO_ACCENT, color:"#fff", fontSize:"12px", fontWeight:"700", cursor:"pointer", opacity:editForm.title?.trim() ? 1 : 0.5 }}>Save</button>
                     </div>
                   </div>
-                  {isAdmin && (
-                    <button onClick={() => deleteEvent(ev.id)}
-                      style={{ background:"none", border:"none", color:"#EF4444", cursor:"pointer", fontSize:"14px", padding:"2px 6px", flexShrink:0 }}>
-                      ✕
-                    </button>
-                  )}
-                </div>
+                ) : (
+                  /* Event header — view mode */
+                  <div style={{ padding:"14px 16px", borderBottom:`1px solid ${C.border}`,
+                    display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:"12px" }}>
+                    <div>
+                      <div style={{ fontSize:"14px", fontWeight:"800", color:C.text }}>{ev.title}</div>
+                      <div style={{ display:"flex", gap:"12px", marginTop:"4px", flexWrap:"wrap" }}>
+                        {ev.date && <span style={{ fontSize:"12px", color:C.muted }}>📅 {fmtDate(ev.date)}</span>}
+                        {ev.location && <span style={{ fontSize:"12px", color:C.muted }}>📍 {ev.location}</span>}
+                        {ev.notes && <span style={{ fontSize:"12px", color:C.muted, fontStyle:"italic" }}>{ev.notes}</span>}
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", gap:"4px", flexShrink:0 }}>
+                      <button onClick={() => startEdit(ev)}
+                        style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:"14px", padding:"2px 6px" }}>
+                        ✏️
+                      </button>
+                      <button onClick={() => deleteEvent(ev.id)}
+                        style={{ background:"none", border:"none", color:"#EF4444", cursor:"pointer", fontSize:"14px", padding:"2px 6px" }}>
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* 4 coverage slots */}
                 <div style={{ padding:"14px 16px" }}>
