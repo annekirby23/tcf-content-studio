@@ -321,6 +321,7 @@ function AddForm({ token, onAdd, onClose }) {
         {[
           { value: "recurring", emoji: "🔁", label: "Regular Supply", desc: "Ongoing orders" },
           { value: "purchase", emoji: "🛒", label: "One-Time Purchase", desc: "Equipment, furniture, etc." },
+          { value: "roho", emoji: "🎉", label: "ROHO Supplies", desc: "ROHO Social Club supplies" },
         ].map((opt) => (
           <button key={opt.value} onClick={() => setOrderType(opt.value)} style={{ flex: 1, padding: "10px 14px", borderRadius: "10px", border: `2px solid ${orderType === opt.value ? C.accent : C.border}`, background: orderType === opt.value ? C.accentLight : C.cardBg, color: orderType === opt.value ? C.accent : C.muted, fontSize: "12px", fontWeight: "700", cursor: "pointer", textAlign: "left" }}>
             <div>{opt.emoji} {opt.label}</div>
@@ -397,12 +398,17 @@ export default function InventoryView({ token, currentUser }) {
       .finally(() => setLoading(false));
   }, [token]);
 
-  const recurringItems = items.filter((i) => i.orderType !== "purchase");
+  const recurringItems = items.filter((i) => i.orderType !== "purchase" && i.orderType !== "roho");
   const purchaseItems = items.filter((i) => i.orderType === "purchase");
+  const rohoItems = items.filter((i) => i.orderType === "roho");
 
   const handleReorder = async (sectionType, newSectionItems) => {
-    // Merge the reordered section back into the full items array preserving the other section
-    const otherItems = items.filter((i) => (sectionType === "recurring" ? i.orderType === "purchase" : i.orderType !== "purchase"));
+    // Merge the reordered section back into the full items array preserving the other sections
+    const otherItems = items.filter((i) =>
+      sectionType === "recurring" ? (i.orderType === "purchase" || i.orderType === "roho")
+      : sectionType === "purchase" ? (i.orderType !== "purchase")
+      : (i.orderType !== "roho")
+    );
     const newItems = sectionType === "recurring"
       ? [...newSectionItems, ...otherItems]
       : [...otherItems, ...newSectionItems];
@@ -485,6 +491,20 @@ export default function InventoryView({ token, currentUser }) {
         onItemUpdate={handleItemUpdate}
         onItemDelete={handleItemDelete}
         onReorder={(newItems) => handleReorder("purchase", newItems)}
+        filterStatus={filterStatus}
+        filterNeeded={filterNeeded}
+        filterLocation={filterLocation}
+      />
+
+      <SectionBlock
+        title="ROHO Supplies"
+        emoji="🎉"
+        accentColor="#EC4899"
+        items={rohoItems}
+        token={token}
+        onItemUpdate={handleItemUpdate}
+        onItemDelete={handleItemDelete}
+        onReorder={(newItems) => handleReorder("roho", newItems)}
         filterStatus={filterStatus}
         filterNeeded={filterNeeded}
         filterLocation={filterLocation}
