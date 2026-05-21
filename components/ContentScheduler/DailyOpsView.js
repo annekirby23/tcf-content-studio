@@ -855,7 +855,7 @@ function MailPackagesTab({ token, currentUser, teamMembers, reference, setRefere
             {/* Mailbox Rows */}
             {loc.mailboxes.length === 0 ? (
               <div style={{ textAlign: "center", padding: "20px", color: C.muted, fontSize: "13px", fontStyle: "italic", background: C.cardBg, borderRadius: "10px", marginBottom: "12px" }}>
-                No mailboxes yet.{isAdmin ? " Click \"+ Add Mailbox\" below." : ""}
+                No mailboxes yet. Click &ldquo;+ Add Mailbox&rdquo; below.
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "0px", marginBottom: "12px", borderRadius: "10px", overflow: "hidden", border: `1px solid ${C.border}` }}>
@@ -867,7 +867,7 @@ function MailPackagesTab({ token, currentUser, teamMembers, reference, setRefere
                   <span style={{ ...labelStyle, margin: 0 }}>Sign</span>
                   {loc.id === "812" && <span style={{ ...labelStyle, margin: 0, color: "#8B5CF6" }}>CRIZ Details</span>}
                   {loc.id === "812" && <span style={{ ...labelStyle, margin: 0, color: "#8B5CF6" }}>Alerted</span>}
-                  {isAdmin && <span style={{ ...labelStyle, margin: 0 }}></span>}
+                  <span style={{ ...labelStyle, margin: 0 }}></span>
                 </div>
 
                 {loc.mailboxes.map((box, idx) => (
@@ -880,85 +880,70 @@ function MailPackagesTab({ token, currentUser, teamMembers, reference, setRefere
                   >
                     <div style={{ display: "grid", gridTemplateColumns: loc.id === "812" ? "1fr 1.5fr auto auto 1.5fr auto auto" : "1fr 1.5fr auto auto auto", gap: "8px", padding: "10px 12px", alignItems: "center" }}>
                       {/* Mailbox number */}
-                      {isAdmin ? (
-                        <input
-                          value={box.number}
-                          onChange={(e) => updateMailbox(loc.id, box.id, { number: e.target.value })}
-                          onBlur={() => save(locations)}
-                          style={textInput({ fontSize: "13px", padding: "6px 8px", width: "100%" })}
-                          placeholder="# / Suite"
-                        />
-                      ) : (
-                        <span style={{ fontSize: "13px", color: C.text, fontWeight: "600" }}>{box.number || "—"}</span>
-                      )}
+                      <input
+                        value={box.number}
+                        onChange={(e) => updateMailbox(loc.id, box.id, { number: e.target.value })}
+                        onBlur={() => save(locations)}
+                        style={textInput({ fontSize: "13px", padding: "6px 8px", width: "100%" })}
+                        placeholder="# / Suite"
+                      />
 
                       {/* Contact */}
-                      {isAdmin ? (
-                        <input
-                          value={box.contact}
-                          onChange={(e) => updateMailbox(loc.id, box.id, { contact: e.target.value })}
-                          onBlur={() => save(locations)}
-                          style={textInput({ fontSize: "13px", padding: "6px 8px", width: "100%" })}
-                          placeholder="Contact name(s)"
-                        />
-                      ) : (
-                        <span style={{ fontSize: "13px", color: C.text }}>{box.contact || "—"}</span>
-                      )}
+                      <input
+                        value={box.contact}
+                        onChange={(e) => updateMailbox(loc.id, box.id, { contact: e.target.value })}
+                        onBlur={() => save(locations)}
+                        style={textInput({ fontSize: "13px", padding: "6px 8px", width: "100%" })}
+                        placeholder="Contact name(s)"
+                      />
 
                       {/* GBP checkbox */}
-                      <label style={{ display: "flex", alignItems: "center", gap: "4px", cursor: isAdmin ? "pointer" : "default", whiteSpace: "nowrap" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: "4px", cursor: "pointer", whiteSpace: "nowrap" }}>
                         <input
                           type="checkbox"
                           checked={!!box.googleBizProfile}
-                          onChange={(e) => isAdmin && updateMailbox(loc.id, box.id, { googleBizProfile: e.target.checked })}
-                          disabled={!isAdmin}
-                          style={{ accentColor: C.accent, width: "15px", height: "15px", cursor: isAdmin ? "pointer" : "default" }}
+                          onChange={(e) => updateMailbox(loc.id, box.id, { googleBizProfile: e.target.checked })}
+                          style={{ accentColor: C.accent, width: "15px", height: "15px", cursor: "pointer" }}
                         />
                         <span style={{ fontSize: "11px", color: C.muted, fontWeight: "600" }}>GBP</span>
                       </label>
 
                       {/* Sign Created checkbox */}
-                      <label style={{ display: "flex", alignItems: "center", gap: "4px", cursor: isAdmin ? "pointer" : "default", whiteSpace: "nowrap" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: "4px", cursor: "pointer", whiteSpace: "nowrap" }}>
                         <input
                           type="checkbox"
                           checked={!!box.signCreated}
-                          onChange={(e) => isAdmin && updateMailbox(loc.id, box.id, { signCreated: e.target.checked })}
-                          disabled={!isAdmin}
-                          style={{ accentColor: C.accent, width: "15px", height: "15px", cursor: isAdmin ? "pointer" : "default" }}
+                          onChange={(e) => updateMailbox(loc.id, box.id, { signCreated: e.target.checked })}
+                          style={{ accentColor: C.accent, width: "15px", height: "15px", cursor: "pointer" }}
                         />
                         <span style={{ fontSize: "11px", color: C.muted, fontWeight: "600" }}>Sign</span>
                       </label>
 
                       {/* 812 CRIZ Details */}
                       {loc.id === "812" && (
-                        isAdmin ? (
-                          <input
-                            value={box.crizDetails || ""}
-                            onChange={(e) => updateMailbox(loc.id, box.id, { crizDetails: e.target.value })}
-                            onBlur={() => save(locations)}
-                            style={textInput({ fontSize: "13px", padding: "6px 8px", width: "100%", background: "rgba(139,92,246,0.07)", borderColor: "rgba(139,92,246,0.3)" })}
-                            placeholder="CRIZ details…"
-                          />
-                        ) : (
-                          <span style={{ fontSize: "13px", color: "#8B5CF6", background: "rgba(139,92,246,0.07)", borderRadius: "6px", padding: "4px 8px" }}>{box.crizDetails || "—"}</span>
-                        )
+                        <input
+                          value={box.crizDetails || ""}
+                          onChange={(e) => updateMailbox(loc.id, box.id, { crizDetails: e.target.value })}
+                          onBlur={() => save(locations)}
+                          style={textInput({ fontSize: "13px", padding: "6px 8px", width: "100%", background: "rgba(139,92,246,0.07)", borderColor: "rgba(139,92,246,0.3)" })}
+                          placeholder="CRIZ details…"
+                        />
                       )}
 
                       {/* 812 Member Alerted checkbox */}
                       {loc.id === "812" && (
-                        <label style={{ display: "flex", alignItems: "center", gap: "4px", cursor: isAdmin ? "pointer" : "default", whiteSpace: "nowrap" }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: "4px", cursor: "pointer", whiteSpace: "nowrap" }}>
                           <input
                             type="checkbox"
                             checked={!!box.memberAlerted}
-                            onChange={(e) => isAdmin && updateMailbox(loc.id, box.id, { memberAlerted: e.target.checked })}
-                            disabled={!isAdmin}
-                            style={{ accentColor: "#8B5CF6", width: "15px", height: "15px", cursor: isAdmin ? "pointer" : "default" }}
+                            onChange={(e) => updateMailbox(loc.id, box.id, { memberAlerted: e.target.checked })}
+                            style={{ accentColor: "#8B5CF6", width: "15px", height: "15px", cursor: "pointer" }}
                           />
                           <span style={{ fontSize: "11px", color: "#8B5CF6", fontWeight: "600" }}>Alerted</span>
                         </label>
                       )}
 
-                      {/* Delete button */}
+                      {/* Delete button — admin only */}
                       {isAdmin && (
                         <button
                           onClick={() => deleteMailbox(loc.id, box.id)}
@@ -975,14 +960,12 @@ function MailPackagesTab({ token, currentUser, teamMembers, reference, setRefere
             )}
 
             {/* Add Mailbox button */}
-            {isAdmin && (
-              <button
-                onClick={() => addMailbox(loc.id)}
-                style={{ padding: "8px 16px", borderRadius: "8px", border: `1px dashed ${accent}`, background: `${accent}10`, color: accent, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}
-              >
-                + Add Mailbox
-              </button>
-            )}
+            <button
+              onClick={() => addMailbox(loc.id)}
+              style={{ padding: "8px 16px", borderRadius: "8px", border: `1px dashed ${accent}`, background: `${accent}10`, color: accent, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}
+            >
+              + Add Mailbox
+            </button>
           </div>
         );
       })}
