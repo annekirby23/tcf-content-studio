@@ -33,6 +33,7 @@ import DailyOpsView from "./DailyOpsView";
 import BrandRepoView from "./BrandRepoView";
 import MemberResourcesView from "./MemberResourcesView";
 import MembershipInfoView from "./MembershipInfoView";
+import ROHOView from "./ROHOView";
 
 const TOKEN_KEY = "tcf_session";
 
@@ -68,6 +69,7 @@ const DEFAULT_INTERNAL_VIEWS = [
   { id: "inventory",  icon: "📦", label: "Inventory" },
   { id: "teamtasks",  icon: "✅", label: "Task Tracker" },
   { id: "training",   icon: "🎓", label: "Training" },
+  { id: "roho",       icon: "🎉", label: "ROHO Social Club" },
 ];
 
 // ─── Avatar helpers ──────────────────────────────────────────────────────────
@@ -1480,6 +1482,7 @@ export default function ContentScheduler() {
     { id: "leadership", label: "Leadership Hub" },
     { id: "dailyops", label: "Daily Ops & Systems" },
     { id: "brandrepo", label: "Brand Repository" },
+    { id: "roho", label: "ROHO Social Club" },
   ];
   const topBarTitle = view === "mydash"
     ? workspaceTitle
@@ -2000,6 +2003,7 @@ export default function ContentScheduler() {
               {view === "brandrepo" && <BrandRepoView token={authToken} currentUser={currentUser} />}
               {view === "memberresources" && <MemberResourcesView token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
               {view === "membershipinfo" && <MembershipInfoView token={authToken} currentUser={currentUser} />}
+              {view === "roho" && <ROHOView token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
             </>
           )}
         </div>

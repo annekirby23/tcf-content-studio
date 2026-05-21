@@ -3225,6 +3225,22 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
       .catch(() => {});
   }, [token, effectiveViewingUserId]);
 
+  // ROHO Social Club — tasks assigned to this user + team membership
+  const [rohoData, setRohoData] = useState(null);
+  useEffect(() => {
+    apiFetch("/api/roho", {}, token)
+      .then((r) => r.json())
+      .then((data) => setRohoData(data))
+      .catch(() => {});
+  }, [token, effectiveViewingUserId]);
+
+  const rohoTasks = rohoData
+    ? (rohoData.tasks || []).filter((t) => !t.done && t.assigneeId === effectiveViewingUserId)
+    : [];
+  const isRohoMember = rohoData
+    ? (rohoData.teamMembers || []).some((m) => m.userId === effectiveViewingUserId)
+    : false;
+
   // ── Collapsible workspace cards ───────────────────────────────────────────
   const CARD_STORAGE_KEY = `tcf_cards_${effectiveViewingUserId}`;
   const [cardCollapsed, setCardCollapsed] = useState(() => {
@@ -3647,6 +3663,51 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
               onOpenSlack={onOpenSlack}
             />
           </CCard>
+
+          {/* ROHO Team Badge */}
+          {isRohoMember && (
+            <div style={{ background: "linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)", border: "1px solid #f9a8d4", borderRadius: "16px", overflow: "hidden", boxShadow: C.shadow }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "14px 18px" }}>
+                <span style={{ fontSize: "22px" }}>🎉</span>
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: "700", color: "#be185d" }}>ROHO Social Club Team</div>
+                  <div style={{ fontSize: "11px", color: "#9d174d", marginTop: "2px" }}>
+                    {(rohoData?.teamMembers || []).find((m) => m.userId === effectiveViewingUserId)?.role || "Team Member"}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ROHO Tasks assigned to this user */}
+          {rohoTasks.length > 0 && (
+            <div style={{ background: C.card, border: "1px solid #f9a8d4", borderRadius: "16px", boxShadow: C.shadow, overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 16px", background: "#fdf2f8", borderBottom: "1px solid #f9a8d4" }}>
+                <span style={{ fontSize: "10px", fontWeight: "700", color: "#be185d", textTransform: "uppercase", letterSpacing: "0.07em" }}>🎉 ROHO Tasks</span>
+              </div>
+              <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                {rohoTasks.map((t) => {
+                  const overdue = t.dueDate && t.dueDate < localDateStr();
+                  const dueToday = t.dueDate && t.dueDate === localDateStr();
+                  return (
+                    <div key={t.id} style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "10px 12px", borderRadius: "10px", background: overdue ? "#fff1f2" : C.cardBg, border: `1px solid ${overdue ? "#fca5a5" : C.border}` }}>
+                      <span style={{ fontSize: "16px", marginTop: "1px" }}>
+                        {t.priority === "high" ? "🔴" : t.priority === "low" ? "🟢" : "🟡"}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "13px", fontWeight: "600", color: overdue ? "#dc2626" : C.text }}>{t.text}</div>
+                        {t.dueDate && (
+                          <div style={{ fontSize: "11px", marginTop: "3px", color: overdue ? "#dc2626" : dueToday ? "#d97706" : C.muted, fontWeight: overdue || dueToday ? "700" : "400" }}>
+                            {overdue ? "⚠️ Overdue · " : dueToday ? "📅 Due today · " : "📅 "}{t.dueDate}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Member Resources assigned to this user */}
           {assignedResources.length > 0 && (
