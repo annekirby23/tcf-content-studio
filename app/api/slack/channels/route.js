@@ -24,7 +24,7 @@ export async function POST(req) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { name, description, emoji } = body;
+  const { name, description, emoji, assignedTo, helpers, memberManagers, engagementLevel, notes, isMemberClub, clubId, purpose } = body;
 
   if (!name || typeof name !== "string" || name.trim().length === 0) {
     return NextResponse.json({ error: "name is required" }, { status: 400 });
@@ -40,6 +40,14 @@ export async function POST(req) {
     name: name.trim(),
     description: description || "",
     emoji: emoji || "💬",
+    assignedTo: assignedTo || null,
+    helpers: Array.isArray(helpers) ? helpers : [],
+    memberManagers: Array.isArray(memberManagers) ? memberManagers : [],
+    engagementLevel: ["none","low","moderate","high"].includes(engagementLevel) ? engagementLevel : "none",
+    notes: String(notes || ""),
+    isMemberClub: Boolean(isMemberClub),
+    clubId: clubId || null,
+    purpose: String(purpose || ""),
     createdBy: user.name,
     createdAt: new Date().toISOString(),
   };
@@ -81,13 +89,8 @@ export async function PUT(req) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { id, name, description, emoji, assignedTo } = body;
+  const { id, name, description, emoji, assignedTo, helpers, memberManagers, engagementLevel, notes, isMemberClub, clubId, purpose } = body;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
-
-  // Only admins can rename/edit channel details; anyone can assign
-  if ((name !== undefined || emoji !== undefined || description !== undefined) && user.role !== "admin") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   if (name !== undefined) {
     if (typeof name !== "string" || name.trim().length === 0) {
@@ -108,6 +111,14 @@ export async function PUT(req) {
   if (description !== undefined) updated.description = description;
   if (emoji !== undefined) updated.emoji = emoji;
   if (assignedTo !== undefined) updated.assignedTo = assignedTo || null;
+  if (helpers !== undefined) updated.helpers = Array.isArray(helpers) ? helpers : [];
+  if (memberManagers !== undefined) updated.memberManagers = Array.isArray(memberManagers) ? memberManagers : [];
+  if (engagementLevel !== undefined) updated.engagementLevel = ["none","low","moderate","high"].includes(engagementLevel) ? engagementLevel : "none";
+  if (notes !== undefined) updated.notes = String(notes || "");
+  if (isMemberClub !== undefined) updated.isMemberClub = Boolean(isMemberClub);
+  if (clubId !== undefined) updated.clubId = clubId || null;
+  if (purpose !== undefined) updated.purpose = String(purpose || "");
+  updated.updatedAt = new Date().toISOString();
 
   channels[idx] = updated;
   await kvSet(CHANNELS_KEY, channels);
