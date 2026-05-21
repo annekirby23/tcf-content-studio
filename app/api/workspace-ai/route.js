@@ -192,6 +192,18 @@ ${context}
       return Response.json({ result: message.content[0].text });
     }
 
+    if (type === "slack-engagement") {
+      const { prompt } = body;
+      if (!prompt) return Response.json({ error: "prompt is required" }, { status: 400 });
+      const client = getClient();
+      const message = await client.messages.create({
+        model: "claude-opus-4-7",
+        max_tokens: 600,
+        messages: [{ role: "user", content: prompt }],
+      });
+      return Response.json({ result: message.content[0].text });
+    }
+
     return Response.json({ error: "Invalid type" }, { status: 400 });
   } catch (e) {
     return Response.json({ error: e.message }, { status: 500 });

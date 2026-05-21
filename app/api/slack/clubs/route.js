@@ -20,9 +20,10 @@ export async function POST(req) {
   const body = await req.json().catch(() => ({}));
   const name = String(body.name || "").trim();
   if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 });
+  const notes = String(body.notes || "").trim();
 
   const clubs = (await kvGet(KEY)) || [];
-  const club = { id: crypto.randomBytes(8).toString("hex"), name, createdAt: new Date().toISOString() };
+  const club = { id: crypto.randomBytes(8).toString("hex"), name, notes, createdAt: new Date().toISOString() };
   clubs.push(club);
   await kvSet(KEY, clubs);
   return NextResponse.json(club, { status: 201 });
@@ -34,14 +35,14 @@ export async function PUT(req) {
   if (user.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
-  const { id, name } = body;
+  const { id, name, notes } = body;
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
   const clubs = (await kvGet(KEY)) || [];
   const idx = clubs.findIndex((c) => c.id === id);
   if (idx === -1) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  clubs[idx] = { ...clubs[idx], name: String(name || "").trim() };
+  clubs[idx] = { ...clubs[idx], name: String(name || "").trim(), notes: String(notes || "").trim() };
   await kvSet(KEY, clubs);
   return NextResponse.json(clubs[idx]);
 }

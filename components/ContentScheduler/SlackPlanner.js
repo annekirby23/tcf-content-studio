@@ -231,24 +231,27 @@ function ChannelFormModal({ initial, onSave, onCancel, teamMembers = [], clubs =
 
 function ClubsManager({ token, clubs, onClubsChange }) {
   const [newName, setNewName] = useState("");
+  const [newNotes, setNewNotes] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState("");
+  const [editNotes, setEditNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
   const addClub = async () => {
     if (!newName.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch("/api/slack/clubs", { method: "POST", headers: { "x-session": token, "Content-Type": "application/json" }, body: JSON.stringify({ name: newName.trim() }) });
+      const res = await fetch("/api/slack/clubs", { method: "POST", headers: { "x-session": token, "Content-Type": "application/json" }, body: JSON.stringify({ name: newName.trim(), notes: newNotes.trim() }) });
       const club = await res.json();
       onClubsChange([...clubs, club]);
       setNewName("");
+      setNewNotes("");
     } finally { setSaving(false); }
   };
 
   const saveEdit = async (id) => {
     if (!editName.trim()) return;
-    const res = await fetch("/api/slack/clubs", { method: "PUT", headers: { "x-session": token, "Content-Type": "application/json" }, body: JSON.stringify({ id, name: editName.trim() }) });
+    const res = await fetch("/api/slack/clubs", { method: "PUT", headers: { "x-session": token, "Content-Type": "application/json" }, body: JSON.stringify({ id, name: editName.trim(), notes: editNotes.trim() }) });
     const updated = await res.json();
     onClubsChange(clubs.map((c) => c.id === id ? updated : c));
     setEditingId(null);
@@ -262,29 +265,36 @@ function ClubsManager({ token, clubs, onClubsChange }) {
   return (
     <div style={{ padding: "16px 20px", background: C.cardBg, borderRadius: 14, border: `1px solid ${C.border}`, marginBottom: 20 }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: C.text, marginBottom: 12 }}>⭕ Manage Clubs List</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
         {clubs.length === 0 && <div style={{ fontSize: 12, color: C.muted, fontStyle: "italic" }}>No clubs yet.</div>}
         {clubs.map((c) => (
-          <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", background: C.card, borderRadius: 8, border: `1px solid ${C.border}` }}>
+          <div key={c.id} style={{ background: C.card, borderRadius: 8, border: `1px solid ${C.border}`, overflow: "hidden" }}>
             {editingId === c.id ? (
-              <>
-                <input value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus style={{ ...inputStyle({ flex: 1, padding: "4px 8px", fontSize: 12 }) }} />
-                <button onClick={() => saveEdit(c.id)} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: C.accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Save</button>
-                <button onClick={() => setEditingId(null)} style={{ padding: "4px 8px", borderRadius: 6, border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: 12, cursor: "pointer" }}>✕</button>
-              </>
+              <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+                <input value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus placeholder="Club name…" style={{ ...inputStyle({ fontSize: 12, padding: "5px 8px" }) }} />
+                <textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={2} placeholder="Notes about this club…" style={{ ...inputStyle({ fontSize: 12, padding: "5px 8px", resize: "vertical", lineHeight: 1.5 }) }} />
+                <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                  <button onClick={() => setEditingId(null)} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: 12, cursor: "pointer" }}>Cancel</button>
+                  <button onClick={() => saveEdit(c.id)} style={{ padding: "4px 12px", borderRadius: 6, border: "none", background: C.accent, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Save</button>
+                </div>
+              </div>
             ) : (
-              <>
-                <span style={{ flex: 1, fontSize: 13, color: C.text }}>{c.name}</span>
-                <button onClick={() => { setEditingId(c.id); setEditName(c.name); }} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 12 }}>✏️</button>
-                <button onClick={() => deleteClub(c.id)} style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer", fontSize: 12 }}>🗑</button>
-              </>
+              <div style={{ padding: "9px 12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: C.text }}>{c.name}</span>
+                  <button onClick={() => { setEditingId(c.id); setEditName(c.name); setEditNotes(c.notes || ""); }} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 12 }}>✏️</button>
+                  <button onClick={() => deleteClub(c.id)} style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer", fontSize: 12 }}>🗑</button>
+                </div>
+                {c.notes && <div style={{ fontSize: 11, color: C.muted, marginTop: 4, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{c.notes}</div>}
+              </div>
             )}
           </div>
         ))}
       </div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <input value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addClub()} placeholder="New club name…" style={{ ...inputStyle({ flex: 1 }) }} />
-        <button onClick={addClub} disabled={saving || !newName.trim()} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: C.accent, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: !newName.trim() ? 0.5 : 1 }}>Add</button>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New club name…" style={{ ...inputStyle() }} />
+        <textarea value={newNotes} onChange={(e) => setNewNotes(e.target.value)} rows={2} placeholder="Notes (optional)…" style={{ ...inputStyle({ resize: "vertical", lineHeight: 1.5 }) }} />
+        <button onClick={addClub} disabled={saving || !newName.trim()} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: C.accent, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: !newName.trim() ? 0.5 : 1, alignSelf: "flex-end" }}>Add Club</button>
       </div>
     </div>
   );
@@ -433,11 +443,12 @@ function EngagementSuggestions({ channel, token }) {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-session": token },
         body: JSON.stringify({
+          type: "slack-engagement",
           prompt: `You are a community engagement expert for a coworking space called TCF. Give 5 specific, actionable suggestions to increase activity and engagement for the Slack channel "#${channel.name}".\n\nChannel purpose: ${channel.purpose || channel.description || "Not specified"}\nCurrent engagement level: ${channel.engagementLevel || "unknown"}\nNotes: ${channel.notes || "None"}\n\nFormat as a numbered list. Keep each suggestion concise (2-3 sentences). Focus on realistic tactics that a small community team can execute.`,
         }),
       });
       const data = await res.json();
-      setSuggestions(data.summary || data.message || "");
+      setSuggestions(data.result || "");
     } catch {
       setError("Failed to generate suggestions.");
     } finally { setLoading(false); }
@@ -591,12 +602,10 @@ export default function SlackPlanner({ currentUser, token, onMakePost, teamMembe
           {/* Sidebar Header */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 14px 10px", borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, background: C.surface, zIndex: 1 }}>
             <span style={{ fontWeight: 700, fontSize: 13, color: C.text }}>Slack Channels</span>
-            {isAdmin && (
-              <button onClick={() => { setEditingChannel(null); setShowChannelModal(true); }} title="Add channel"
-                style={{ width: 26, height: 26, borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                +
-              </button>
-            )}
+            <button onClick={() => { setEditingChannel(null); setShowChannelModal(true); }} title="Add channel"
+              style={{ width: 26, height: 26, borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              +
+            </button>
           </div>
 
           {/* Admin: Clubs Manager toggle */}
@@ -635,10 +644,10 @@ export default function SlackPlanner({ currentUser, token, onMakePost, teamMembe
                     {channel.isMemberClub && <span title="Member Club" style={{ fontSize: 10, color: "#8B5CF6" }}>⭕</span>}
                     <span title={`Engagement: ${engCfg.label}`} style={{ fontSize: 8, color: engCfg.color, flexShrink: 0 }}>●</span>
                     {channel.assignedTo && (() => { const m = teamMembers.find((t) => t.id === channel.assignedTo); if (!m) return null; return <MiniAvatar name={m.name} size={18} />; })()}
-                    {isSelected && isAdmin && (
+                    {isSelected && (
                       <span style={{ display: "flex", gap: 2, flexShrink: 0 }}>
                         <button onClick={(e) => { e.stopPropagation(); setEditingChannel(channel); setShowChannelModal(true); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: "1px 3px", color: C.muted }}>✏️</button>
-                        <button onClick={(e) => { e.stopPropagation(); handleDeleteChannel(channel.id); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: "1px 3px", color: C.muted }}>🗑</button>
+                        {isAdmin && <button onClick={(e) => { e.stopPropagation(); handleDeleteChannel(channel.id); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: "1px 3px", color: C.muted }}>🗑</button>}
                       </span>
                     )}
                   </div>
@@ -667,12 +676,10 @@ export default function SlackPlanner({ currentUser, token, onMakePost, teamMembe
                   </div>
                   {selectedChannel.description && <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{selectedChannel.description}</div>}
                 </div>
-                {isAdmin && (
-                  <button onClick={() => { setEditingChannel(selectedChannel); setShowChannelModal(true); }}
-                    style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                    ✏️ Edit Channel
-                  </button>
-                )}
+                <button onClick={() => { setEditingChannel(selectedChannel); setShowChannelModal(true); }}
+                  style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  ✏️ Edit Channel
+                </button>
               </div>
 
               {/* Team info bar */}
