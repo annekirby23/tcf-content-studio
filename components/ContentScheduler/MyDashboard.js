@@ -3207,6 +3207,40 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
   const effectiveViewingUserId = viewingUserId || currentUserId;
   const readOnly = effectiveViewingUserId !== currentUserId;
 
+  // Spanish translation toggle — only shown on Yessica's workspace
+  const ownerMember = teamMembers.find((m) => m.id === effectiveViewingUserId);
+  const isYessica = (ownerMember?.name || currentUser?.name || "").toLowerCase().includes("yessica");
+  const [isSpanish, setIsSpanish] = useState(() => {
+    if (typeof document === "undefined") return false;
+    return document.cookie.split(";").some((c) => c.trim().startsWith("googtrans=/en/es"));
+  });
+  function toggleSpanish() {
+    if (isSpanish) {
+      document.cookie = "googtrans=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      document.cookie = `googtrans=; path=/; domain=${window.location.hostname}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+    } else {
+      document.cookie = "googtrans=/en/es; path=/";
+      document.cookie = `googtrans=/en/es; path=/; domain=${window.location.hostname}`;
+      // Inject hidden translate element + script if not already present
+      if (!document.getElementById("google_translate_element")) {
+        const div = document.createElement("div");
+        div.id = "google_translate_element";
+        div.style.cssText = "position:absolute;top:-9999px;left:-9999px;visibility:hidden;";
+        document.body.appendChild(div);
+      }
+      if (!document.getElementById("gt-script")) {
+        window.googleTranslateElementInit = function () {
+          new window.google.translate.TranslateElement({ pageLanguage: "en", includedLanguages: "es", autoDisplay: false }, "google_translate_element");
+        };
+        const s = document.createElement("script");
+        s.id = "gt-script";
+        s.src = "//translate.googleapis.com/translate_a/element.js?cb=googleTranslateElementInit";
+        document.head.appendChild(s);
+      }
+    }
+    window.location.reload();
+  }
+
   // Profile data (header image, processRole, sectionTitles)
   const [profile, setProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -3379,6 +3413,10 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
 
   return (
     <div style={{ padding: "0", minHeight: "100vh", background: C.bg }}>
+      {/* Suppress Google Translate toolbar when active */}
+      {isYessica && isSpanish && (
+        <style>{`body { top: 0 !important; } .goog-te-banner-frame, #goog-gt-tt, .goog-te-balloon-frame { display: none !important; } .goog-logo-link { display: none !important; }`}</style>
+      )}
       {/* Header banner */}
       <div style={{ position: "relative", marginBottom: "24px" }}>
         <div style={{
@@ -3492,6 +3530,18 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
                   <p style={{ margin: 0, fontSize: "13px", color: C.muted }}>Read-only view</p>
                 )}
               </div>
+              {/* Spanish toggle for Yessica */}
+              {isYessica && (
+                <div style={{ marginTop: "10px" }}>
+                  <button
+                    onClick={toggleSpanish}
+                    style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "6px 14px", borderRadius: "20px", border: `1px solid ${isSpanish ? "#10B981" : C.border}`, background: isSpanish ? "rgba(16,185,129,0.1)" : C.cardBg, color: isSpanish ? "#10B981" : C.muted, fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "all 0.15s" }}
+                    title={isSpanish ? "Switch back to English" : "Translate app to Spanish"}
+                  >
+                    🌐 {isSpanish ? "Volver al inglés" : "Ver en Español"}
+                  </button>
+                </div>
+              )}
               {/* Date + Photo Dump */}
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
                 <LiveDate />
