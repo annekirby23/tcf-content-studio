@@ -18,7 +18,6 @@ export async function GET(req) {
     const user = users.find((u) => u.id === userId);
     if (!user || user.role !== "admin") return Response.json({ error: "Forbidden" }, { status: 403 });
 
-    const redis = getRedis();
     const keys = await redis.keys("*");
 
     const dump = {};
