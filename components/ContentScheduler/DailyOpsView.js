@@ -601,7 +601,7 @@ function MailPackagesTab({ token, currentUser, teamMembers, reference, setRefere
   const [howToDesc, setHowToDesc] = useState(reference?.mail?.description || "");
   const [howToSteps, setHowToSteps] = useState(Array.isArray(reference?.mail?.steps) ? reference.mail.steps : []);
   const [howToNotes, setHowToNotes] = useState(reference?.mail?.notes || "");
-  const [howToCollapsed, setHowToCollapsed] = useState(false);
+  const [howToCollapsed, setHowToCollapsed] = useState(true);
   const [overviewCollapsed, setOverviewCollapsed] = useState(false);
   const [stepsCollapsed, setStepsCollapsed] = useState(false);
   const [notesCollapsed, setNotesCollapsed] = useState(false);
