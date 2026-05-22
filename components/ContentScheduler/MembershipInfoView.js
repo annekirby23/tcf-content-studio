@@ -684,7 +684,7 @@ function TierCard({ tier, isAdmin, onEdit }) {
 
 function MembershipTiersSection({ tiers, isAdmin, token, onUpdate }) {
   const [modalTier, setModalTier] = useState(null); // null = closed, false = new, object = edit
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   async function saveTiers(updated) {
     const res = await apiFetch("/api/membershipinfo", { method: "PUT", body: JSON.stringify({ membershipTiers: updated }) }, token);
@@ -714,7 +714,7 @@ function MembershipTiersSection({ tiers, isAdmin, token, onUpdate }) {
         onClick={() => setCollapsed((v) => !v)}
         style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 16px", background: C.cardBg, borderBottom: collapsed ? "none" : `1px solid ${C.border}`, cursor: "pointer", userSelect: "none" }}
       >
-        <span style={{ fontSize: "10px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>🏷️ Membership Tiers</span>
+        <span style={{ fontSize: "15px", fontWeight: "800", color: C.text }}>🏷️ Membership Tiers</span>
         <span style={{ fontSize: "11px", color: C.muted, fontWeight: "700" }}>{collapsed ? "+" : "−"}</span>
       </div>
 
@@ -833,10 +833,10 @@ export default function MembershipInfoView({ token, currentUser }) {
       <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", alignItems: "flex-start" }}>
         {/* Left Column */}
         <div style={{ flex: "1 1 380px", minWidth: 0 }}>
-          {/* 1. New Member Onboarding */}
+          {/* 1. Getting a New Member Signed Up */}
           <InfoCard
             icon="🆕"
-            title="New Member Onboarding"
+            title="Getting a New Member Signed Up"
             isAdmin={isAdmin}
             editing={editingCard === "onboarding"}
             saving={saving}
@@ -846,36 +846,33 @@ export default function MembershipInfoView({ token, currentUser }) {
             editContent={
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                 <div>
-                  <label style={labelStyle}>Sign-Up Form Details</label>
-                  <textarea value={draft.signupFormDetails || ""} onChange={(e) => setDraft((d) => ({ ...d, signupFormDetails: e.target.value }))} rows={3} style={textInput({ width: "100%", resize: "vertical" })} placeholder="Details about the sign-up form and process…" />
+                  <label style={labelStyle}>Notes</label>
+                  <textarea value={draft.signupFormDetails || ""} onChange={(e) => setDraft((d) => ({ ...d, signupFormDetails: e.target.value }))} rows={3} style={textInput({ width: "100%", resize: "vertical" })} placeholder="Any notes about the sign-up process…" />
                 </div>
                 <div>
-                  <label style={labelStyle}>Sign-Up Form URL</label>
+                  <label style={labelStyle}>Sign Up to TCF Link</label>
                   <input value={draft.signupFormUrl || ""} onChange={(e) => setDraft((d) => ({ ...d, signupFormUrl: e.target.value }))} style={textInput({ width: "100%" })} placeholder="https://…" />
                 </div>
                 <div>
-                  <label style={labelStyle}>Sign-Up Direct Link</label>
+                  <label style={labelStyle}>Sign Up for Onboarding Link</label>
                   <input value={draft.signupLink || ""} onChange={(e) => setDraft((d) => ({ ...d, signupLink: e.target.value }))} style={textInput({ width: "100%" })} placeholder="https://…" />
                 </div>
               </div>
             }
           >
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div style={{ paddingBottom: "14px", borderBottom: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: "12px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>Sign-Up Form</div>
-                {info?.signupFormDetails && <p style={{ margin: "0 0 10px", fontSize: "13px", color: C.text, lineHeight: "1.7", whiteSpace: "pre-wrap" }}>{info.signupFormDetails}</p>}
-                {info?.signupFormUrl ? <LinkButton url={info.signupFormUrl} label="Open Form" /> : <span style={{ fontSize: "13px", color: C.muted, fontStyle: "italic" }}>No URL set.</span>}
-              </div>
-              <div>
-                <div style={{ fontSize: "12px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>Sign-Up Link</div>
-                {info?.signupLink ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <code style={{ fontSize: "12px", color: C.text, background: C.cardBg, padding: "6px 10px", borderRadius: "6px", border: `1px solid ${C.border}`, flex: 1, wordBreak: "break-all" }}>{info.signupLink}</code>
-                    <CopyButton text={info.signupLink} label="Copy" />
-                  </div>
-                ) : (
-                  <span style={{ fontSize: "13px", color: C.muted, fontStyle: "italic" }}>No link set.</span>
-                )}
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              {info?.signupFormDetails && (
+                <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: "1.7", whiteSpace: "pre-wrap" }}>{info.signupFormDetails}</p>
+              )}
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Sign Up to TCF</div>
+                  {info?.signupFormUrl ? <LinkButton url={info.signupFormUrl} label="Sign Up to TCF →" /> : <span style={{ fontSize: "13px", color: C.muted, fontStyle: "italic" }}>No link set.</span>}
+                </div>
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" }}>Sign Up for Onboarding</div>
+                  {info?.signupLink ? <LinkButton url={info.signupLink} label="Sign Up for Onboarding →" /> : <span style={{ fontSize: "13px", color: C.muted, fontStyle: "italic" }}>No link set.</span>}
+                </div>
               </div>
             </div>
           </InfoCard>
