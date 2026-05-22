@@ -5,15 +5,17 @@ export async function PUT(req, { params }) {
     const currentUser = await getSession(req);
     if (!currentUser) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
+    const { id } = await params;
+
     // Members can only update their own profile (name only); admins can update anyone
-    const isSelf = currentUser.id === params.id;
+    const isSelf = currentUser.id === id;
     if (!isSelf && currentUser.role !== "admin") {
       return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const body = await req.json();
     const users = await getUsers();
-    const idx = users.findIndex((u) => u.id === params.id);
+    const idx = users.findIndex((u) => u.id === id);
     if (idx === -1) return Response.json({ error: "Not found" }, { status: 404 });
 
     const updates = {};
@@ -38,10 +40,12 @@ export async function DELETE(req, { params }) {
     const currentUser = await getSession(req);
     if (!currentUser) return Response.json({ error: "Unauthorized" }, { status: 401 });
     if (currentUser.role !== "admin") return Response.json({ error: "Admin only" }, { status: 403 });
-    if (currentUser.id === params.id) return Response.json({ error: "Cannot remove yourself" }, { status: 400 });
+
+    const { id } = await params;
+    if (currentUser.id === id) return Response.json({ error: "Cannot remove yourself" }, { status: 400 });
 
     const users = await getUsers();
-    const filtered = users.filter((u) => u.id !== params.id);
+    const filtered = users.filter((u) => u.id !== id);
     if (filtered.length === users.length) return Response.json({ error: "Not found" }, { status: 404 });
 
     await setUsers(filtered);

@@ -8,7 +8,7 @@ export async function PUT(req, { params }) {
     const user = await getSession(req);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { id } = params;
+    const { id } = await params;
     const body = await req.json();
     const assets = (await kvGet(KEY)) || [];
     const idx = assets.findIndex((a) => a.id === id);
@@ -45,7 +45,7 @@ export async function DELETE(req, { params }) {
     const user = await getSession(req);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { id } = params;
+    const { id } = await params;
     const assets = (await kvGet(KEY)) || [];
     const asset = assets.find((a) => a.id === id);
     if (!asset) return Response.json({ error: "Not found" }, { status: 404 });

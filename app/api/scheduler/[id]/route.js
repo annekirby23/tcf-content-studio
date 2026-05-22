@@ -10,8 +10,9 @@ export async function GET(req, { params }) {
     const user = await getSession(req);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
+    const { id } = await params;
     const posts = (await kvGet(POSTS_KEY)) || [];
-    const post = posts.find((p) => p.id === params.id);
+    const post = posts.find((p) => p.id === id);
     if (!post) return Response.json({ error: "Not found" }, { status: 404 });
     return Response.json(post);
   } catch (e) {
@@ -24,9 +25,10 @@ export async function PUT(req, { params }) {
     const user = await getSession(req);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
+    const { id } = await params;
     const body = await req.json();
     const posts = (await kvGet(POSTS_KEY)) || [];
-    const idx = posts.findIndex((p) => p.id === params.id);
+    const idx = posts.findIndex((p) => p.id === id);
     if (idx === -1) return Response.json({ error: "Not found" }, { status: 404 });
 
     // Members cannot move posts to admin-only statuses
@@ -34,7 +36,7 @@ export async function PUT(req, { params }) {
       return Response.json({ error: "Insufficient permissions to set this status" }, { status: 403 });
     }
 
-    posts[idx] = { ...posts[idx], ...body, id: params.id, updatedAt: new Date().toISOString() };
+    posts[idx] = { ...posts[idx], ...body, id, updatedAt: new Date().toISOString() };
     await kvSet(POSTS_KEY, posts);
     return Response.json(posts[idx]);
   } catch (e) {
@@ -48,8 +50,9 @@ export async function DELETE(req, { params }) {
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
     if (user.role !== "admin") return Response.json({ error: "Admin only" }, { status: 403 });
 
+    const { id } = await params;
     const posts = (await kvGet(POSTS_KEY)) || [];
-    const filtered = posts.filter((p) => p.id !== params.id);
+    const filtered = posts.filter((p) => p.id !== id);
     if (filtered.length === posts.length) return Response.json({ error: "Not found" }, { status: 404 });
 
     await kvSet(POSTS_KEY, filtered);
