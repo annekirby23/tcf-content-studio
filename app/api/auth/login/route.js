@@ -1,4 +1,5 @@
 import { getUsers, verifyPassword, createSession } from "@/lib/serverAuth";
+import { getRedis } from "@/lib/redis";
 
 export async function POST(req) {
   try {
@@ -15,6 +16,11 @@ export async function POST(req) {
     }
 
     const token = await createSession(user.id);
+
+    // Track last login time for team health reports
+    const redis = getRedis();
+    await redis.set(`tcf:lastlogin:${user.id}`, new Date().toISOString());
+
     const { password: _, ...safeUser } = user;
     return Response.json({ token, user: safeUser });
   } catch (e) {

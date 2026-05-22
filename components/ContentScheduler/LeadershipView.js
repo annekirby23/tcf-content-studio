@@ -790,6 +790,175 @@ function TasksSection({ tasks, isAdmin, teamMembers, onSave }) {
 
 // ─── Main LeadershipView ──────────────────────────────────────────────────────
 
+// ─── Team Health Report ───────────────────────────────────────────────────────
+
+function healthColor(status) {
+  if (status === "active") return "#10B981";
+  if (status === "at-risk") return "#F59E0B";
+  return "#EF4444";
+}
+
+function healthLabel(status) {
+  if (status === "active") return "Active";
+  if (status === "at-risk") return "At Risk";
+  return "Inactive";
+}
+
+function ScoreBadge({ score, status }) {
+  const color = healthColor(status);
+  return (
+    <div style={{
+      width: 44, height: 44, borderRadius: "50%",
+      background: color + "22", border: `2px solid ${color}`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      flexDirection: "column", flexShrink: 0,
+    }}>
+      <span style={{ fontSize: 13, fontWeight: 800, color, lineHeight: 1 }}>{score}</span>
+    </div>
+  );
+}
+
+function StatPill({ label, value, highlight }) {
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", alignItems: "center",
+      background: highlight ? "#F59E0B11" : C.cardBg,
+      border: `1px solid ${highlight ? "#F59E0B44" : C.border}`,
+      borderRadius: 8, padding: "6px 10px", minWidth: 56,
+    }}>
+      <span style={{ fontSize: 15, fontWeight: 800, color: highlight ? "#F59E0B" : C.text }}>{value}</span>
+      <span style={{ fontSize: 10, color: C.muted, textAlign: "center", lineHeight: 1.2, marginTop: 2 }}>{label}</span>
+    </div>
+  );
+}
+
+function MemberHealthCard({ member }) {
+  const color = healthColor(member.status);
+  const completionRate = member.personal.total > 0
+    ? Math.round((member.personal.done / member.personal.total) * 100)
+    : null;
+
+  return (
+    <div style={{
+      background: C.cardBg, border: `1px solid ${C.border}`,
+      borderRadius: 12, padding: "14px 16px",
+      borderLeft: `3px solid ${color}`,
+    }}>
+      {/* Header row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <ScoreBadge score={member.score} status={member.status} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {member.name}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+              background: color + "22", color,
+            }}>
+              {healthLabel(member.status)}
+            </span>
+            <span style={{ fontSize: 11, color: C.muted }}>
+              {member.daysSinceLogin === null
+                ? "Never logged in"
+                : member.daysSinceLogin === 0
+                ? "Logged in today"
+                : `Last login ${member.daysSinceLogin}d ago`}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <StatPill label="Tasks Done" value={`${member.personal.done}/${member.personal.total}`} />
+        {completionRate !== null && (
+          <StatPill label="Completion" value={`${completionRate}%`} highlight={completionRate < 30} />
+        )}
+        {member.personal.overdue > 0 && (
+          <StatPill label="Overdue" value={member.personal.overdue} highlight={true} />
+        )}
+        <StatPill label="Added (7d)" value={member.personal.addedThisWeek + member.team.addedThisWeek} />
+        {member.team.assigned > 0 && (
+          <StatPill label="Team Tasks" value={`${member.team.completed}/${member.team.assigned}`} />
+        )}
+      </div>
+
+      {/* Bottom insight */}
+      {member.personal.addedThisWeek === 0 && member.team.addedThisWeek === 0 && member.status !== "inactive" && (
+        <div style={{ marginTop: 8, fontSize: 11, color: "#F59E0B", fontStyle: "italic" }}>
+          ⚠ No tasks added in the last 7 days
+        </div>
+      )}
+      {member.personal.overdue > 0 && (
+        <div style={{ marginTop: 8, fontSize: 11, color: "#EF4444", fontStyle: "italic" }}>
+          ⚠ {member.personal.overdue} overdue task{member.personal.overdue > 1 ? "s" : ""}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TeamHealthSection({ token }) {
+  const [health, setHealth] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    apiFetch("/api/internal/teamhealth", {}, token)
+      .then((r) => r.json())
+      .then((d) => { setHealth(Array.isArray(d) ? d : []); })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  const active = health?.filter((m) => m.status === "active").length ?? 0;
+  const atRisk = health?.filter((m) => m.status === "at-risk").length ?? 0;
+  const inactive = health?.filter((m) => m.status === "inactive").length ?? 0;
+
+  return (
+    <SectionCard>
+      {/* Header */}
+      <div
+        onClick={() => setCollapsed((c) => !c)}
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {sectionLabel("Team Health Report")}
+          {!loading && health && (
+            <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: "#10B98122", color: "#10B981" }}>{active} Active</span>
+              {atRisk > 0 && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: "#F59E0B22", color: "#F59E0B" }}>{atRisk} At Risk</span>}
+              {inactive > 0 && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: "#EF444422", color: "#EF4444" }}>{inactive} Inactive</span>}
+            </div>
+          )}
+        </div>
+        <span style={{ fontSize: 16, color: C.muted, marginBottom: 12 }}>{collapsed ? "+" : "−"}</span>
+      </div>
+
+      {!collapsed && (
+        <>
+          {loading && <div style={{ color: C.muted, fontSize: 13 }}>Loading team data…</div>}
+          {error && <div style={{ color: "#EF4444", fontSize: 13 }}>{error}</div>}
+          {health && (
+            <>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 14 }}>
+                Activity score (0–100) based on login recency, task completion rate, and recent task activity.
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                {health.map((m) => <MemberHealthCard key={m.id} member={m} />)}
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </SectionCard>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export default function LeadershipView({ token, currentUser, teamMembers = [] }) {
   const isAdmin = currentUser?.role === "admin";
 
@@ -870,6 +1039,9 @@ export default function LeadershipView({ token, currentUser, teamMembers = [] })
           Leadership team resources — meetings, agenda, notes, and tasks.
         </p>
       </div>
+
+      {/* Team Health Report — admin only */}
+      {isAdmin && <TeamHealthSection token={token} />}
 
       {/* Google Drive */}
       <DriveCard
