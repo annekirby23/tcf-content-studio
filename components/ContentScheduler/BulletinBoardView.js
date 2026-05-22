@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { C } from "./constants";
 
 function apiFetch(url, opts = {}, token) {
@@ -470,6 +470,57 @@ function ShoutoutCard({ shoutout, canDelete, onDelete }) {
   );
 }
 
+// ─── Image Upload Tab ─────────────────────────────────────────────────────────
+function ImageUploadTab({ image, label, icon, isAdmin, uploading, inputRef, onUploadClick, onFileChange, onClear }) {
+  return (
+    <div>
+      {/* Admin toolbar */}
+      {isAdmin && (
+        <div style={{ display: "flex", gap: "10px", marginBottom: "16px", alignItems: "center" }}>
+          <button
+            onClick={onUploadClick}
+            disabled={uploading}
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "10px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: uploading ? "default" : "pointer", opacity: uploading ? 0.6 : 1 }}
+          >
+            {uploading ? "Uploading…" : `⬆ Upload ${label}`}
+          </button>
+          {image && (
+            <button
+              onClick={onClear}
+              style={{ padding: "8px 14px", borderRadius: "10px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}
+            >
+              🗑 Remove
+            </button>
+          )}
+          <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/gif" style={{ display: "none" }} onChange={onFileChange} />
+        </div>
+      )}
+
+      {/* Image display or empty state */}
+      {image ? (
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", overflow: "hidden", boxShadow: C.shadow }}>
+          <img
+            src={image}
+            alt={label}
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+        </div>
+      ) : (
+        <div
+          onClick={isAdmin ? onUploadClick : undefined}
+          style={{ textAlign: "center", padding: "60px 20px", background: C.card, borderRadius: "14px", border: `2px dashed ${C.border}`, color: C.muted, cursor: isAdmin ? "pointer" : "default" }}
+        >
+          <div style={{ fontSize: "48px", marginBottom: "14px" }}>{icon}</div>
+          <div style={{ fontSize: "15px", fontWeight: "700", color: C.text, marginBottom: "6px" }}>{label}</div>
+          <div style={{ fontSize: "13px" }}>
+            {isAdmin ? "Click to upload a PNG or image file." : "No image uploaded yet."}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main BulletinBoardView ───────────────────────────────────────────────────
 
 export default function BulletinBoardView({ token, currentUser, teamMembers = [] }) {
@@ -532,7 +583,42 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
     { id: "all", label: "🏠 All" },
     { id: "posts", label: "📢 Announcements" },
     { id: "shoutouts", label: "⭐ Shoutouts" },
+    { id: "calendar", label: "📅 Monthly Calendar" },
+    { id: "schedule", label: "🗓️ Team Schedule" },
   ];
+
+  const calendarInputRef = useRef(null);
+  const scheduleInputRef = useRef(null);
+  const [calendarUploading, setCalendarUploading] = useState(false);
+  const [scheduleUploading, setScheduleUploading] = useState(false);
+
+  function handleImageUpload(field, setUploading) {
+    return (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setUploading(true);
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const dataUrl = ev.target.result;
+        try {
+          const res = await apiFetch("/api/bulletin", { method: "PUT", body: JSON.stringify({ [field]: dataUrl }) }, token);
+          const updated = await res.json();
+          setData(updated);
+        } catch {}
+        setUploading(false);
+      };
+      reader.readAsDataURL(file);
+      e.target.value = "";
+    };
+  }
+
+  async function clearImage(field) {
+    try {
+      const res = await apiFetch("/api/bulletin", { method: "PUT", body: JSON.stringify({ [field]: null }) }, token);
+      const updated = await res.json();
+      setData(updated);
+    } catch {}
+  }
 
   return (
     <div style={{ padding: "24px", maxWidth: "860px", margin: "0 auto" }}>
@@ -658,8 +744,39 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
               ? <div style={{ textAlign: "center", padding: "40px", color: C.muted, fontSize: "14px" }}>No shoutouts yet. Be the first!</div>
               : shoutouts.map((s) => <ShoutoutCard key={s.id} shoutout={s} canDelete={isAdmin || s.fromId === currentUser?.id} onDelete={handleDelete} />)
           )}
+
+          {/* Monthly Calendar tab */}
+          {activeTab === "calendar" && (
+            <ImageUploadTab
+              image={data.calendarImage}
+              label="Monthly Calendar"
+              icon="📅"
+              isAdmin={isAdmin}
+              uploading={calendarUploading}
+              inputRef={calendarInputRef}
+              onUploadClick={() => calendarInputRef.current?.click()}
+              onFileChange={handleImageUpload("calendarImage", setCalendarUploading)}
+              onClear={() => clearImage("calendarImage")}
+            />
+          )}
+
+          {/* Team Schedule tab */}
+          {activeTab === "schedule" && (
+            <ImageUploadTab
+              image={data.teamScheduleImage}
+              label="Team Schedule"
+              icon="🗓️"
+              isAdmin={isAdmin}
+              uploading={scheduleUploading}
+              inputRef={scheduleInputRef}
+              onUploadClick={() => scheduleInputRef.current?.click()}
+              onFileChange={handleImageUpload("teamScheduleImage", setScheduleUploading)}
+              onClear={() => clearImage("teamScheduleImage")}
+            />
+          )}
         </div>
       )}
+
     </div>
   );
 }
