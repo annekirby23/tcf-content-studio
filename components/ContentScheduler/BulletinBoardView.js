@@ -471,14 +471,37 @@ function ShoutoutCard({ shoutout, canDelete, onDelete }) {
 }
 
 // ─── Image Upload Tab ─────────────────────────────────────────────────────────
-function ImageUploadTab({ image, label, icon, isAdmin, uploading, inputRef, onUploadClick, onFileChange, onClear }) {
+// Self-contained: owns its own ref, file reading, and uploading state.
+// Parent only needs to pass image URL, callbacks, and isAdmin flag.
+function ImageUploadTab({ image, label, icon, isAdmin, onUpload, onClear }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+
+  function handleChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      await onUpload(ev.target.result);
+      setUploading(false);
+    };
+    reader.onerror = () => setUploading(false);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
+
+  function triggerPicker() {
+    inputRef.current?.click();
+  }
+
   return (
     <div>
       {/* Admin toolbar */}
       {isAdmin && (
         <div style={{ display: "flex", gap: "10px", marginBottom: "16px", alignItems: "center" }}>
           <button
-            onClick={onUploadClick}
+            onClick={triggerPicker}
             disabled={uploading}
             style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "10px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: uploading ? "default" : "pointer", opacity: uploading ? 0.6 : 1 }}
           >
@@ -492,29 +515,29 @@ function ImageUploadTab({ image, label, icon, isAdmin, uploading, inputRef, onUp
               🗑 Remove
             </button>
           )}
-          <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/gif" style={{ display: "none" }} onChange={onFileChange} />
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif"
+            style={{ display: "none" }}
+            onChange={handleChange}
+          />
         </div>
       )}
 
       {/* Image display or empty state */}
       {image ? (
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", overflow: "hidden", boxShadow: C.shadow }}>
-          <img
-            src={image}
-            alt={label}
-            style={{ width: "100%", height: "auto", display: "block" }}
-          />
+          <img src={image} alt={label} style={{ width: "100%", height: "auto", display: "block" }} />
         </div>
       ) : (
         <div
-          onClick={isAdmin ? onUploadClick : undefined}
+          onClick={isAdmin ? triggerPicker : undefined}
           style={{ textAlign: "center", padding: "60px 20px", background: C.card, borderRadius: "14px", border: `2px dashed ${C.border}`, color: C.muted, cursor: isAdmin ? "pointer" : "default" }}
         >
           <div style={{ fontSize: "48px", marginBottom: "14px" }}>{icon}</div>
           <div style={{ fontSize: "15px", fontWeight: "700", color: C.text, marginBottom: "6px" }}>{label}</div>
-          <div style={{ fontSize: "13px" }}>
-            {isAdmin ? "Click to upload a PNG or image file." : "No image uploaded yet."}
-          </div>
+          <div style={{ fontSize: "13px" }}>{isAdmin ? "Click to upload a PNG or image file." : "No image uploaded yet."}</div>
         </div>
       )}
     </div>
@@ -597,33 +620,12 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
       .catch(() => {});
   }, [token]);
 
-  const calendarInputRef = useRef(null);
-  const scheduleInputRef = useRef(null);
-  const schedule2InputRef = useRef(null);
-  const monthlyScheduleInputRef = useRef(null);
-  const [calendarUploading, setCalendarUploading] = useState(false);
-  const [scheduleUploading, setScheduleUploading] = useState(false);
-  const [schedule2Uploading, setSchedule2Uploading] = useState(false);
-  const [monthlyScheduleUploading, setMonthlyScheduleUploading] = useState(false);
-
-  function handleImageUpload(field, setUploading) {
-    return (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      setUploading(true);
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const dataUrl = ev.target.result;
-        try {
-          const res = await apiFetch("/api/bulletin/images", { method: "PUT", body: JSON.stringify({ field, value: dataUrl }) }, token);
-          const updated = await res.json();
-          if (!updated.error) setImages(updated);
-        } catch {}
-        setUploading(false);
-      };
-      reader.readAsDataURL(file);
-      e.target.value = "";
-    };
+  async function uploadImage(field, dataUrl) {
+    try {
+      const res = await apiFetch("/api/bulletin/images", { method: "PUT", body: JSON.stringify({ field, value: dataUrl }) }, token);
+      const updated = await res.json();
+      if (!updated.error) setImages(updated);
+    } catch {}
   }
 
   async function clearImage(field) {
@@ -766,10 +768,7 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
               label="Monthly Calendar"
               icon="📅"
               isAdmin={isAdmin}
-              uploading={calendarUploading}
-              inputRef={calendarInputRef}
-              onUploadClick={() => calendarInputRef.current?.click()}
-              onFileChange={handleImageUpload("calendarImage", setCalendarUploading)}
+              onUpload={(dataUrl) => uploadImage("calendarImage", dataUrl)}
               onClear={() => clearImage("calendarImage")}
             />
           )}
@@ -784,10 +783,7 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
                   label="Week 1 Schedule"
                   icon="🗓️"
                   isAdmin={isAdmin}
-                  uploading={scheduleUploading}
-                  inputRef={scheduleInputRef}
-                  onUploadClick={() => scheduleInputRef.current?.click()}
-                  onFileChange={handleImageUpload("teamScheduleImage", setScheduleUploading)}
+                  onUpload={(dataUrl) => uploadImage("teamScheduleImage", dataUrl)}
                   onClear={() => clearImage("teamScheduleImage")}
                 />
               </div>
@@ -798,10 +794,7 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
                   label="Week 2 Schedule"
                   icon="🗓️"
                   isAdmin={isAdmin}
-                  uploading={schedule2Uploading}
-                  inputRef={schedule2InputRef}
-                  onUploadClick={() => schedule2InputRef.current?.click()}
-                  onFileChange={handleImageUpload("teamScheduleImage2", setSchedule2Uploading)}
+                  onUpload={(dataUrl) => uploadImage("teamScheduleImage2", dataUrl)}
                   onClear={() => clearImage("teamScheduleImage2")}
                 />
               </div>
@@ -815,10 +808,7 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
               label="Monthly Schedule"
               icon="📆"
               isAdmin={isAdmin}
-              uploading={monthlyScheduleUploading}
-              inputRef={monthlyScheduleInputRef}
-              onUploadClick={() => monthlyScheduleInputRef.current?.click()}
-              onFileChange={handleImageUpload("monthlyScheduleImage", setMonthlyScheduleUploading)}
+              onUpload={(dataUrl) => uploadImage("monthlyScheduleImage", dataUrl)}
               onClear={() => clearImage("monthlyScheduleImage")}
             />
           )}
