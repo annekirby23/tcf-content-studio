@@ -869,7 +869,7 @@ function DailyRoutinesSection({ token, viewingUserId, currentUserId, sectionTitl
   const [newText, setNewText] = useState("");
   const [newDays, setNewDays] = useState(["mon","tue","wed","thu","fri"]);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [selectedDay, setSelectedDay] = useState("all");
+  const [selectedDay, setSelectedDay] = useState(() => todayDayId());
   const readOnly = viewingUserId !== currentUserId;
 
   // Daily Ops assigned checklists
