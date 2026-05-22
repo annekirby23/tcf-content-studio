@@ -470,6 +470,29 @@ function ShoutoutCard({ shoutout, canDelete, onDelete }) {
   );
 }
 
+// ─── Compress image via Canvas before uploading ────────────────────────────────
+// Resizes to max 1400px and converts to JPEG — turns a 3MB PNG into ~150KB
+function compressImage(dataUrl, maxWidth = 1400, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = Math.round(height * maxWidth / width);
+        width = maxWidth;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
 // ─── Image Upload Tab ─────────────────────────────────────────────────────────
 // Input nested directly inside its label — the most reliable trigger possible.
 function ImageUploadTab({ image, label, icon, isAdmin, onUpload, onClear }) {
@@ -484,7 +507,8 @@ function ImageUploadTab({ image, label, icon, isAdmin, onUpload, onClear }) {
     const reader = new FileReader();
     reader.onload = async (ev) => {
       try {
-        await onUpload(ev.target.result);
+        const compressed = await compressImage(ev.target.result);
+        await onUpload(compressed);
       } catch (err) {
         setUploadError("Upload failed — " + (err?.message || "please try again"));
       }
