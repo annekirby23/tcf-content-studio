@@ -16,6 +16,7 @@ export async function PUT(req, { params }) {
     const task = { ...tasks[index] };
     if (body.text !== undefined) task.text = body.text;
     if (body.done !== undefined) task.done = body.done;
+    if (body.doneWeek !== undefined) task.doneWeek = body.doneWeek;
     if (body.days !== undefined) task.days = body.days;
 
     tasks[index] = task;
