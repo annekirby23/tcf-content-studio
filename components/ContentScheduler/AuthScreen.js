@@ -61,23 +61,14 @@ export default function AuthScreen({ needsSetup, onAuth }) {
       <div style={{ width: "100%", maxWidth: "400px" }}>
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: "40px" }}>
-          <div style={{
-            width: "52px",
-            height: "52px",
-            borderRadius: "14px",
-            background: `linear-gradient(135deg, ${C.accent}, #8B5CF6)`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "22px",
-            fontWeight: "800",
-            color: "#fff",
-            margin: "0 auto 16px",
-            boxShadow: `0 0 32px rgba(99,102,241,0.4)`,
-          }}>T</div>
-          <h1 style={{ fontSize: "22px", fontWeight: "800", color: C.text, margin: "0 0 6px" }}>TCF Content Studio</h1>
-          <p style={{ fontSize: "14px", color: C.muted, margin: 0 }}>
-            {mode === "setup" ? "Create your admin account to get started" : "Sign in to your account"}
+          <img
+            src="/tcf-logo.png"
+            alt="TCF"
+            style={{ width: "90px", height: "auto", margin: "0 auto 16px", display: "block" }}
+          />
+          <h1 style={{ fontSize: "22px", fontWeight: "800", color: C.text, margin: "0 0 8px" }}>TCF Content Studio</h1>
+          <p style={{ fontSize: "14px", color: C.muted, margin: 0, fontStyle: "italic" }}>
+            {mode === "setup" ? "Create your admin account to get started" : "We love that you are here, have a great day!"}
           </p>
         </div>
 

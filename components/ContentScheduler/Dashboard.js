@@ -415,7 +415,7 @@ function CampaignCard({ campaign, postCount, onClick }) {
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
-export default function Dashboard({ posts, campaigns, goals, currentUser, ideas, onEdit, onNewPost, onNavigate, onGoalsUpdate, onIdeasUpdate, onMakePost, token }) {
+export default function Dashboard({ posts, campaigns, goals, currentUser, ideas, onEdit, onNewPost, onNavigate, onGoalsUpdate, onIdeasUpdate, onMakePost, token, onNewCampaign }) {
   const safeGoals = goals || { publishedPerMonth: 0, scheduledPerWeek: 0, reviewTargetDays: 3 };
 
   const today = new Date().toISOString().split("T")[0];
@@ -682,9 +682,21 @@ export default function Dashboard({ posts, campaigns, goals, currentUser, ideas,
       </div>
 
       {/* Campaigns */}
-      {campaignList.length > 0 && (
-        <div style={{ marginBottom: "24px" }}>
-          {sectionTitle("Campaigns")}
+      <div style={{ marginBottom: "24px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+          <h3 style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: C.text, letterSpacing: "0.02em" }}>Campaigns</h3>
+          {onNewCampaign && (
+            <button
+              onClick={onNewCampaign}
+              style={{ fontSize: "12px", fontWeight: "700", color: "#fff", background: `linear-gradient(135deg, ${C.accent}, #8B5CF6)`, border: "none", borderRadius: "8px", padding: "6px 14px", cursor: "pointer", boxShadow: `0 0 12px rgba(99,102,241,0.3)`, transition: "all 0.15s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+            >
+              + New Campaign
+            </button>
+          )}
+        </div>
+        {campaignList.length > 0 ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px" }}>
             {campaignList.map((campaign) => {
               const name = campaign.name || campaign;
@@ -699,8 +711,10 @@ export default function Dashboard({ posts, campaigns, goals, currentUser, ideas,
               );
             })}
           </div>
-        </div>
-      )}
+        ) : (
+          <div style={{ fontSize: "13px", color: C.muted, fontStyle: "italic" }}>No campaigns yet — create one to get started.</div>
+        )}
+      </div>
 
       {/* Idea Board */}
       <IdeaBoard

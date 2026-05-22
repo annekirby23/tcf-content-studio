@@ -1698,18 +1698,11 @@ export default function ContentScheduler() {
                 />
               ))}
 
-              {/* Campaigns header + New Campaign button */}
+              {/* Campaigns header */}
               {sidebarOpen ? (
                 <div style={{ padding: "0 4px", marginTop: "6px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 6px", marginBottom: "2px" }}>
                     <div style={{ fontSize: "10px", color: C.muted, fontWeight: "700", letterSpacing: "0.08em", textTransform: "uppercase" }}>Campaigns</div>
-                    <button
-                      onClick={() => setCampaignModalOpen(true)}
-                      style={{ fontSize: "11px", color: C.accent, background: "none", border: "none", cursor: "pointer", fontWeight: "700", padding: "0 2px" }}
-                      title="New Campaign"
-                    >
-                      + New
-                    </button>
                   </div>
                   {campaigns.slice(0, 8).map((c) => (
                     <button
@@ -1733,17 +1726,7 @@ export default function ContentScheduler() {
                     </button>
                   )}
                 </div>
-              ) : (
-                <button
-                  onClick={() => setCampaignModalOpen(true)}
-                  title="New Campaign"
-                  style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "9px 4px", borderRadius: "8px", border: "none", background: "transparent", color: C.muted, fontSize: "16px", cursor: "pointer", transition: "all 0.15s" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = C.hover)}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  🎯
-                </button>
-              )}
+              ) : null}
             </>
           )}
 
@@ -1949,7 +1932,7 @@ export default function ContentScheduler() {
             </div>
           ) : (
             <>
-              {view === "dashboard" && <Dashboard posts={posts} campaigns={campaigns} goals={goals} currentUser={currentUser} ideas={ideas} onEdit={openEdit} onNewPost={() => openNew()} onNavigate={handleNavigate} onGoalsUpdate={handleGoalsUpdate} onIdeasUpdate={setIdeas} onMakePost={handleMakePost} token={authToken} />}
+              {view === "dashboard" && <Dashboard posts={posts} campaigns={campaigns} goals={goals} currentUser={currentUser} ideas={ideas} onEdit={openEdit} onNewPost={() => openNew()} onNavigate={handleNavigate} onGoalsUpdate={handleGoalsUpdate} onIdeasUpdate={setIdeas} onMakePost={handleMakePost} token={authToken} onNewCampaign={() => setCampaignModalOpen(true)} />}
               {view === "calendar" && <CalendarView posts={posts} onEdit={openEdit} onNewPost={(date) => openNew(date)} onDateChange={handleDateChange} token={authToken} />}
               {view === "pipeline" && <Pipeline posts={posts} onEdit={openEdit} onNewPost={(date, status) => openNew(date, status || "draft")} onStatusChange={handleStatusChange} currentUser={currentUser} />}
               {view === "list" && <ListView key={JSON.stringify(listFilters)} posts={posts} campaigns={campaigns} onEdit={openEdit} onNewPost={() => openNew()} initialFilters={listFilters} />}
