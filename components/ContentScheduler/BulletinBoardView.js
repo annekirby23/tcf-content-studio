@@ -588,6 +588,15 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
     { id: "monthlySchedule", label: "📆 Monthly Schedule" },
   ];
 
+  // Images live in their own API / Redis keys — completely separate from posts & shoutouts
+  const [images, setImages] = useState({ calendarImage: null, teamScheduleImage: null, teamScheduleImage2: null, monthlyScheduleImage: null });
+  useEffect(() => {
+    apiFetch("/api/bulletin/images", {}, token)
+      .then((r) => r.json())
+      .then((d) => { if (d && !d.error) setImages(d); })
+      .catch(() => {});
+  }, [token]);
+
   const calendarInputRef = useRef(null);
   const scheduleInputRef = useRef(null);
   const schedule2InputRef = useRef(null);
@@ -606,9 +615,9 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
       reader.onload = async (ev) => {
         const dataUrl = ev.target.result;
         try {
-          const res = await apiFetch("/api/bulletin", { method: "PUT", body: JSON.stringify({ [field]: dataUrl }) }, token);
+          const res = await apiFetch("/api/bulletin/images", { method: "PUT", body: JSON.stringify({ field, value: dataUrl }) }, token);
           const updated = await res.json();
-          setData(updated);
+          if (!updated.error) setImages(updated);
         } catch {}
         setUploading(false);
       };
@@ -619,9 +628,9 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
 
   async function clearImage(field) {
     try {
-      const res = await apiFetch("/api/bulletin", { method: "PUT", body: JSON.stringify({ [field]: null }) }, token);
+      const res = await apiFetch("/api/bulletin/images", { method: "PUT", body: JSON.stringify({ field, value: null }) }, token);
       const updated = await res.json();
-      setData(updated);
+      if (!updated.error) setImages(updated);
     } catch {}
   }
 
@@ -753,7 +762,7 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
           {/* Monthly Calendar tab */}
           {activeTab === "calendar" && (
             <ImageUploadTab
-              image={data.calendarImage}
+              image={images.calendarImage}
               label="Monthly Calendar"
               icon="📅"
               isAdmin={isAdmin}
@@ -771,7 +780,7 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
               <div>
                 <div style={{ fontSize: "12px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px" }}>📅 Week 1</div>
                 <ImageUploadTab
-                  image={data.teamScheduleImage}
+                  image={images.teamScheduleImage}
                   label="Week 1 Schedule"
                   icon="🗓️"
                   isAdmin={isAdmin}
@@ -785,7 +794,7 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
               <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "24px" }}>
                 <div style={{ fontSize: "12px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px" }}>📅 Week 2</div>
                 <ImageUploadTab
-                  image={data.teamScheduleImage2}
+                  image={images.teamScheduleImage2}
                   label="Week 2 Schedule"
                   icon="🗓️"
                   isAdmin={isAdmin}
@@ -802,7 +811,7 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
           {/* Monthly Schedule tab */}
           {activeTab === "monthlySchedule" && (
             <ImageUploadTab
-              image={data.monthlyScheduleImage}
+              image={images.monthlyScheduleImage}
               label="Monthly Schedule"
               icon="📆"
               isAdmin={isAdmin}
