@@ -1,11 +1,21 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { C } from "./constants";
 
 const NEEDED_WHEN_OPTIONS = ["Next Amazon Order", "Wish List", "Weekly Order", "Next Trip", "ASAP"];
 const ORDER_STATUS_OPTIONS = ["Not Started", "Ordered", "In Progress", "Received", "Cancelled"];
 const LOCATION_OPTIONS = ["321", "342", "812"];
+
+// All inventory sections — add new ones here
+const SECTIONS = [
+  { type: "recurring",    label: "Regular Supply Orders", emoji: "🔁", color: "#10B981" },
+  { type: "purchase",     label: "One-Time Purchases",    emoji: "🛒", color: "#F59E0B" },
+  { type: "roho",         label: "ROHO Supplies",         emoji: "🎉", color: "#EC4899" },
+  { type: "events",       label: "Events",                emoji: "📅", color: "#6366F1" },
+  { type: "sweethealth",  label: "Sweet Health",          emoji: "🍬", color: "#14B8A6" },
+  { type: "jellybellies", label: "Jelly Bellies",         emoji: "🍭", color: "#F97316" },
+];
 
 const NEEDED_COLORS = {
   "Next Amazon Order": { color: "#3B82F6", bg: "rgba(59,130,246,0.12)" },
@@ -60,11 +70,7 @@ function ItemDetailModal({ item, token, onSave, onDelete, onClose }) {
     setSaving(true);
     try {
       const res = await apiFetch("/api/inventory", { method: "PUT", body: JSON.stringify(form) }, token);
-      if (res.ok) {
-        const updated = await res.json();
-        onSave(updated);
-        onClose();
-      }
+      if (res.ok) { onSave(await res.json()); onClose(); }
     } finally { setSaving(false); }
   };
 
@@ -73,8 +79,7 @@ function ItemDetailModal({ item, token, onSave, onDelete, onClose }) {
     setDeleting(true);
     try {
       await apiFetch(`/api/inventory?id=${item.id}`, { method: "DELETE" }, token);
-      onDelete(item.id);
-      onClose();
+      onDelete(item.id); onClose();
     } finally { setDeleting(false); }
   };
 
@@ -95,12 +100,8 @@ function ItemDetailModal({ item, token, onSave, onDelete, onClose }) {
   );
 
   return (
-    <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
-    >
+    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
       <div style={{ background: C.card, borderRadius: "16px", boxShadow: C.shadowMd, width: "100%", maxWidth: "580px", maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {/* Header */}
         <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <div style={{ fontSize: "16px", fontWeight: "800", color: C.text }}>{item.itemName}</div>
@@ -108,10 +109,14 @@ function ItemDetailModal({ item, token, onSave, onDelete, onClose }) {
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: "20px", color: C.muted, cursor: "pointer", padding: "0 4px", lineHeight: 1 }}>×</button>
         </div>
-
-        {/* Fields */}
         <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: "14px" }}>
           {field("Item Name", "itemName")}
+          <div>
+            <label style={{ fontSize: "11px", color: C.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: "5px" }}>Card / Category</label>
+            <select value={form.orderType || "recurring"} onChange={(e) => setForm((f) => ({ ...f, orderType: e.target.value }))} style={inputStyle}>
+              {SECTIONS.map((s) => <option key={s.type} value={s.type}>{s.emoji} {s.label}</option>)}
+            </select>
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
             {field("Needed When", "neededWhen", "text", NEEDED_WHEN_OPTIONS)}
             {field("Status", "orderStatus", "text", ORDER_STATUS_OPTIONS)}
@@ -123,8 +128,6 @@ function ItemDetailModal({ item, token, onSave, onDelete, onClose }) {
           {field("URL / Order Link", "url")}
           {field("Notes", "notes", "textarea")}
         </div>
-
-        {/* Footer */}
         <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button onClick={del} disabled={deleting} style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid #EF444440", background: "rgba(239,68,68,0.06)", color: "#EF4444", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>
             {deleting ? "Deleting…" : "🗑 Delete"}
@@ -141,9 +144,9 @@ function ItemDetailModal({ item, token, onSave, onDelete, onClose }) {
   );
 }
 
-// ─── Draggable Item Row ──────────────────────────────────────────────────────
+// ─── Item Row ────────────────────────────────────────────────────────────────
 
-function ItemRow({ item, idx, sectionItems, onDrop, onDragStart, dragOverId, setDragOverId, onClick, selected, onToggleSelect, onStatusChange }) {
+function ItemRow({ item, onDragStart, onDrop, dragOverId, setDragOverId, onClick, selected, onToggleSelect, onStatusChange }) {
   const stCfg = STATUS_COLORS[item.orderStatus] || STATUS_COLORS["Not Started"];
   const nwCfg = NEEDED_COLORS[item.neededWhen];
   const isDragOver = dragOverId === item.id;
@@ -161,62 +164,40 @@ function ItemRow({ item, idx, sectionItems, onDrop, onDragStart, dragOverId, set
         padding: "11px 16px",
         background: selected ? C.accentLight : isDragOver ? C.hover : "transparent",
         borderBottom: `1px solid ${C.border}`,
-        cursor: "pointer",
-        transition: "background 0.1s",
-        userSelect: "none",
+        cursor: "pointer", transition: "background 0.1s", userSelect: "none",
       }}
       onMouseEnter={(e) => { if (!isDragOver && !selected) e.currentTarget.style.background = C.hover; }}
       onMouseLeave={(e) => { if (!isDragOver && !selected) e.currentTarget.style.background = "transparent"; }}
     >
-      {/* Checkbox */}
-      <input
-        type="checkbox"
-        checked={selected}
-        onChange={() => onToggleSelect(item.id)}
-        onClick={(e) => e.stopPropagation()}
-        style={{ width: "15px", height: "15px", flexShrink: 0, cursor: "pointer", accentColor: C.accent }}
-      />
-
-      {/* Drag handle */}
-      <span
-        style={{ fontSize: "14px", color: C.muted, opacity: 0.35, cursor: "grab", flexShrink: 0, padding: "0 2px" }}
-        title="Drag to reorder"
-        onClick={(e) => e.stopPropagation()}
-      >⠿</span>
-
-      {/* Item name */}
+      <input type="checkbox" checked={selected} onChange={() => onToggleSelect(item.id)} onClick={(e) => e.stopPropagation()} style={{ width: "15px", height: "15px", flexShrink: 0, cursor: "pointer", accentColor: C.accent }} />
+      <span style={{ fontSize: "14px", color: C.muted, opacity: 0.35, cursor: "grab", flexShrink: 0, padding: "0 2px" }} title="Drag to reorder within section" onClick={(e) => e.stopPropagation()}>⠿</span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: "13px", fontWeight: "600", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.itemName}</div>
         {item.forWhat && <div style={{ fontSize: "11px", color: C.muted, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.forWhat}</div>}
       </div>
-
-      {/* Badges */}
       <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
         {nwCfg && <Pill label={item.neededWhen} color={nwCfg.color} bg={nwCfg.bg} />}
-        {/* Inline status dropdown */}
+        {/* Status dropdown — fixed text overflow by using native select with proper sizing */}
         <select
           value={item.orderStatus || "Not Started"}
           onChange={(e) => { e.stopPropagation(); onStatusChange(item.id, e.target.value); }}
           onClick={(e) => e.stopPropagation()}
           style={{
-            fontSize: "10px", fontWeight: "700", padding: "2px 6px", borderRadius: "20px",
-            border: `1px solid ${stCfg.color}40`,
-            background: stCfg.bg, color: stCfg.color,
-            cursor: "pointer", outline: "none", appearance: "none",
-            WebkitAppearance: "none", paddingRight: "16px",
-            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath fill='${encodeURIComponent(stCfg.color)}' d='M0 2l4 4 4-4z'/%3E%3C/svg%3E")`,
-            backgroundRepeat: "no-repeat", backgroundPosition: "right 4px center",
+            fontSize: "10px", fontWeight: "700",
+            padding: "2px 8px",
+            borderRadius: "20px",
+            border: `1px solid ${stCfg.color}60`,
+            background: stCfg.bg,
+            color: stCfg.color,
+            cursor: "pointer", outline: "none",
+            minWidth: "90px",
           }}
         >
           {ORDER_STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
         {item.location && <Pill label={`📍 ${item.location}`} color={C.muted} bg={C.cardBg} />}
       </div>
-
-      {/* Person */}
       {item.personAdded && <AvatarSmall name={item.personAdded} />}
-
-      {/* Link */}
       {item.url && (
         <a href={item.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ fontSize: "14px", color: C.accent, textDecoration: "none", flexShrink: 0 }} title={item.url}>🔗</a>
       )}
@@ -224,11 +205,12 @@ function ItemRow({ item, idx, sectionItems, onDrop, onDragStart, dragOverId, set
   );
 }
 
-// ─── Section Block ────────────────────────────────────────────────────────────
+// ─── Section Block ─────────────────────────────────────────────────────────
 
-function SectionBlock({ title, emoji, accentColor, items, token, onItemUpdate, onItemDelete, onReorder, filterStatus, filterNeeded, filterLocation }) {
-  const [dragItemId, setDragItemId] = useState(null);
+function SectionBlock({ section, items, token, onItemUpdate, onItemDelete, onReorder, onCrossDrop, dragItemId, setDragItemId, filterStatus, filterNeeded, filterLocation }) {
+  const { type: sectionType, label: title, emoji, color: accentColor } = section;
   const [dragOverId, setDragOverId] = useState(null);
+  const [dropTargetSection, setDropTargetSection] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
 
@@ -239,33 +221,26 @@ function SectionBlock({ title, emoji, accentColor, items, token, onItemUpdate, o
     return true;
   });
 
+  // Within-section reorder
   const handleDrop = (targetId) => {
-    if (!dragItemId || dragItemId === targetId) return;
+    if (!dragItemId) return;
     const fromIdx = items.findIndex((i) => i.id === dragItemId);
-    const toIdx = items.findIndex((i) => i.id === targetId);
-    if (fromIdx === -1 || toIdx === -1) return;
-    const newItems = [...items];
-    const [moved] = newItems.splice(fromIdx, 1);
-    newItems.splice(toIdx, 0, moved);
-    onReorder(newItems);
+    const toIdx   = items.findIndex((i) => i.id === targetId);
+    if (fromIdx !== -1 && toIdx !== -1) {
+      const newItems = [...items];
+      const [moved] = newItems.splice(fromIdx, 1);
+      newItems.splice(toIdx, 0, moved);
+      onReorder(newItems);
+    }
     setDragItemId(null);
+    setDragOverId(null);
   };
 
-  const toggleSelect = (id) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
+  const toggleSelect = (id) => setSelectedIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const allFilteredSelected = filtered.length > 0 && filtered.every((i) => selectedIds.has(i.id));
   const toggleSelectAll = () => {
-    if (allFilteredSelected) {
-      setSelectedIds((prev) => { const next = new Set(prev); filtered.forEach((i) => next.delete(i.id)); return next; });
-    } else {
-      setSelectedIds((prev) => { const next = new Set(prev); filtered.forEach((i) => next.add(i.id)); return next; });
-    }
+    if (allFilteredSelected) setSelectedIds((prev) => { const n = new Set(prev); filtered.forEach((i) => n.delete(i.id)); return n; });
+    else setSelectedIds((prev) => { const n = new Set(prev); filtered.forEach((i) => n.add(i.id)); return n; });
   };
 
   const handleStatusChange = async (id, newStatus) => {
@@ -274,79 +249,82 @@ function SectionBlock({ title, emoji, accentColor, items, token, onItemUpdate, o
     const updated = { ...item, orderStatus: newStatus };
     onItemUpdate(updated);
     if (detailItem?.id === id) setDetailItem(updated);
-    try {
-      await apiFetch("/api/inventory", { method: "PUT", body: JSON.stringify(updated) }, token);
-    } catch {}
+    try { await apiFetch("/api/inventory", { method: "PUT", body: JSON.stringify(updated) }, token); } catch {}
   };
 
   const handleBatchDelete = async () => {
     const ids = [...selectedIds];
     setSelectedIds(new Set());
     ids.forEach((id) => onItemDelete(id));
-    try {
-      await Promise.all(ids.map((id) =>
-        apiFetch(`/api/inventory?id=${id}`, { method: "DELETE" }, token)
-      ));
-    } catch {}
+    try { await Promise.all(ids.map((id) => apiFetch(`/api/inventory?id=${id}`, { method: "DELETE" }, token))); } catch {}
   };
 
   const selectedCount = filtered.filter((i) => selectedIds.has(i.id)).length;
-
   const r = parseInt(accentColor.slice(1, 3), 16);
   const g = parseInt(accentColor.slice(3, 5), 16);
   const b = parseInt(accentColor.slice(5, 7), 16);
 
+  // Determine if the dragged item is from a DIFFERENT section (cross-section drag)
+  const isDragFromOtherSection = dragItemId && !items.some((i) => i.id === dragItemId);
+
   return (
     <>
-      <div style={{ marginBottom: "32px", background: C.card, borderRadius: "16px", border: `2px solid rgba(${r},${g},${b},0.3)`, boxShadow: `0 2px 12px rgba(${r},${g},${b},0.1)`, overflow: "hidden" }}>
-        {/* Section header */}
+      <div
+        style={{
+          marginBottom: "32px", background: C.card, borderRadius: "16px",
+          border: dropTargetSection && isDragFromOtherSection
+            ? `2px dashed ${accentColor}`
+            : `2px solid rgba(${r},${g},${b},0.3)`,
+          boxShadow: dropTargetSection && isDragFromOtherSection
+            ? `0 0 0 4px rgba(${r},${g},${b},0.15)`
+            : `0 2px 12px rgba(${r},${g},${b},0.1)`,
+          overflow: "hidden", transition: "box-shadow 0.15s, border-color 0.15s",
+        }}
+        onDragOver={(e) => { e.preventDefault(); if (isDragFromOtherSection) setDropTargetSection(true); }}
+        onDragLeave={() => setDropTargetSection(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDropTargetSection(false);
+          if (isDragFromOtherSection && dragItemId) {
+            onCrossDrop(dragItemId, sectionType);
+            setDragItemId(null);
+          }
+        }}
+      >
+        {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "18px 22px", background: `rgba(${r},${g},${b},0.07)`, borderBottom: `2px solid rgba(${r},${g},${b},0.2)` }}>
           <div style={{ width: "5px", height: "36px", borderRadius: "3px", background: accentColor, flexShrink: 0 }} />
           <span style={{ fontSize: "22px" }}>{emoji}</span>
           <span style={{ fontSize: "17px", fontWeight: "800", color: C.text }}>{title}</span>
+          {isDragFromOtherSection && dropTargetSection && (
+            <span style={{ fontSize: "12px", color: accentColor, fontWeight: "700", marginLeft: "8px" }}>Drop here to move →</span>
+          )}
           <span style={{ fontSize: "12px", color: accentColor, padding: "3px 12px", borderRadius: "20px", background: `rgba(${r},${g},${b},0.15)`, fontWeight: "700", marginLeft: "auto" }}>
             {items.length} item{items.length !== 1 ? "s" : ""}
             {filtered.length !== items.length ? ` (${filtered.length} shown)` : ""}
           </span>
         </div>
 
-        {/* Batch-delete bar — visible when any items are checked */}
+        {/* Batch-delete bar */}
         {selectedCount > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "9px 16px", background: "#fff1f2", borderBottom: `1px solid #fca5a5` }}>
-            <span style={{ fontSize: "13px", fontWeight: "600", color: "#dc2626", flex: 1 }}>
-              {selectedCount} item{selectedCount !== 1 ? "s" : ""} selected
-            </span>
-            <button
-              onClick={() => setSelectedIds(new Set())}
-              style={{ fontSize: "12px", color: C.muted, background: "none", border: "none", cursor: "pointer", fontWeight: "600" }}
-            >
-              Clear
-            </button>
-            <button
-              onClick={handleBatchDelete}
-              style={{ fontSize: "12px", fontWeight: "700", color: "#fff", background: "#dc2626", border: "none", borderRadius: "8px", padding: "6px 14px", cursor: "pointer" }}
-            >
-              🗑 Delete {selectedCount} item{selectedCount !== 1 ? "s" : ""}
-            </button>
+            <span style={{ fontSize: "13px", fontWeight: "600", color: "#dc2626", flex: 1 }}>{selectedCount} item{selectedCount !== 1 ? "s" : ""} selected</span>
+            <button onClick={() => setSelectedIds(new Set())} style={{ fontSize: "12px", color: C.muted, background: "none", border: "none", cursor: "pointer", fontWeight: "600" }}>Clear</button>
+            <button onClick={handleBatchDelete} style={{ fontSize: "12px", fontWeight: "700", color: "#fff", background: "#dc2626", border: "none", borderRadius: "8px", padding: "6px 14px", cursor: "pointer" }}>🗑 Delete {selectedCount}</button>
           </div>
         )}
 
         {/* Items */}
         {filtered.length === 0 ? (
           <div style={{ padding: "32px", textAlign: "center", color: C.muted, fontSize: "13px", fontStyle: "italic" }}>
-            {items.length === 0 ? "No items yet — add one above." : "No items match the current filters."}
+            {items.length === 0
+              ? isDragFromOtherSection ? `Drop here to move an item to ${title}` : "No items yet — add one above."
+              : "No items match the current filters."}
           </div>
         ) : (
           <div>
-            {/* Column headers with select-all checkbox */}
             <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "7px 16px", borderBottom: `1px solid ${C.border}`, background: C.cardBg }}>
-              <input
-                type="checkbox"
-                checked={allFilteredSelected}
-                onChange={toggleSelectAll}
-                style={{ width: "15px", height: "15px", flexShrink: 0, cursor: "pointer", accentColor: C.accent }}
-                title="Select all"
-              />
+              <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAll} style={{ width: "15px", height: "15px", flexShrink: 0, cursor: "pointer", accentColor: C.accent }} title="Select all" />
               <span style={{ width: "18px", flexShrink: 0 }} />
               <span style={{ flex: 1, fontSize: "10px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.06em", color: C.muted }}>Item</span>
               <span style={{ fontSize: "10px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.06em", color: C.muted, minWidth: "200px", textAlign: "right" }}>When · Status · Location</span>
@@ -357,7 +335,6 @@ function SectionBlock({ title, emoji, accentColor, items, token, onItemUpdate, o
                 key={item.id}
                 item={item}
                 idx={idx}
-                sectionItems={filtered}
                 onDragStart={setDragItemId}
                 onDrop={handleDrop}
                 dragOverId={dragOverId}
@@ -376,11 +353,8 @@ function SectionBlock({ title, emoji, accentColor, items, token, onItemUpdate, o
         <ItemDetailModal
           item={detailItem}
           token={token}
-          onSave={(updated) => {
-            onItemUpdate(updated);
-            setDetailItem(updated);
-          }}
-          onDelete={(id) => { onItemDelete(id); setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; }); }}
+          onSave={(updated) => { onItemUpdate(updated); setDetailItem(updated); }}
+          onDelete={(id) => { onItemDelete(id); setSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n; }); }}
           onClose={() => setDetailItem(null)}
         />
       )}
@@ -388,7 +362,7 @@ function SectionBlock({ title, emoji, accentColor, items, token, onItemUpdate, o
   );
 }
 
-// ─── Add Form ─────────────────────────────────────────────────────────────────
+// ─── Add Form ────────────────────────────────────────────────────────────────
 
 function AddForm({ token, onAdd, onClose }) {
   const [orderType, setOrderType] = useState("recurring");
@@ -402,11 +376,7 @@ function AddForm({ token, onAdd, onClose }) {
     setSaving(true);
     try {
       const res = await apiFetch("/api/inventory", { method: "POST", body: JSON.stringify({ ...form, orderType }) }, token);
-      if (res.ok) {
-        const saved = await res.json();
-        onAdd(saved);
-        onClose();
-      }
+      if (res.ok) { onAdd(await res.json()); onClose(); }
     } finally { setSaving(false); }
   };
 
@@ -414,18 +384,26 @@ function AddForm({ token, onAdd, onClose }) {
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "20px 24px", marginBottom: "24px", boxShadow: C.shadow }}>
       <h3 style={{ margin: "0 0 14px", fontSize: "15px", fontWeight: "700", color: C.text }}>+ Add Inventory Item</h3>
 
-      {/* Type picker */}
-      <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
-        {[
-          { value: "recurring", emoji: "🔁", label: "Regular Supply", desc: "Ongoing orders" },
-          { value: "purchase", emoji: "🛒", label: "One-Time Purchase", desc: "Equipment, furniture, etc." },
-          { value: "roho", emoji: "🎉", label: "ROHO Supplies", desc: "ROHO Social Club supplies" },
-        ].map((opt) => (
-          <button key={opt.value} onClick={() => setOrderType(opt.value)} style={{ flex: 1, padding: "10px 14px", borderRadius: "10px", border: `2px solid ${orderType === opt.value ? C.accent : C.border}`, background: orderType === opt.value ? C.accentLight : C.cardBg, color: orderType === opt.value ? C.accent : C.muted, fontSize: "12px", fontWeight: "700", cursor: "pointer", textAlign: "left" }}>
-            <div>{opt.emoji} {opt.label}</div>
-            <div style={{ fontSize: "11px", fontWeight: "400", opacity: 0.7, marginTop: "2px" }}>{opt.desc}</div>
-          </button>
-        ))}
+      {/* Card picker — all sections */}
+      <div style={{ marginBottom: "16px" }}>
+        <label style={{ fontSize: "11px", color: C.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "8px" }}>Add to Card</label>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          {SECTIONS.map((s) => (
+            <button
+              key={s.type}
+              onClick={() => setOrderType(s.type)}
+              style={{
+                padding: "8px 14px", borderRadius: "10px",
+                border: `2px solid ${orderType === s.type ? s.color : C.border}`,
+                background: orderType === s.type ? s.color + "22" : C.cardBg,
+                color: orderType === s.type ? s.color : C.muted,
+                fontSize: "12px", fontWeight: "700", cursor: "pointer",
+              }}
+            >
+              {s.emoji} {s.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "12px", marginBottom: "14px" }}>
@@ -476,7 +454,7 @@ function AddForm({ token, onAdd, onClose }) {
   );
 }
 
-// ─── Main InventoryView ──────────────────────────────────────────────────────
+// ─── Main InventoryView ───────────────────────────────────────────────────────
 
 export default function InventoryView({ token, currentUser }) {
   const [items, setItems] = useState([]);
@@ -485,6 +463,7 @@ export default function InventoryView({ token, currentUser }) {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterNeeded, setFilterNeeded] = useState("");
   const [filterLocation, setFilterLocation] = useState("");
+  const [dragItemId, setDragItemId] = useState(null);
 
   const inputStyle = { padding: "7px 10px", border: `1px solid ${C.border}`, borderRadius: "8px", background: C.inputBg, color: C.text, fontSize: "12px", outline: "none", fontFamily: "inherit" };
 
@@ -496,51 +475,41 @@ export default function InventoryView({ token, currentUser }) {
       .finally(() => setLoading(false));
   }, [token]);
 
-  const recurringItems = items.filter((i) => i.orderType !== "purchase" && i.orderType !== "roho");
-  const purchaseItems = items.filter((i) => i.orderType === "purchase");
-  const rohoItems = items.filter((i) => i.orderType === "roho");
+  const itemsForSection = (type) => items.filter((i) => i.orderType === type);
 
   const handleReorder = async (sectionType, newSectionItems) => {
-    // Merge the reordered section back into the full items array preserving the other sections
-    const otherItems = items.filter((i) =>
-      sectionType === "recurring" ? (i.orderType === "purchase" || i.orderType === "roho")
-      : sectionType === "purchase" ? (i.orderType !== "purchase")
-      : (i.orderType !== "roho")
-    );
-    const newItems = sectionType === "recurring"
-      ? [...newSectionItems, ...otherItems]
-      : [...otherItems, ...newSectionItems];
+    const otherItems = items.filter((i) => i.orderType !== sectionType);
+    const newItems = [...newSectionItems, ...otherItems];
     setItems(newItems);
-    // Persist full reordered array
     try {
       await apiFetch("/api/inventory", { method: "PUT", body: JSON.stringify({ bulkReorder: newItems.map((i) => i.id) }) }, token);
     } catch {}
   };
 
-  const handleItemUpdate = (updated) => {
-    setItems((prev) => prev.map((i) => i.id === updated.id ? updated : i));
+  // Cross-section drag: change the item's orderType
+  const handleCrossDrop = async (itemId, targetSectionType) => {
+    const item = items.find((i) => i.id === itemId);
+    if (!item || item.orderType === targetSectionType) return;
+    const updated = { ...item, orderType: targetSectionType };
+    setItems((prev) => prev.map((i) => i.id === itemId ? updated : i));
+    try {
+      await apiFetch("/api/inventory", { method: "PUT", body: JSON.stringify(updated) }, token);
+    } catch {}
   };
 
-  const handleItemDelete = (id) => {
-    setItems((prev) => prev.filter((i) => i.id !== id));
-  };
-
-  const handleAdd = (newItem) => {
-    setItems((prev) => [newItem, ...prev]);
-    setShowAdd(false);
-  };
+  const handleItemUpdate = (updated) => setItems((prev) => prev.map((i) => i.id === updated.id ? updated : i));
+  const handleItemDelete = (id) => setItems((prev) => prev.filter((i) => i.id !== id));
+  const handleAdd = (newItem) => { setItems((prev) => [newItem, ...prev]); setShowAdd(false); };
 
   if (loading) return <div style={{ textAlign: "center", padding: "60px", color: C.muted }}>Loading inventory…</div>;
 
   return (
     <div style={{ padding: "24px", maxWidth: "1060px", margin: "0 auto" }}>
-      {/* Header */}
       <div style={{ marginBottom: "20px" }}>
         <h1 style={{ margin: "0 0 6px", fontSize: "24px", fontWeight: "800", color: C.text }}>📦 Inventory</h1>
-        <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>Track supplies and orders. Click any item to view or edit details. Drag ⠿ to reorder.</p>
+        <p style={{ margin: 0, fontSize: "14px", color: C.muted }}>Track supplies and orders. Click any item to edit. Drag ⠿ to reorder within a card, or drag to a different card header to move it.</p>
       </div>
 
-      {/* Toolbar */}
       <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "20px", flexWrap: "wrap" }}>
         <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={inputStyle}>
           <option value="">All Statuses</option>
@@ -565,48 +534,23 @@ export default function InventoryView({ token, currentUser }) {
 
       {showAdd && <AddForm token={token} onAdd={handleAdd} onClose={() => setShowAdd(false)} />}
 
-      {/* Two separate sections */}
-      <SectionBlock
-        title="Regular Supply Orders"
-        emoji="🔁"
-        accentColor="#10B981"
-        items={recurringItems}
-        token={token}
-        onItemUpdate={handleItemUpdate}
-        onItemDelete={handleItemDelete}
-        onReorder={(newItems) => handleReorder("recurring", newItems)}
-        filterStatus={filterStatus}
-        filterNeeded={filterNeeded}
-        filterLocation={filterLocation}
-      />
-
-      <SectionBlock
-        title="One-Time Purchases"
-        emoji="🛒"
-        accentColor="#F59E0B"
-        items={purchaseItems}
-        token={token}
-        onItemUpdate={handleItemUpdate}
-        onItemDelete={handleItemDelete}
-        onReorder={(newItems) => handleReorder("purchase", newItems)}
-        filterStatus={filterStatus}
-        filterNeeded={filterNeeded}
-        filterLocation={filterLocation}
-      />
-
-      <SectionBlock
-        title="ROHO Supplies"
-        emoji="🎉"
-        accentColor="#EC4899"
-        items={rohoItems}
-        token={token}
-        onItemUpdate={handleItemUpdate}
-        onItemDelete={handleItemDelete}
-        onReorder={(newItems) => handleReorder("roho", newItems)}
-        filterStatus={filterStatus}
-        filterNeeded={filterNeeded}
-        filterLocation={filterLocation}
-      />
+      {SECTIONS.map((section) => (
+        <SectionBlock
+          key={section.type}
+          section={section}
+          items={itemsForSection(section.type)}
+          token={token}
+          onItemUpdate={handleItemUpdate}
+          onItemDelete={handleItemDelete}
+          onReorder={(newItems) => handleReorder(section.type, newItems)}
+          onCrossDrop={handleCrossDrop}
+          dragItemId={dragItemId}
+          setDragItemId={setDragItemId}
+          filterStatus={filterStatus}
+          filterNeeded={filterNeeded}
+          filterLocation={filterLocation}
+        />
+      ))}
     </div>
   );
 }
