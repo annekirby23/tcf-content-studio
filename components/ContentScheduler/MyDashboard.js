@@ -3251,6 +3251,18 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
       .catch(() => {});
   }, [token, effectiveViewingUserId]);
 
+  // Mail locations assigned to this user
+  const [assignedMailLocations, setAssignedMailLocations] = useState([]);
+  useEffect(() => {
+    apiFetch("/api/dailyops/reference", {}, token)
+      .then((r) => r.json())
+      .then((data) => {
+        const locs = Array.isArray(data?.mailLocations) ? data.mailLocations : [];
+        setAssignedMailLocations(locs.filter((l) => l.assignedMemberId === effectiveViewingUserId && l.mailboxes?.length > 0));
+      })
+      .catch(() => {});
+  }, [token, effectiveViewingUserId]);
+
   // ROHO Social Club — tasks assigned to this user + team membership
   const [rohoData, setRohoData] = useState(null);
   useEffect(() => {
@@ -3743,6 +3755,52 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
                           </span>
                         )}
                       </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Mailbox assignments */}
+          {assignedMailLocations.length > 0 && (
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", boxShadow: C.shadow, overflow: "hidden" }}>
+              <div style={{ padding: "7px 16px", background: C.cardBg, borderBottom: `1px solid ${C.border}` }}>
+                <span style={{ fontSize: "10px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>📬 My Mailboxes</span>
+              </div>
+              <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: "14px" }}>
+                {assignedMailLocations.map((loc) => (
+                  <div key={loc.id}>
+                    <div style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>
+                      📍 Suite {loc.name}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      {loc.mailboxes.map((box) => (
+                        <div key={box.id} style={{ padding: "10px 14px", background: C.cardBg, borderRadius: "10px", border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.accent}` }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: box.contact || box.crizDetails ? "6px" : "0" }}>
+                            <div style={{ fontSize: "13px", fontWeight: "700", color: C.text }}>
+                              📫 Box #{box.number || "—"}
+                            </div>
+                            <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                              {box.googleBizProfile && (
+                                <span style={{ fontSize: "10px", fontWeight: "600", color: "#10B981", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: "6px", padding: "1px 7px" }}>Google ✓</span>
+                              )}
+                              {box.signCreated && (
+                                <span style={{ fontSize: "10px", fontWeight: "600", color: "#6366F1", background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: "6px", padding: "1px 7px" }}>Sign ✓</span>
+                              )}
+                              {box.memberAlerted && (
+                                <span style={{ fontSize: "10px", fontWeight: "600", color: "#F59E0B", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "6px", padding: "1px 7px" }}>Alerted ✓</span>
+                              )}
+                            </div>
+                          </div>
+                          {box.contact && (
+                            <div style={{ fontSize: "12px", color: C.muted, marginBottom: box.crizDetails ? "4px" : "0" }}>👤 {box.contact}</div>
+                          )}
+                          {box.crizDetails && (
+                            <div style={{ fontSize: "11px", color: C.muted, fontStyle: "italic" }}>📝 {box.crizDetails}</div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
