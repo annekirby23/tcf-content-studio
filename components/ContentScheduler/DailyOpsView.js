@@ -601,6 +601,10 @@ function MailPackagesTab({ token, currentUser, teamMembers, reference, setRefere
   const [howToDesc, setHowToDesc] = useState(reference?.mail?.description || "");
   const [howToSteps, setHowToSteps] = useState(Array.isArray(reference?.mail?.steps) ? reference.mail.steps : []);
   const [howToNotes, setHowToNotes] = useState(reference?.mail?.notes || "");
+  const [howToCollapsed, setHowToCollapsed] = useState(false);
+  const [overviewCollapsed, setOverviewCollapsed] = useState(false);
+  const [stepsCollapsed, setStepsCollapsed] = useState(false);
+  const [notesCollapsed, setNotesCollapsed] = useState(false);
 
   // Keep local state in sync when reference changes from outside
   useEffect(() => {
@@ -713,94 +717,141 @@ function MailPackagesTab({ token, currentUser, teamMembers, reference, setRefere
         {saving && <span style={{ fontSize: "12px", color: C.muted, fontStyle: "italic" }}>Saving…</span>}
       </div>
 
-      {/* How To Process Mail — block-style card */}
+      {/* How To Process Mail — collapsible with sub-cards */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", overflow: "hidden", marginBottom: "20px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: `1px solid ${C.border}`, background: C.cardBg }}>
+        {/* Outer header — always visible */}
+        <div
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", background: C.cardBg, borderBottom: howToCollapsed ? "none" : `1px solid ${C.border}`, cursor: "pointer", userSelect: "none" }}
+          onClick={() => { if (!editingHowTo) setHowToCollapsed((v) => !v); }}
+        >
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <span style={{ fontSize: "20px" }}>📋</span>
             <span style={{ fontSize: "15px", fontWeight: "800", color: C.text }}>How To Process Mail</span>
           </div>
-          {!editingHowTo && (
-            <button
-              onClick={() => { setHowToDesc(reference?.mail?.description || ""); setHowToSteps(Array.isArray(reference?.mail?.steps) ? [...reference.mail.steps] : []); setHowToNotes(reference?.mail?.notes || ""); setEditingHowTo(true); }}
-              style={{ padding: "6px 12px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
-            >✏️ Edit</button>
-          )}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }} onClick={(e) => e.stopPropagation()}>
+            {!editingHowTo && !howToCollapsed && (
+              <button
+                onClick={() => { setHowToDesc(reference?.mail?.description || ""); setHowToSteps(Array.isArray(reference?.mail?.steps) ? [...reference.mail.steps] : []); setHowToNotes(reference?.mail?.notes || ""); setEditingHowTo(true); }}
+                style={{ padding: "5px 11px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
+              >✏️ Edit</button>
+            )}
+            <span
+              onClick={() => { if (!editingHowTo) setHowToCollapsed((v) => !v); }}
+              style={{ fontSize: "13px", fontWeight: "800", color: C.muted, cursor: "pointer", width: "20px", textAlign: "center" }}
+            >{howToCollapsed ? "+" : "−"}</span>
+          </div>
         </div>
 
-        {editingHowTo ? (
-          <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "20px" }}>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                <div style={{ width: "3px", height: "16px", background: C.accent, borderRadius: "2px" }} />
-                <label style={{ ...labelStyle, margin: 0 }}>Overview / Description</label>
-              </div>
-              <textarea autoFocus value={howToDesc} onChange={(e) => setHowToDesc(e.target.value)} rows={4}
-                style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.7" }) }}
-                placeholder="Describe the mail process — context, key points, any general rules…" />
-            </div>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
-                <div style={{ width: "3px", height: "16px", background: "#10B981", borderRadius: "2px" }} />
-                <label style={{ ...labelStyle, margin: 0 }}>Step-by-Step Process</label>
-              </div>
-              <StepListEditor steps={howToSteps} onChange={setHowToSteps} />
-            </div>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                <div style={{ width: "3px", height: "16px", background: "#F59E0B", borderRadius: "2px" }} />
-                <label style={{ ...labelStyle, margin: 0 }}>💡 Notes & Tips</label>
-              </div>
-              <textarea value={howToNotes} onChange={(e) => setHowToNotes(e.target.value)} rows={3}
-                style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.7" }), background: "rgba(245,158,11,0.05)", borderColor: "rgba(245,158,11,0.3)" }}
-                placeholder="Edge cases, reminders, or tips for the team…" />
-            </div>
-            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-              <button onClick={() => setEditingHowTo(false)} style={{ padding: "8px 16px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
-              <button onClick={saveHowTo} disabled={howToSaving} style={{ padding: "8px 20px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", opacity: howToSaving ? 0.6 : 1 }}>{howToSaving ? "Saving…" : "Save"}</button>
-            </div>
-          </div>
-        ) : (reference?.mail?.description || (Array.isArray(reference?.mail?.steps) && reference.mail.steps.length > 0) || reference?.mail?.notes) ? (
-          <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "18px" }}>
-            {reference?.mail?.description && (
+        {!howToCollapsed && (
+          editingHowTo ? (
+            <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "20px" }}>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                  <div style={{ width: "3px", height: "14px", background: C.accent, borderRadius: "2px" }} />
-                  <span style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>Overview</span>
+                  <div style={{ width: "3px", height: "16px", background: C.accent, borderRadius: "2px" }} />
+                  <label style={{ ...labelStyle, margin: 0 }}>Overview / Description</label>
                 </div>
-                <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: "1.75", whiteSpace: "pre-wrap" }}>{reference.mail.description}</p>
+                <textarea autoFocus value={howToDesc} onChange={(e) => setHowToDesc(e.target.value)} rows={4}
+                  style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.7" }) }}
+                  placeholder="Describe the mail process — context, key points, any general rules…" />
               </div>
-            )}
-            {Array.isArray(reference?.mail?.steps) && reference.mail.steps.length > 0 && (
               <div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                  <div style={{ width: "3px", height: "14px", background: "#10B981", borderRadius: "2px" }} />
-                  <span style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>Process</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+                  <div style={{ width: "3px", height: "16px", background: "#10B981", borderRadius: "2px" }} />
+                  <label style={{ ...labelStyle, margin: 0 }}>Step-by-Step Process</label>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {reference.mail.steps.map((step, i) => (
-                    <div key={i} style={{ display: "flex", gap: "12px", alignItems: "flex-start", padding: "10px 14px", background: C.cardBg, borderRadius: "10px", border: `1px solid ${C.border}` }}>
-                      <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "#10B981", color: "#fff", fontSize: "11px", fontWeight: "800", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</div>
-                      <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: "1.65", whiteSpace: "pre-wrap", paddingTop: "3px" }}>{step}</p>
+                <StepListEditor steps={howToSteps} onChange={setHowToSteps} />
+              </div>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                  <div style={{ width: "3px", height: "16px", background: "#F59E0B", borderRadius: "2px" }} />
+                  <label style={{ ...labelStyle, margin: 0 }}>💡 Notes & Tips</label>
+                </div>
+                <textarea value={howToNotes} onChange={(e) => setHowToNotes(e.target.value)} rows={3}
+                  style={{ ...textInput({ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: "1.7" }), background: "rgba(245,158,11,0.05)", borderColor: "rgba(245,158,11,0.3)" }}
+                  placeholder="Edge cases, reminders, or tips for the team…" />
+              </div>
+              <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                <button onClick={() => setEditingHowTo(false)} style={{ padding: "8px 16px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
+                <button onClick={saveHowTo} disabled={howToSaving} style={{ padding: "8px 20px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: "pointer", opacity: howToSaving ? 0.6 : 1 }}>{howToSaving ? "Saving…" : "Save"}</button>
+              </div>
+            </div>
+          ) : (reference?.mail?.description || (Array.isArray(reference?.mail?.steps) && reference.mail.steps.length > 0) || reference?.mail?.notes) ? (
+            <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: "12px" }}>
+
+              {/* Overview sub-card */}
+              {reference?.mail?.description && (
+                <div style={{ border: `1px solid ${C.border}`, borderRadius: "10px", overflow: "hidden" }}>
+                  <div
+                    onClick={() => setOverviewCollapsed((v) => !v)}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: C.cardBg, cursor: "pointer", userSelect: "none", borderBottom: overviewCollapsed ? "none" : `1px solid ${C.border}` }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <div style={{ width: "3px", height: "13px", background: C.accent, borderRadius: "2px" }} />
+                      <span style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>📖 Overview</span>
                     </div>
-                  ))}
+                    <span style={{ fontSize: "12px", fontWeight: "800", color: C.muted }}>{overviewCollapsed ? "+" : "−"}</span>
+                  </div>
+                  {!overviewCollapsed && (
+                    <div style={{ padding: "12px 14px" }}>
+                      <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: "1.75", whiteSpace: "pre-wrap" }}>{reference.mail.description}</p>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
-            {reference?.mail?.notes && (
-              <div style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "10px", padding: "12px 16px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
-                  <span style={{ fontSize: "14px" }}>💡</span>
-                  <span style={{ fontSize: "11px", fontWeight: "700", color: "#B45309", textTransform: "uppercase", letterSpacing: "0.07em" }}>Notes & Tips</span>
+              )}
+
+              {/* Steps sub-card */}
+              {Array.isArray(reference?.mail?.steps) && reference.mail.steps.length > 0 && (
+                <div style={{ border: `1px solid ${C.border}`, borderRadius: "10px", overflow: "hidden" }}>
+                  <div
+                    onClick={() => setStepsCollapsed((v) => !v)}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: C.cardBg, cursor: "pointer", userSelect: "none", borderBottom: stepsCollapsed ? "none" : `1px solid ${C.border}` }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <div style={{ width: "3px", height: "13px", background: "#10B981", borderRadius: "2px" }} />
+                      <span style={{ fontSize: "11px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>✅ Step-by-Step Process</span>
+                    </div>
+                    <span style={{ fontSize: "12px", fontWeight: "800", color: C.muted }}>{stepsCollapsed ? "+" : "−"}</span>
+                  </div>
+                  {!stepsCollapsed && (
+                    <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                      {reference.mail.steps.map((step, i) => (
+                        <div key={i} style={{ display: "flex", gap: "12px", alignItems: "flex-start", padding: "10px 14px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}` }}>
+                          <div style={{ width: "22px", height: "22px", borderRadius: "50%", background: "#10B981", color: "#fff", fontSize: "11px", fontWeight: "800", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</div>
+                          <p style={{ margin: 0, fontSize: "13px", color: C.text, lineHeight: "1.65", whiteSpace: "pre-wrap", paddingTop: "2px" }}>{step}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <p style={{ margin: 0, fontSize: "13px", color: "#92400E", lineHeight: "1.7", whiteSpace: "pre-wrap" }}>{reference.mail.notes}</p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div style={{ padding: "24px 20px" }}>
-            <p style={{ margin: 0, fontSize: "13px", color: C.muted, fontStyle: "italic" }}>{isAdmin ? "Click Edit to add mail processing instructions." : "No instructions added yet."}</p>
-          </div>
+              )}
+
+              {/* Notes sub-card */}
+              {reference?.mail?.notes && (
+                <div style={{ border: "1px solid rgba(245,158,11,0.35)", borderRadius: "10px", overflow: "hidden" }}>
+                  <div
+                    onClick={() => setNotesCollapsed((v) => !v)}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "rgba(245,158,11,0.06)", cursor: "pointer", userSelect: "none", borderBottom: notesCollapsed ? "none" : "1px solid rgba(245,158,11,0.25)" }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "13px" }}>💡</span>
+                      <span style={{ fontSize: "11px", fontWeight: "700", color: "#B45309", textTransform: "uppercase", letterSpacing: "0.07em" }}>Notes & Tips</span>
+                    </div>
+                    <span style={{ fontSize: "12px", fontWeight: "800", color: "#B45309" }}>{notesCollapsed ? "+" : "−"}</span>
+                  </div>
+                  {!notesCollapsed && (
+                    <div style={{ padding: "12px 14px", background: "rgba(245,158,11,0.04)" }}>
+                      <p style={{ margin: 0, fontSize: "13px", color: "#92400E", lineHeight: "1.7", whiteSpace: "pre-wrap" }}>{reference.mail.notes}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
+          ) : (
+            <div style={{ padding: "24px 20px" }}>
+              <p style={{ margin: 0, fontSize: "13px", color: C.muted, fontStyle: "italic" }}>{"Click Edit to add mail processing instructions."}</p>
+            </div>
+          )
         )}
       </div>
 
