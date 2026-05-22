@@ -3214,14 +3214,12 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
     if (typeof document === "undefined") return false;
     return document.cookie.split(";").some((c) => c.trim().startsWith("googtrans=/en/es"));
   });
-  function toggleSpanish() {
-    if (isSpanish) {
-      document.cookie = "googtrans=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-      document.cookie = `googtrans=; path=/; domain=${window.location.hostname}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-    } else {
-      document.cookie = "googtrans=/en/es; path=/";
-      document.cookie = `googtrans=/en/es; path=/; domain=${window.location.hostname}`;
-      // Inject hidden translate element + script if not already present
+
+  // Load Google Translate on mount whenever Yessica's workspace is open
+  // (handles the post-reload case where the cookie is set but the script isn't loaded yet)
+  useEffect(() => {
+    if (!isYessica) return;
+    function loadGT() {
       if (!document.getElementById("google_translate_element")) {
         const div = document.createElement("div");
         div.id = "google_translate_element";
@@ -3237,6 +3235,18 @@ export default function MyDashboard({ currentUser, token, viewingUserId, teamMem
         s.src = "//translate.googleapis.com/translate_a/element.js?cb=googleTranslateElementInit";
         document.head.appendChild(s);
       }
+    }
+    loadGT();
+  }, [isYessica]);
+
+  function toggleSpanish() {
+    if (isSpanish) {
+      // Clear translation cookie and reset to English
+      document.cookie = "googtrans=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      document.cookie = "googtrans=/en/en; path=/";
+    } else {
+      // Set Spanish translation cookie
+      document.cookie = "googtrans=/en/es; path=/";
     }
     window.location.reload();
   }
