@@ -1000,16 +1000,14 @@ function MailPackagesTab({ token, currentUser, teamMembers, reference, setRefere
                         </label>
                       )}
 
-                      {/* Delete button — admin only */}
-                      {isAdmin && (
-                        <button
-                          onClick={() => deleteMailbox(loc.id, box.id)}
-                          style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer", fontSize: "16px", lineHeight: 1, padding: "2px 4px", borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center" }}
-                          title="Remove mailbox"
-                        >
-                          ✕
-                        </button>
-                      )}
+                      {/* Delete button */}
+                      <button
+                        onClick={() => deleteMailbox(loc.id, box.id)}
+                        style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer", fontSize: "16px", lineHeight: 1, padding: "2px 4px", borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        title="Remove mailbox"
+                      >
+                        ✕
+                      </button>
                     </div>
                   </div>
                 ))}
