@@ -43,6 +43,7 @@ export async function POST(req) {
     const item = {
       id: genId(),
       itemName: body.itemName.trim(),
+      orderType: body.orderType || "recurring",
       date: today(),
       neededWhen: body.neededWhen || "",
       forWhat: body.forWhat || "",
