@@ -1867,10 +1867,28 @@ function NoteCard({ note, onSave, onDelete, readOnly }) {
   const pal = notepalette(note.id);
   const tilt = notetilt(note.id);
 
+  const isEmpty = !note.title && !note.content;
+
   const handleSave = async () => {
+    // If saved with no content, just delete it
+    if (!title.trim() && !content.trim()) {
+      onDelete(note.id);
+      return;
+    }
     setSaving(true);
     await onSave(note.id, { title, content });
     setSaving(false);
+    setEditing(false);
+  };
+
+  const handleCancel = () => {
+    // If the note was never given content, delete it on cancel
+    if (!note.title && !note.content) {
+      onDelete(note.id);
+      return;
+    }
+    setTitle(note.title || "");
+    setContent(note.content || "");
     setEditing(false);
   };
 
@@ -1935,10 +1953,10 @@ function NoteCard({ note, onSave, onDelete, readOnly }) {
             />
             <div style={{ display: "flex", gap: "6px", marginTop: "10px", justifyContent: "flex-end" }}>
               <button
-                onClick={() => { setTitle(note.title || ""); setContent(note.content || ""); setEditing(false); }}
+                onClick={handleCancel}
                 style={{ padding: "5px 12px", borderRadius: "6px", border: `1px solid ${pal.border}`, background: "rgba(255,255,255,0.5)", color: pal.text, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}
               >
-                Cancel
+                {isEmpty ? "Discard" : "Cancel"}
               </button>
               <button
                 onClick={handleSave}
@@ -1951,8 +1969,8 @@ function NoteCard({ note, onSave, onDelete, readOnly }) {
           </div>
         ) : (
           <div>
-            {/* Delete button on hover */}
-            {!readOnly && hov && (
+            {/* Delete button — always visible on empty notes, hover on others */}
+            {!readOnly && (hov || isEmpty) && (
               <button
                 onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
                 style={{ position: "absolute", top: "14px", right: "10px", background: "rgba(0,0,0,0.12)", border: "none", borderRadius: "50%", width: "20px", height: "20px", cursor: "pointer", fontSize: "10px", color: pal.text, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700" }}
