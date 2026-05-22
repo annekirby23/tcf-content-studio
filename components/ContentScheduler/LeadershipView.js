@@ -874,10 +874,10 @@ function MemberHealthCard({ member }) {
             </span>
             <span style={{ fontSize: 11, color: C.muted }}>
               {member.daysSinceLogin === null
-                ? "Never logged in"
+                ? "No activity recorded"
                 : member.daysSinceLogin === 0
-                ? "Logged in today"
-                : `Last login ${member.daysSinceLogin}d ago`}
+                ? "Active today"
+                : `Last active ${member.daysSinceLogin}d ago`}
             </span>
           </div>
         </div>
