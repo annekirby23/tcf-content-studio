@@ -194,26 +194,29 @@ function DriveCard({ driveUrl, isAdmin, onSave }) {
 
 // ─── 2. Who's Working On What ────────────────────────────────────────────────
 
-function WorkingOnCard({ member, isAdmin, onSaveStatus }) {
+function WorkingOnCard({ member, isAdmin, onSaveItems }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(member.status || "");
+  const items = Array.isArray(member.items) ? member.items : (member.status ? [member.status] : []);
+  const [draft, setDraft] = useState(items.join("\n"));
 
-  useEffect(() => { setDraft(member.status || ""); }, [member.status]);
+  useEffect(() => {
+    const its = Array.isArray(member.items) ? member.items : (member.status ? [member.status] : []);
+    setDraft(its.join("\n"));
+  }, [member.items, member.status]);
 
   const handleSave = () => {
-    onSaveStatus(member.memberId, draft.trim());
+    const updated = draft.split("\n").map((s) => s.trim()).filter(Boolean);
+    onSaveItems(member.memberId, updated);
     setEditing(false);
   };
 
   return (
-    <div
-      style={{
-        background: C.cardBg, border: `1px solid ${C.border}`,
-        borderRadius: 12, padding: "14px 16px",
-        display: "flex", flexDirection: "column", gap: 10,
-        boxShadow: C.shadow,
-      }}
-    >
+    <div style={{
+      background: C.cardBg, border: `1px solid ${C.border}`,
+      borderRadius: 12, padding: "14px 16px",
+      display: "flex", flexDirection: "column", gap: 10,
+      boxShadow: C.shadow,
+    }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{
           width: 36, height: 36, borderRadius: "50%",
@@ -233,35 +236,41 @@ function WorkingOnCard({ member, isAdmin, onSaveStatus }) {
           <button
             onClick={() => setEditing(true)}
             style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 15, padding: "2px 4px" }}
-            title="Edit status"
-          >
-            ✏️
-          </button>
+            title="Edit"
+          >✏️</button>
         )}
       </div>
 
       {editing ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <input
-            style={inputStyle()}
+          <div style={{ fontSize: 11, color: C.muted, marginBottom: 2 }}>One item per line</div>
+          <textarea
+            style={{ ...inputStyle(), minHeight: 90, resize: "vertical" }}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="What are they working on?"
+            placeholder={"Working on Q3 report\nReviewing onboarding process\nMeeting prep for Thursday"}
             autoFocus
           />
           <div style={{ display: "flex", gap: 6 }}>
             <button style={btnStyle("primary", { flex: 1, padding: "6px 10px", fontSize: 12 })} onClick={handleSave}>Save</button>
-            <button style={btnStyle("ghost", { padding: "6px 10px", fontSize: 12 })} onClick={() => { setDraft(member.status || ""); setEditing(false); }}>Cancel</button>
+            <button style={btnStyle("ghost", { padding: "6px 10px", fontSize: 12 })} onClick={() => { setDraft(items.join("\n")); setEditing(false); }}>Cancel</button>
           </div>
         </div>
       ) : (
         <div style={{
-          fontSize: 13, color: member.status ? C.text : C.muted,
-          background: C.card, borderRadius: 8, padding: "8px 10px",
+          fontSize: 13, borderRadius: 8, padding: "8px 10px",
           border: `1px solid ${C.border}`, minHeight: 36,
-          fontStyle: member.status ? "normal" : "italic",
+          background: C.card,
         }}>
-          {member.status || "No status set."}
+          {items.length === 0 ? (
+            <span style={{ color: C.muted, fontStyle: "italic" }}>Nothing added yet.</span>
+          ) : (
+            <ul style={{ margin: 0, paddingLeft: 16, display: "flex", flexDirection: "column", gap: 4 }}>
+              {items.map((item, i) => (
+                <li key={i} style={{ color: C.text }}>{item}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>
@@ -269,24 +278,30 @@ function WorkingOnCard({ member, isAdmin, onSaveStatus }) {
 }
 
 function WorkingOnSection({ workingOn, teamMembers, isAdmin, onSave }) {
-  // Merge teamMembers into workingOn (ensure every leadership member has an entry)
-  const merged = teamMembers.map((tm) => {
+  // Only show admin/leadership members
+  const adminMembers = teamMembers.filter((tm) => tm.role === "admin");
+
+  const merged = adminMembers.map((tm) => {
     const existing = (workingOn || []).find((w) => w.memberId === tm.id);
-    return existing || { memberId: tm.id, memberName: tm.name, status: "", updatedAt: null };
+    return existing || { memberId: tm.id, memberName: tm.name, items: [], updatedAt: null };
   });
 
-  const handleSaveStatus = (memberId, status) => {
-    const updated = merged.map((w) =>
-      w.memberId === memberId ? { ...w, status, updatedAt: new Date().toISOString() } : w
+  const handleSaveItems = (memberId, items) => {
+    // Merge with non-admin entries so we don't lose their data
+    const nonAdminEntries = (workingOn || []).filter(
+      (w) => !adminMembers.some((a) => a.id === w.memberId)
     );
-    onSave(updated);
+    const updated = merged.map((w) =>
+      w.memberId === memberId ? { ...w, items, updatedAt: new Date().toISOString() } : w
+    );
+    onSave([...updated, ...nonAdminEntries]);
   };
 
   if (merged.length === 0) {
     return (
       <SectionCard>
         {sectionLabel("Who's Working On What")}
-        <div style={{ color: C.muted, fontSize: 13 }}>No leadership team members found.</div>
+        <div style={{ color: C.muted, fontSize: 13 }}>No admin/leadership members found.</div>
       </SectionCard>
     );
   }
@@ -296,7 +311,7 @@ function WorkingOnSection({ workingOn, teamMembers, isAdmin, onSave }) {
       {sectionLabel("Who's Working On What")}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+        gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
         gap: 12,
       }}>
         {merged.map((member) => (
@@ -304,7 +319,7 @@ function WorkingOnSection({ workingOn, teamMembers, isAdmin, onSave }) {
             key={member.memberId}
             member={member}
             isAdmin={isAdmin}
-            onSaveStatus={handleSaveStatus}
+            onSaveItems={handleSaveItems}
           />
         ))}
       </div>
