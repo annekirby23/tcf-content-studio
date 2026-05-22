@@ -471,10 +471,10 @@ function ShoutoutCard({ shoutout, canDelete, onDelete }) {
 }
 
 // ─── Image Upload Tab ─────────────────────────────────────────────────────────
-// Self-contained: owns its own ref, file reading, and uploading state.
-// Parent only needs to pass image URL, callbacks, and isAdmin flag.
+// Uses label+htmlFor so the file picker opens natively — no .click() needed.
 function ImageUploadTab({ image, label, icon, isAdmin, onUpload, onClear }) {
-  const inputRef = useRef(null);
+  // Stable unique ID per component instance so label↔input always match
+  const inputId = useRef(`img-${Math.random().toString(36).slice(2)}`).current;
   const [uploading, setUploading] = useState(false);
 
   function handleChange(e) {
@@ -491,22 +491,34 @@ function ImageUploadTab({ image, label, icon, isAdmin, onUpload, onClear }) {
     e.target.value = "";
   }
 
-  function triggerPicker() {
-    inputRef.current?.click();
-  }
+  const labelBtnStyle = {
+    display: "inline-flex", alignItems: "center", gap: "6px",
+    padding: "8px 16px", borderRadius: "10px",
+    background: uploading ? C.muted : C.accent, color: "#fff",
+    fontSize: "13px", fontWeight: "700",
+    cursor: uploading ? "default" : "pointer",
+    opacity: uploading ? 0.6 : 1,
+    userSelect: "none",
+  };
 
   return (
     <div>
+      {/* Hidden file input — label opens it natively */}
+      <input
+        id={inputId}
+        type="file"
+        accept="image/png,image/jpeg,image/gif"
+        style={{ position: "absolute", width: "1px", height: "1px", opacity: 0, pointerEvents: "none" }}
+        onChange={handleChange}
+        disabled={uploading}
+      />
+
       {/* Admin toolbar */}
       {isAdmin && (
         <div style={{ display: "flex", gap: "10px", marginBottom: "16px", alignItems: "center" }}>
-          <button
-            onClick={triggerPicker}
-            disabled={uploading}
-            style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "10px", border: "none", background: C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: uploading ? "default" : "pointer", opacity: uploading ? 0.6 : 1 }}
-          >
+          <label htmlFor={inputId} style={labelBtnStyle}>
             {uploading ? "Uploading…" : `⬆ Upload ${label}`}
-          </button>
+          </label>
           {image && (
             <button
               onClick={onClear}
@@ -515,13 +527,6 @@ function ImageUploadTab({ image, label, icon, isAdmin, onUpload, onClear }) {
               🗑 Remove
             </button>
           )}
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/gif"
-            style={{ display: "none" }}
-            onChange={handleChange}
-          />
         </div>
       )}
 
@@ -530,14 +535,17 @@ function ImageUploadTab({ image, label, icon, isAdmin, onUpload, onClear }) {
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", overflow: "hidden", boxShadow: C.shadow }}>
           <img src={image} alt={label} style={{ width: "100%", height: "auto", display: "block" }} />
         </div>
-      ) : (
-        <div
-          onClick={isAdmin ? triggerPicker : undefined}
-          style={{ textAlign: "center", padding: "60px 20px", background: C.card, borderRadius: "14px", border: `2px dashed ${C.border}`, color: C.muted, cursor: isAdmin ? "pointer" : "default" }}
-        >
+      ) : isAdmin ? (
+        <label htmlFor={inputId} style={{ display: "block", textAlign: "center", padding: "60px 20px", background: C.card, borderRadius: "14px", border: `2px dashed ${C.border}`, color: C.muted, cursor: "pointer" }}>
           <div style={{ fontSize: "48px", marginBottom: "14px" }}>{icon}</div>
           <div style={{ fontSize: "15px", fontWeight: "700", color: C.text, marginBottom: "6px" }}>{label}</div>
-          <div style={{ fontSize: "13px" }}>{isAdmin ? "Click to upload a PNG or image file." : "No image uploaded yet."}</div>
+          <div style={{ fontSize: "13px" }}>Click to upload a PNG or image file.</div>
+        </label>
+      ) : (
+        <div style={{ textAlign: "center", padding: "60px 20px", background: C.card, borderRadius: "14px", border: `2px dashed ${C.border}`, color: C.muted }}>
+          <div style={{ fontSize: "48px", marginBottom: "14px" }}>{icon}</div>
+          <div style={{ fontSize: "15px", fontWeight: "700", color: C.text, marginBottom: "6px" }}>{label}</div>
+          <div style={{ fontSize: "13px" }}>No image uploaded yet.</div>
         </div>
       )}
     </div>
