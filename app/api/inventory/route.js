@@ -23,6 +23,14 @@ export async function GET(req) {
 
     let items = (await kvGet(KEY)) || [];
 
+    // Backfill legacy items that were saved before orderType was introduced.
+    // Default them to "recurring" so they remain visible and aren't lost.
+    const needsMigration = items.some((i) => !i.orderType);
+    if (needsMigration) {
+      items = items.map((i) => i.orderType ? i : { ...i, orderType: "recurring" });
+      await kvSet(KEY, items); // persist so migration only runs once
+    }
+
     if (statusFilter) items = items.filter((i) => i.orderStatus === statusFilter);
     if (assignedToFilter) items = items.filter((i) => i.personAddedId === assignedToFilter);
 

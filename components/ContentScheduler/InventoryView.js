@@ -492,7 +492,8 @@ export default function InventoryView({ token, currentUser }) {
       .finally(() => setLoading(false));
   }, [token]);
 
-  const itemsForSection = (type) => items.filter((i) => i.orderType === type);
+  // Default missing orderType to "recurring" so legacy items are never invisible
+  const itemsForSection = (type) => items.filter((i) => (i.orderType || "recurring") === type);
 
   const handleReorder = async (sectionType, newSectionItems) => {
     const otherItems = items.filter((i) => i.orderType !== sectionType);
