@@ -1,11 +1,22 @@
-import { getSession } from "@/lib/serverAuth";
-import { getRedis } from "@/lib/redis";
+import { getRedis, kvGet } from "@/lib/redis";
 
 export async function GET(req) {
   try {
-    const user = await getSession(req);
-    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-    if (user.role !== "admin") return Response.json({ error: "Forbidden" }, { status: 403 });
+    // Session token can come from x-session header OR ?token= query param
+    // (query param allows direct browser URL access)
+    const url = new URL(req.url);
+    const token =
+      req.headers.get("x-session") || url.searchParams.get("token");
+
+    if (!token) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+    const redis = getRedis();
+    const userId = await redis.get(`tcf:session:${token}`);
+    if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+    const users = (await kvGet("tcf:users")) || [];
+    const user = users.find((u) => u.id === userId);
+    if (!user || user.role !== "admin") return Response.json({ error: "Forbidden" }, { status: 403 });
 
     const redis = getRedis();
     const keys = await redis.keys("*");
