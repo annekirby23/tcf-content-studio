@@ -55,10 +55,11 @@ function Pill({ label, color, bg }) {
 
 // ─── Detail / Edit Modal ─────────────────────────────────────────────────────
 
-function ItemDetailModal({ item, token, onSave, onDelete, onClose }) {
+function ItemDetailModal({ item, token, onSave, onDelete, onAdd, onClose }) {
   const [form, setForm] = useState({ ...item });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
 
   const inputStyle = {
     width: "100%", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: "8px",
@@ -81,6 +82,15 @@ function ItemDetailModal({ item, token, onSave, onDelete, onClose }) {
       await apiFetch(`/api/inventory?id=${item.id}`, { method: "DELETE" }, token);
       onDelete(item.id); onClose();
     } finally { setDeleting(false); }
+  };
+
+  const duplicate = async () => {
+    setDuplicating(true);
+    try {
+      const { id, createdAt, updatedAt, date, personAdded, personAddedId, ...rest } = form;
+      const res = await apiFetch("/api/inventory", { method: "POST", body: JSON.stringify({ ...rest, itemName: `${form.itemName} (copy)` }) }, token);
+      if (res.ok) { onAdd(await res.json()); onClose(); }
+    } finally { setDuplicating(false); }
   };
 
   const field = (label, key, type = "text", opts = null) => (
@@ -129,9 +139,14 @@ function ItemDetailModal({ item, token, onSave, onDelete, onClose }) {
           {field("Notes", "notes", "textarea")}
         </div>
         <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <button onClick={del} disabled={deleting} style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid #EF444440", background: "rgba(239,68,68,0.06)", color: "#EF4444", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>
-            {deleting ? "Deleting…" : "🗑 Delete"}
-          </button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button onClick={del} disabled={deleting} style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid #EF444440", background: "rgba(239,68,68,0.06)", color: "#EF4444", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>
+              {deleting ? "Deleting…" : "🗑 Delete"}
+            </button>
+            <button onClick={duplicate} disabled={duplicating} style={{ padding: "8px 16px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>
+              {duplicating ? "Copying…" : "⧉ Duplicate"}
+            </button>
+          </div>
           <div style={{ display: "flex", gap: "8px" }}>
             <button onClick={onClose} style={{ padding: "8px 16px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", cursor: "pointer" }}>Cancel</button>
             <button onClick={save} disabled={saving} style={{ padding: "8px 22px", borderRadius: "8px", border: "none", background: C.accent, color: "#fff", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>
@@ -174,6 +189,7 @@ function ItemRow({ item, onDragStart, onDrop, dragOverId, setDragOverId, onClick
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: "13px", fontWeight: "600", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.itemName}</div>
         {item.forWhat && <div style={{ fontSize: "11px", color: C.muted, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.forWhat}</div>}
+        {item.notes && <div style={{ fontSize: "11px", color: C.muted, marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontStyle: "italic", opacity: 0.75 }}>📝 {item.notes}</div>}
       </div>
       <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
         {nwCfg && <Pill label={item.neededWhen} color={nwCfg.color} bg={nwCfg.bg} />}
@@ -207,7 +223,7 @@ function ItemRow({ item, onDragStart, onDrop, dragOverId, setDragOverId, onClick
 
 // ─── Section Block ─────────────────────────────────────────────────────────
 
-function SectionBlock({ section, items, token, onItemUpdate, onItemDelete, onReorder, onCrossDrop, dragItemId, setDragItemId, filterStatus, filterNeeded, filterLocation }) {
+function SectionBlock({ section, items, token, onItemUpdate, onItemDelete, onItemAdd, onReorder, onCrossDrop, dragItemId, setDragItemId, filterStatus, filterNeeded, filterLocation }) {
   const { type: sectionType, label: title, emoji, color: accentColor } = section;
   const [dragOverId, setDragOverId] = useState(null);
   const [dropTargetSection, setDropTargetSection] = useState(false);
@@ -355,6 +371,7 @@ function SectionBlock({ section, items, token, onItemUpdate, onItemDelete, onReo
           token={token}
           onSave={(updated) => { onItemUpdate(updated); setDetailItem(updated); }}
           onDelete={(id) => { onItemDelete(id); setSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n; }); }}
+          onAdd={onItemAdd}
           onClose={() => setDetailItem(null)}
         />
       )}
@@ -542,6 +559,7 @@ export default function InventoryView({ token, currentUser }) {
           token={token}
           onItemUpdate={handleItemUpdate}
           onItemDelete={handleItemDelete}
+          onItemAdd={(newItem) => setItems((prev) => [newItem, ...prev])}
           onReorder={(newItems) => handleReorder(section.type, newItems)}
           onCrossDrop={handleCrossDrop}
           dragItemId={dragItemId}
