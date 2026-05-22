@@ -471,61 +471,60 @@ function ShoutoutCard({ shoutout, canDelete, onDelete }) {
 }
 
 // ─── Image Upload Tab ─────────────────────────────────────────────────────────
-// Uses label+htmlFor so the file picker opens natively — no .click() needed.
+// Input nested directly inside its label — the most reliable trigger possible.
 function ImageUploadTab({ image, label, icon, isAdmin, onUpload, onClear }) {
-  // Stable unique ID per component instance so label↔input always match
-  const inputId = useRef(`img-${Math.random().toString(36).slice(2)}`).current;
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
-  function handleChange(e) {
+  async function handleChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
+    setUploadError("");
     const reader = new FileReader();
     reader.onload = async (ev) => {
-      await onUpload(ev.target.result);
+      try {
+        await onUpload(ev.target.result);
+      } catch (err) {
+        setUploadError("Upload failed — " + (err?.message || "please try again"));
+      }
       setUploading(false);
     };
-    reader.onerror = () => setUploading(false);
+    reader.onerror = () => {
+      setUploadError("Could not read file — please try a different image");
+      setUploading(false);
+    };
     reader.readAsDataURL(file);
     e.target.value = "";
   }
 
-  const labelBtnStyle = {
-    display: "inline-flex", alignItems: "center", gap: "6px",
-    padding: "8px 16px", borderRadius: "10px",
-    background: uploading ? C.muted : C.accent, color: "#fff",
-    fontSize: "13px", fontWeight: "700",
-    cursor: uploading ? "default" : "pointer",
-    opacity: uploading ? 0.6 : 1,
-    userSelect: "none",
-  };
+  // The <input> lives inside the <label> — clicking the label always opens the picker
+  const fileInput = (
+    <input
+      type="file"
+      accept="image/*"
+      style={{ display: "none" }}
+      onChange={handleChange}
+      disabled={uploading}
+    />
+  );
 
   return (
     <div>
-      {/* Hidden file input — label opens it natively */}
-      <input
-        id={inputId}
-        type="file"
-        accept="image/png,image/jpeg,image/gif"
-        style={{ position: "absolute", width: "1px", height: "1px", opacity: 0, pointerEvents: "none" }}
-        onChange={handleChange}
-        disabled={uploading}
-      />
-
       {/* Admin toolbar */}
       {isAdmin && (
-        <div style={{ display: "flex", gap: "10px", marginBottom: "16px", alignItems: "center" }}>
-          <label htmlFor={inputId} style={labelBtnStyle}>
+        <div style={{ display: "flex", gap: "10px", marginBottom: "16px", alignItems: "center", flexWrap: "wrap" }}>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "10px", background: uploading ? C.muted : C.accent, color: "#fff", fontSize: "13px", fontWeight: "700", cursor: uploading ? "default" : "pointer", userSelect: "none" }}>
+            {fileInput}
             {uploading ? "Uploading…" : `⬆ Upload ${label}`}
           </label>
-          {image && (
-            <button
-              onClick={onClear}
-              style={{ padding: "8px 14px", borderRadius: "10px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}
-            >
+          {image && !uploading && (
+            <button onClick={onClear} style={{ padding: "8px 14px", borderRadius: "10px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>
               🗑 Remove
             </button>
+          )}
+          {uploadError && (
+            <span style={{ fontSize: "12px", color: "#EF4444", fontWeight: "600" }}>⚠ {uploadError}</span>
           )}
         </div>
       )}
@@ -536,10 +535,11 @@ function ImageUploadTab({ image, label, icon, isAdmin, onUpload, onClear }) {
           <img src={image} alt={label} style={{ width: "100%", height: "auto", display: "block" }} />
         </div>
       ) : isAdmin ? (
-        <label htmlFor={inputId} style={{ display: "block", textAlign: "center", padding: "60px 20px", background: C.card, borderRadius: "14px", border: `2px dashed ${C.border}`, color: C.muted, cursor: "pointer" }}>
+        <label style={{ display: "block", textAlign: "center", padding: "60px 20px", background: C.card, borderRadius: "14px", border: `2px dashed ${C.border}`, color: C.muted, cursor: "pointer" }}>
+          {fileInput}
           <div style={{ fontSize: "48px", marginBottom: "14px" }}>{icon}</div>
           <div style={{ fontSize: "15px", fontWeight: "700", color: C.text, marginBottom: "6px" }}>{label}</div>
-          <div style={{ fontSize: "13px" }}>Click to upload a PNG or image file.</div>
+          <div style={{ fontSize: "13px" }}>Click to upload an image.</div>
         </label>
       ) : (
         <div style={{ textAlign: "center", padding: "60px 20px", background: C.card, borderRadius: "14px", border: `2px dashed ${C.border}`, color: C.muted }}>
@@ -629,11 +629,14 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
   }, [token]);
 
   async function uploadImage(field, dataUrl) {
-    try {
-      const res = await apiFetch("/api/bulletin/images", { method: "PUT", body: JSON.stringify({ field, value: dataUrl }) }, token);
-      const updated = await res.json();
-      if (!updated.error) setImages(updated);
-    } catch {}
+    const res = await apiFetch("/api/bulletin/images", { method: "PUT", body: JSON.stringify({ field, value: dataUrl }) }, token);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Server error ${res.status}`);
+    }
+    const updated = await res.json();
+    if (updated.error) throw new Error(updated.error);
+    setImages(updated);
   }
 
   async function clearImage(field) {
