@@ -29,7 +29,7 @@ export async function POST(req) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { channelId, title, copy } = body;
+  const { channelId, title, copy, assignedTo } = body;
 
   if (!channelId || typeof channelId !== "string" || channelId.trim().length === 0) {
     return NextResponse.json({ error: "channelId is required" }, { status: 400 });
@@ -45,6 +45,7 @@ export async function POST(req) {
     channelId: channelId.trim(),
     title: title.trim(),
     copy: copy || "",
+    assignedTo: assignedTo || null,
     submittedBy: user.name,
     submittedById: user.id,
     createdAt: new Date().toISOString(),
@@ -93,7 +94,7 @@ export async function PUT(req) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { id, title, copy } = body;
+  const { id, title, copy, assignedTo } = body;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
   const ideas = (await kvGet(IDEAS_KEY)) || [];
@@ -117,6 +118,7 @@ export async function PUT(req) {
     updated.title = title.trim();
   }
   if (copy !== undefined) updated.copy = copy;
+  if (assignedTo !== undefined) updated.assignedTo = assignedTo;
 
   ideas[idx] = updated;
   await kvSet(IDEAS_KEY, ideas);

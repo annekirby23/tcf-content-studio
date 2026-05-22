@@ -27,6 +27,7 @@ const EMPTY = {
   priority: "medium",
   author: "",
   assignee: "",
+  assignedTo: "",
   hashtags: "",
   cta: "",
   assetUrl: "",
@@ -133,7 +134,8 @@ export default function ContentForm({
     setThreadNotes(Array.isArray(post?.notes) ? post.notes : []);
     setNoteInput("");
     setMentionQuery(null);
-  }, [post]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post?.id]);
 
   useEffect(() => {
     if (threadBottomRef.current) {
@@ -1205,6 +1207,22 @@ export default function ContentForm({
                     />
                   )}
                 </div>
+              </div>
+
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Assigned To</label>
+                <select
+                  style={{ ...inputStyle, appearance: "none" }}
+                  value={form.assignedTo || ""}
+                  onChange={(e) => set("assignedTo", e.target.value)}
+                >
+                  <option value="">— Unassigned —</option>
+                  {teamMembers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div style={fieldStyle}>

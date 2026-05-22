@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PLATFORM_MAP, STATUS_MAP, THEME_MAP, AUDIENCE_MAP, C } from "./constants";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -356,12 +356,184 @@ function NavBtn({ onClick, children }) {
   );
 }
 
+// ─── Calendar Event Modal ─────────────────────────────────────────────────────
+
+const CAL_COLORS = [
+  { label: "Green",  value: "#10B981" },
+  { label: "Blue",   value: "#3B82F6" },
+  { label: "Purple", value: "#8B5CF6" },
+  { label: "Orange", value: "#F59E0B" },
+  { label: "Red",    value: "#EF4444" },
+  { label: "Pink",   value: "#EC4899" },
+];
+
+const RECUR_FREQ = [
+  { id: "daily",    label: "Daily" },
+  { id: "weekly",   label: "Weekly" },
+  { id: "biweekly", label: "Every 2 weeks" },
+  { id: "monthly",  label: "Monthly" },
+  { id: "yearly",   label: "Yearly" },
+];
+
+function CalEventModal({ event, defaultDate, token, onClose, onSave, onDelete }) {
+  const isNew = !event?.id;
+  const isRecurringSeries = !isNew && event?.recurring && event?.recurringGroupId;
+
+  const [title, setTitle] = useState(event?.title || "");
+  const [date, setDate] = useState(event?.date || defaultDate || "");
+  const [description, setDescription] = useState(event?.description || "");
+  const [color, setColor] = useState(event?.color || "#10B981");
+  const [recurring, setRecurring] = useState(false);
+  const [recurringFrequency, setRecurringFrequency] = useState("weekly");
+  const [recurringEndDate, setRecurringEndDate] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [deleteScope, setDeleteScope] = useState(null); // null | "this" | "all"
+  const [editScope, setEditScope] = useState("this"); // "this" | "all"
+
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const handleSave = async () => {
+    if (!title.trim() || !date) return;
+    setSaving(true);
+    await onSave({
+      title: title.trim(), date, description, color,
+      recurring, recurringFrequency, recurringEndDate: recurringEndDate || null,
+      editScope: isRecurringSeries ? editScope : "this",
+    }, event?.id);
+    setSaving(false);
+    onClose();
+  };
+
+  const handleDelete = async (scope) => {
+    await onDelete(event.id, scope);
+    onClose();
+  };
+
+  const inp = { padding: "8px 10px", border: `1px solid ${C.border}`, borderRadius: "8px", background: C.inputBg, color: C.text, fontSize: "13px", outline: "none", boxSizing: "border-box", width: "100%", fontFamily: "inherit" };
+  const lbl = { display: "block", fontSize: "11px", color: C.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "6px" };
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", backdropFilter: "blur(4px)", zIndex: 3000 }} />
+      <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: "460px", maxWidth: "95vw", background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", zIndex: 3001, boxShadow: "0 20px 60px rgba(0,0,0,0.3)", padding: "28px", maxHeight: "92vh", overflow: "auto" }}>
+        <h3 style={{ margin: "0 0 20px", fontSize: "16px", fontWeight: "800", color: C.text }}>
+          {isNew ? "Log Space Event" : "Edit Space Event"}
+          {isRecurringSeries && <span style={{ marginLeft: "8px", fontSize: "11px", fontWeight: "600", color: C.accent, background: C.accentLight, padding: "2px 8px", borderRadius: "10px" }}>🔁 Recurring</span>}
+        </h3>
+
+        {/* Edit scope (for existing recurring events) */}
+        {isRecurringSeries && (
+          <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px", marginBottom: "16px", display: "flex", gap: "8px", alignItems: "center" }}>
+            <span style={{ fontSize: "12px", color: C.muted, fontWeight: "600" }}>Edit:</span>
+            {["this", "all"].map((s) => (
+              <button key={s} onClick={() => setEditScope(s)} style={{ padding: "4px 12px", borderRadius: "20px", border: `1px solid ${editScope === s ? C.accent : C.border}`, background: editScope === s ? C.accentLight : "none", color: editScope === s ? C.accentBright : C.muted, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>
+                {s === "this" ? "This event only" : "All events in series"}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          <div>
+            <label style={lbl}>Event Name *</label>
+            <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} style={inp} placeholder="Community Day, Board Meeting, Open House…" onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }} />
+          </div>
+          {(!isRecurringSeries || editScope === "this") && (
+            <div>
+              <label style={lbl}>Date *</label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} />
+            </div>
+          )}
+          <div>
+            <label style={lbl}>Description</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} style={{ ...inp, resize: "vertical", lineHeight: "1.6" }} placeholder="What's happening, who's involved…" />
+          </div>
+          <div>
+            <label style={lbl}>Color</label>
+            <div style={{ display: "flex", gap: "8px" }}>
+              {CAL_COLORS.map((c) => (
+                <button key={c.value} onClick={() => setColor(c.value)} title={c.label} style={{ width: "28px", height: "28px", borderRadius: "50%", background: c.value, border: color === c.value ? `3px solid ${C.text}` : `2px solid transparent`, cursor: "pointer", transition: "border 0.15s", flexShrink: 0 }} />
+              ))}
+            </div>
+          </div>
+
+          {/* Recurring (new events only) */}
+          {isNew && (
+            <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", marginBottom: recurring ? "10px" : 0 }}>
+                <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} style={{ width: "15px", height: "15px", accentColor: C.accent, cursor: "pointer" }} />
+                <span style={{ fontSize: "13px", fontWeight: "600", color: C.text }}>🔁 Make this a recurring event</span>
+              </label>
+              {recurring && (
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  <div style={{ flex: 1, minWidth: "130px" }}>
+                    <label style={{ ...lbl, marginTop: "4px" }}>Repeats</label>
+                    <select value={recurringFrequency} onChange={(e) => setRecurringFrequency(e.target.value)} style={{ ...inp, color: C.text }}>
+                      {RECUR_FREQ.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ flex: 1, minWidth: "130px" }}>
+                    <label style={{ ...lbl, marginTop: "4px" }}>End Date</label>
+                    <input type="date" value={recurringEndDate} onChange={(e) => setRecurringEndDate(e.target.value)} style={inp} />
+                    <div style={{ fontSize: "10px", color: C.muted, marginTop: "4px" }}>Leave blank for 12 occurrences</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Delete confirmation */}
+        {deleteScope !== null && (
+          <div style={{ marginTop: "16px", background: "rgba(239,68,68,0.06)", border: "1px solid #EF4444", borderRadius: "10px", padding: "12px" }}>
+            <div style={{ fontSize: "13px", fontWeight: "600", color: "#EF4444", marginBottom: "8px" }}>
+              {deleteScope === "all" ? "Delete the entire recurring series?" : "Delete just this occurrence?"}
+            </div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button onClick={() => handleDelete(deleteScope)} style={{ padding: "6px 14px", borderRadius: "7px", border: "none", background: "#EF4444", color: "#fff", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>Yes, delete</button>
+              <button onClick={() => setDeleteScope(null)} style={{ padding: "6px 12px", borderRadius: "7px", border: `1px solid ${C.border}`, background: "none", color: C.muted, fontSize: "12px", cursor: "pointer" }}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "20px" }}>
+          <div style={{ display: "flex", gap: "6px" }}>
+            {!isNew && !deleteScope && (
+              <>
+                <button onClick={() => setDeleteScope("this")} style={{ padding: "7px 12px", borderRadius: "8px", border: "1px solid #EF4444", background: "none", color: "#EF4444", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>
+                  🗑 {isRecurringSeries ? "This" : "Delete"}
+                </button>
+                {isRecurringSeries && (
+                  <button onClick={() => setDeleteScope("all")} style={{ padding: "7px 12px", borderRadius: "8px", border: "1px solid #EF4444", background: "none", color: "#EF4444", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>
+                    🗑 All series
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button onClick={onClose} style={{ padding: "8px 16px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.cardBg, color: C.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Cancel</button>
+            <button onClick={handleSave} disabled={!title.trim() || !date || saving} style={{ padding: "8px 18px", borderRadius: "8px", border: "none", background: title.trim() && date ? C.accent : C.border, color: "#fff", fontSize: "13px", fontWeight: "600", cursor: title.trim() && date ? "pointer" : "not-allowed" }}>
+              {saving ? "Saving…" : isNew ? (recurring ? "Log Recurring Events" : "Log Event") : "Save"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ─── Month view ───────────────────────────────────────────────────────────────
 
-function MonthView({ posts, onEdit, onNewPost, onDateChange, viewYear, viewMonth, today }) {
+function MonthView({ posts, events = [], calEvents = [], onEdit, onNewPost, onDateChange, viewYear, viewMonth, today, onEditCalEvent }) {
   const [selectedDate, setSelectedDate] = useState(null);
   const [draggedPostId, setDraggedPostId] = useState(null);
   const [dropTargetDate, setDropTargetDate] = useState(null);
+  const [selectedEvent, setSelectedEventLocal] = useState(null);
 
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const firstDow = getFirstDayOfWeek(viewYear, viewMonth);
@@ -376,6 +548,32 @@ function MonthView({ posts, onEdit, onNewPost, onDateChange, viewYear, viewMonth
     if (y === viewYear && m === viewMonth + 1) {
       if (!postsByDay[d]) postsByDay[d] = [];
       postsByDay[d].push(p);
+    }
+  });
+
+  const eventsByDay = {};
+  events.forEach((ev) => {
+    if (!ev.date) return;
+    const parts = ev.date.split("-");
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const d = parseInt(parts[2], 10);
+    if (y === viewYear && m === viewMonth + 1) {
+      if (!eventsByDay[d]) eventsByDay[d] = [];
+      eventsByDay[d].push(ev);
+    }
+  });
+
+  const calEventsByDay = {};
+  calEvents.forEach((ev) => {
+    if (!ev.date) return;
+    const parts = ev.date.split("-");
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const d = parseInt(parts[2], 10);
+    if (y === viewYear && m === viewMonth + 1) {
+      if (!calEventsByDay[d]) calEventsByDay[d] = [];
+      calEventsByDay[d].push(ev);
     }
   });
 
@@ -440,6 +638,8 @@ function MonthView({ posts, onEdit, onNewPost, onDateChange, viewYear, viewMonth
 
             const dateStr = isoDate(viewYear, viewMonth, day);
             const dayPosts = postsByDay[day] || [];
+            const dayEvents = eventsByDay[day] || [];
+            const dayCalEvents = calEventsByDay[day] || [];
             const isToday = dateStr === today;
             const isSelected = dateStr === selectedDate;
             const isDropTarget = dateStr === dropTargetDate;
@@ -536,6 +736,49 @@ function MonthView({ posts, onEdit, onNewPost, onDateChange, viewYear, viewMonth
                     </span>
                   )}
                 </div>
+
+                {/* Mini event planning tags */}
+                {dayEvents.map((ev) => (
+                  <div
+                    key={ev.id}
+                    onClick={(e) => { e.stopPropagation(); setSelectedEventLocal(ev); }}
+                    style={{
+                      fontSize: "10px", fontWeight: "600",
+                      color: "#fff",
+                      background: ev.color || "#6366F1",
+                      borderRadius: "4px",
+                      padding: "1px 5px",
+                      marginBottom: "2px",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      cursor: "pointer",
+                    }}
+                    title={ev.title}
+                  >
+                    📅 {ev.title}
+                  </div>
+                ))}
+
+                {/* Mini space event tags */}
+                {dayCalEvents.map((ev) => (
+                  <div
+                    key={ev.id}
+                    onClick={(e) => { e.stopPropagation(); if (onEditCalEvent) onEditCalEvent(ev); }}
+                    style={{
+                      fontSize: "10px", fontWeight: "600",
+                      color: "#fff",
+                      background: ev.color || "#10B981",
+                      borderRadius: "4px",
+                      padding: "1px 5px",
+                      marginBottom: "2px",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      cursor: "pointer",
+                      opacity: 0.9,
+                    }}
+                    title={ev.title}
+                  >
+                    🏠 {ev.title}
+                  </div>
+                ))}
 
                 {/* Mini post tags */}
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -671,7 +914,27 @@ function MonthView({ posts, onEdit, onNewPost, onDateChange, viewYear, viewMonth
           <div style={{ height: "1px", background: C.border, marginBottom: "12px", flexShrink: 0 }} />
 
           <div style={{ flex: 1, overflowY: "auto" }}>
-            {selectedPosts.length === 0 ? (
+            {/* Space events for this day */}
+            {selectedDate && (calEventsByDay[parseInt(selectedDate.split("-")[2], 10)] || []).map((ev) => (
+              <div key={ev.id} onClick={() => onEditCalEvent && onEditCalEvent(ev)} style={{ padding: "10px 12px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}`, borderLeft: `4px solid ${ev.color || "#10B981"}`, marginBottom: "8px", cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ fontSize: "13px", fontWeight: "700", color: C.text }}>🏠 {ev.title}</div>
+                  <span style={{ fontSize: "10px", fontWeight: "600", color: ev.color || "#10B981", padding: "1px 7px", borderRadius: "10px", background: `${ev.color || "#10B981"}18` }}>Space Event</span>
+                </div>
+                {ev.description && <div style={{ fontSize: "11px", color: C.muted, marginTop: "3px" }}>{ev.description}</div>}
+              </div>
+            ))}
+            {/* Event planning items for this day */}
+            {selectedDate && (eventsByDay[parseInt(selectedDate.split("-")[2], 10)] || []).map((ev) => (
+              <div key={ev.id} style={{ padding: "10px 12px", background: C.cardBg, borderRadius: "8px", border: `1px solid ${C.border}`, borderLeft: `4px solid ${ev.color || "#6366F1"}`, marginBottom: "8px" }}>
+                <div style={{ fontSize: "13px", fontWeight: "700", color: C.text }}>📅 {ev.title}</div>
+                {ev.description && <div style={{ fontSize: "11px", color: C.muted, marginTop: "3px" }}>{ev.description}</div>}
+                {ev.status && <span style={{ fontSize: "10px", fontWeight: "600", color: ev.color || "#6366F1", marginTop: "4px", display: "inline-block" }}>{ev.status.toUpperCase()}</span>}
+              </div>
+            ))}
+            {selectedPosts.length === 0 &&
+             !(selectedDate && (eventsByDay[parseInt(selectedDate.split("-")[2], 10)] || []).length) &&
+             !(selectedDate && (calEventsByDay[parseInt(selectedDate.split("-")[2], 10)] || []).length) ? (
               <div
                 style={{
                   textAlign: "center",
@@ -691,6 +954,33 @@ function MonthView({ posts, onEdit, onNewPost, onDateChange, viewYear, viewMonth
             )}
           </div>
         </div>
+      )}
+
+      {/* Event quick-view popup */}
+      {selectedEvent && (
+        <>
+          <div onClick={() => setSelectedEventLocal(null)} style={{ position: "fixed", inset: 0, zIndex: 1999 }} />
+          <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: "360px", maxWidth: "90vw", background: C.card, border: `1px solid ${C.border}`, borderLeft: `5px solid ${selectedEvent.color || "#6366F1"}`, borderRadius: "14px", padding: "20px", zIndex: 2000, boxShadow: "0 12px 40px rgba(0,0,0,0.25)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+              <div>
+                <div style={{ fontSize: "16px", fontWeight: "800", color: C.text }}>{selectedEvent.title}</div>
+                {selectedEvent.date && <div style={{ fontSize: "12px", color: C.muted, marginTop: "4px" }}>📅 {new Date(selectedEvent.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric", year: "numeric" })}</div>}
+              </div>
+              <button onClick={() => setSelectedEventLocal(null)} style={{ background: "none", border: "none", color: C.muted, fontSize: "16px", cursor: "pointer", padding: "2px 4px" }}>✕</button>
+            </div>
+            {selectedEvent.description && <div style={{ fontSize: "13px", color: C.muted, lineHeight: "1.6", marginBottom: "10px" }}>{selectedEvent.description}</div>}
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {selectedEvent.status && <span style={{ fontSize: "11px", fontWeight: "700", padding: "2px 8px", borderRadius: "10px", background: `${selectedEvent.color || "#6366F1"}20`, color: selectedEvent.color || "#6366F1" }}>{selectedEvent.status}</span>}
+              {selectedEvent.club && <span style={{ fontSize: "11px", color: C.muted, padding: "2px 8px", borderRadius: "10px", background: C.cardBg, border: `1px solid ${C.border}` }}>{selectedEvent.club}</span>}
+              {selectedEvent.slackChannel && <span style={{ fontSize: "11px", color: "#4A154B" }}>💬 {selectedEvent.slackChannel}</span>}
+            </div>
+            {selectedEvent.driveFolderUrl && (
+              <a href={selectedEvent.driveFolderUrl} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "5px", marginTop: "12px", fontSize: "12px", color: C.accent, textDecoration: "none", padding: "5px 10px", borderRadius: "20px", border: `1px solid ${C.accent}`, background: C.accentLight }}>
+                📂 Open Drive Folder
+              </a>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
@@ -1259,11 +1549,73 @@ function CommentsView({ posts, onEdit }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function CalendarView({ posts, onEdit, onNewPost, onDateChange }) {
+export default function CalendarView({ posts, onEdit, onNewPost, onDateChange, token }) {
   const now = new Date();
   const today = now.toISOString().split("T")[0];
 
   const [calView, setCalView] = useState("month");
+  const [events, setEvents] = useState([]);
+  const [calEvents, setCalEvents] = useState([]);
+  const [showContent, setShowContent] = useState(true);
+  const [showPlanning, setShowPlanning] = useState(true);
+  const [showSpaceEvents, setShowSpaceEvents] = useState(true);
+  const [calEventModal, setCalEventModal] = useState(null); // null=closed, false=new, obj=edit
+  const [logEventDate, setLogEventDate] = useState(null);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch("/api/events", { headers: { "x-session": token } })
+      .then((r) => r.json())
+      .then((data) => setEvents(Array.isArray(data) ? data.filter((e) => e.date) : []))
+      .catch(() => {});
+    fetch("/api/calevents", { headers: { "x-session": token } })
+      .then((r) => r.json())
+      .then((data) => setCalEvents(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [token]);
+
+  const handleSaveCalEvent = async (data, id) => {
+    const h = { "Content-Type": "application/json", "x-session": token };
+    if (id) {
+      const res = await fetch(`/api/calevents/${id}`, { method: "PUT", headers: h, body: JSON.stringify(data) });
+      const saved = await res.json();
+      if (Array.isArray(saved)) {
+        // Updated all in series — replace all matching events
+        const gid = saved[0]?.recurringGroupId;
+        setCalEvents((prev) => [...prev.filter((e) => e.recurringGroupId !== gid), ...saved]);
+      } else {
+        setCalEvents((prev) => prev.map((e) => e.id === id ? saved : e));
+      }
+    } else {
+      const res = await fetch("/api/calevents", { method: "POST", headers: h, body: JSON.stringify(data) });
+      const saved = await res.json();
+      if (Array.isArray(saved)) {
+        // Recurring — add all generated events
+        setCalEvents((prev) => [...prev, ...saved]);
+      } else {
+        setCalEvents((prev) => [...prev, saved]);
+      }
+    }
+  };
+
+  const handleDeleteCalEvent = async (id, scope = "this") => {
+    const h = { "x-session": token };
+    if (scope === "all") {
+      const target = calEvents.find((e) => e.id === id);
+      if (target?.recurringGroupId) {
+        setCalEvents((prev) => prev.filter((e) => e.recurringGroupId !== target.recurringGroupId));
+        await fetch(`/api/calevents/${id}?scope=all`, { method: "DELETE", headers: h });
+        return;
+      }
+    }
+    setCalEvents((prev) => prev.filter((e) => e.id !== id));
+    await fetch(`/api/calevents/${id}`, { method: "DELETE", headers: h });
+  };
+
+  const visiblePosts = showContent ? posts : [];
+  const visibleEvents = showPlanning ? events : [];
+  const visibleCalEvents = showSpaceEvents ? calEvents : [];
+
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
   const [selectedDate, setSelectedDate] = useState(null);
@@ -1325,8 +1677,8 @@ export default function CalendarView({ posts, onEdit, onNewPost, onDateChange })
           </div>
         )}
 
-        {/* Right side: Today + New Post */}
-        <div style={{ display: "flex", gap: "8px" }}>
+        {/* Right side: Today + New Post + Log Event */}
+        <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
           {showMonthNav && (
             <button
               onClick={goToday}
@@ -1345,6 +1697,22 @@ export default function CalendarView({ posts, onEdit, onNewPost, onDateChange })
               Today
             </button>
           )}
+          {/* Log Space Event button */}
+          <button
+            onClick={() => { setLogEventDate(selectedDate || today); setCalEventModal(false); }}
+            style={{
+              padding: "6px 14px",
+              borderRadius: "8px",
+              border: `1px solid #10B981`,
+              background: "rgba(16,185,129,0.08)",
+              color: "#10B981",
+              fontSize: "12px",
+              fontWeight: "600",
+              cursor: "pointer",
+            }}
+          >
+            🏠 Log Event
+          </button>
           {showNewPostBtn && (
             <button
               onClick={() => onNewPost(selectedDate || today)}
@@ -1366,16 +1734,53 @@ export default function CalendarView({ posts, onEdit, onNewPost, onDateChange })
         </div>
       </div>
 
+      {/* ── Filter chips ── */}
+      {calView === "month" && (
+        <div style={{ display: "flex", gap: "6px", marginBottom: "16px", flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ fontSize: "11px", color: C.muted, fontWeight: "600", marginRight: "4px" }}>Show:</span>
+          {[
+            { key: "content",     label: "Content",           color: C.accent,   state: showContent,     toggle: () => setShowContent((v) => !v) },
+            { key: "planning",    label: "Events Being Planned", color: "#6366F1", state: showPlanning,    toggle: () => setShowPlanning((v) => !v) },
+            { key: "spaceevents", label: "Space Events",      color: "#10B981",  state: showSpaceEvents, toggle: () => setShowSpaceEvents((v) => !v) },
+          ].map(({ key, label, color, state, toggle }) => (
+            <button
+              key={key}
+              onClick={toggle}
+              style={{
+                padding: "4px 12px",
+                borderRadius: "20px",
+                border: state ? `1px solid ${color}` : `1px solid ${C.border}`,
+                background: state ? `${color}18` : C.card,
+                color: state ? color : C.muted,
+                fontSize: "11px",
+                fontWeight: "600",
+                cursor: "pointer",
+                transition: "all 0.15s",
+                display: "flex",
+                alignItems: "center",
+                gap: "5px",
+              }}
+            >
+              <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: state ? color : C.border, display: "inline-block", flexShrink: 0 }} />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ── View body ── */}
       {calView === "month" && (
         <MonthView
-          posts={posts}
+          posts={visiblePosts}
+          events={visibleEvents}
+          calEvents={visibleCalEvents}
           onEdit={onEdit}
           onNewPost={onNewPost}
           onDateChange={onDateChange}
           viewYear={viewYear}
           viewMonth={viewMonth}
           today={today}
+          onEditCalEvent={(ev) => { setCalEventModal(ev); setLogEventDate(ev.date); }}
         />
       )}
 
@@ -1414,6 +1819,18 @@ export default function CalendarView({ posts, onEdit, onNewPost, onDateChange })
         <CommentsView
           posts={posts}
           onEdit={onEdit}
+        />
+      )}
+
+      {/* ── Cal Event Modal ── */}
+      {calEventModal !== null && (
+        <CalEventModal
+          event={calEventModal || null}
+          defaultDate={logEventDate || today}
+          token={token}
+          onClose={() => { setCalEventModal(null); setLogEventDate(null); }}
+          onSave={handleSaveCalEvent}
+          onDelete={handleDeleteCalEvent}
         />
       )}
     </div>

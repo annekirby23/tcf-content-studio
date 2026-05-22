@@ -278,6 +278,8 @@ const TABS = [
   { id: "pillars", label: "Content Pillars" },
 ];
 
+// Bug Reports tab removed — moved to BugReportsView.js as a standalone sidebar page.
+
 export default function SettingsModal({ token, currentUser, onClose, onSettingsUpdate }) {
   const [activeTab, setActiveTab] = useState("themes");
   const [data, setData] = useState({ themes: [], contentTypes: [], platforms: [], pillars: [] });
@@ -387,6 +389,7 @@ export default function SettingsModal({ token, currentUser, onClose, onSettingsU
               {activeTab === "pillars" && (
                 <SimpleListTab items={data.pillars} isAdmin={isAdmin} saving={saving.pillars} onSave={(updated) => handleSave("pillars", updated)} />
               )}
+
             </>
           )}
         </div>
