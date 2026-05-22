@@ -58,9 +58,11 @@ export async function PUT(req) {
     if (body.memberGoal !== undefined) data.memberGoal = Number(body.memberGoal);
     if (body.memberGoalDate !== undefined) data.memberGoalDate = body.memberGoalDate;
 
-    // ── Calendar / Team Schedule image upload ───────────────────────────────────
+    // ── Image uploads ───────────────────────────────────────────────────────────
     if (body.calendarImage !== undefined) data.calendarImage = body.calendarImage;
     if (body.teamScheduleImage !== undefined) data.teamScheduleImage = body.teamScheduleImage;
+    if (body.teamScheduleImage2 !== undefined) data.teamScheduleImage2 = body.teamScheduleImage2;
+    if (body.monthlyScheduleImage !== undefined) data.monthlyScheduleImage = body.monthlyScheduleImage;
 
     await kvSet(KEY, data);
     return Response.json(data);

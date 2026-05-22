@@ -584,13 +584,18 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
     { id: "posts", label: "📢 Announcements" },
     { id: "shoutouts", label: "⭐ Shoutouts" },
     { id: "calendar", label: "📅 Monthly Calendar" },
-    { id: "schedule", label: "🗓️ Team Schedule" },
+    { id: "schedule", label: "🗓️ Weekly Team Schedule" },
+    { id: "monthlySchedule", label: "📆 Monthly Schedule" },
   ];
 
   const calendarInputRef = useRef(null);
   const scheduleInputRef = useRef(null);
+  const schedule2InputRef = useRef(null);
+  const monthlyScheduleInputRef = useRef(null);
   const [calendarUploading, setCalendarUploading] = useState(false);
   const [scheduleUploading, setScheduleUploading] = useState(false);
+  const [schedule2Uploading, setSchedule2Uploading] = useState(false);
+  const [monthlyScheduleUploading, setMonthlyScheduleUploading] = useState(false);
 
   function handleImageUpload(field, setUploading) {
     return (e) => {
@@ -760,18 +765,52 @@ export default function BulletinBoardView({ token, currentUser, teamMembers = []
             />
           )}
 
-          {/* Team Schedule tab */}
+          {/* Weekly Team Schedule tab — two weeks */}
           {activeTab === "schedule" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+              <div>
+                <div style={{ fontSize: "12px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px" }}>📅 Week 1</div>
+                <ImageUploadTab
+                  image={data.teamScheduleImage}
+                  label="Week 1 Schedule"
+                  icon="🗓️"
+                  isAdmin={isAdmin}
+                  uploading={scheduleUploading}
+                  inputRef={scheduleInputRef}
+                  onUploadClick={() => scheduleInputRef.current?.click()}
+                  onFileChange={handleImageUpload("teamScheduleImage", setScheduleUploading)}
+                  onClear={() => clearImage("teamScheduleImage")}
+                />
+              </div>
+              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "24px" }}>
+                <div style={{ fontSize: "12px", fontWeight: "700", color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px" }}>📅 Week 2</div>
+                <ImageUploadTab
+                  image={data.teamScheduleImage2}
+                  label="Week 2 Schedule"
+                  icon="🗓️"
+                  isAdmin={isAdmin}
+                  uploading={schedule2Uploading}
+                  inputRef={schedule2InputRef}
+                  onUploadClick={() => schedule2InputRef.current?.click()}
+                  onFileChange={handleImageUpload("teamScheduleImage2", setSchedule2Uploading)}
+                  onClear={() => clearImage("teamScheduleImage2")}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Monthly Schedule tab */}
+          {activeTab === "monthlySchedule" && (
             <ImageUploadTab
-              image={data.teamScheduleImage}
-              label="Team Schedule"
-              icon="🗓️"
+              image={data.monthlyScheduleImage}
+              label="Monthly Schedule"
+              icon="📆"
               isAdmin={isAdmin}
-              uploading={scheduleUploading}
-              inputRef={scheduleInputRef}
-              onUploadClick={() => scheduleInputRef.current?.click()}
-              onFileChange={handleImageUpload("teamScheduleImage", setScheduleUploading)}
-              onClear={() => clearImage("teamScheduleImage")}
+              uploading={monthlyScheduleUploading}
+              inputRef={monthlyScheduleInputRef}
+              onUploadClick={() => monthlyScheduleInputRef.current?.click()}
+              onFileChange={handleImageUpload("monthlyScheduleImage", setMonthlyScheduleUploading)}
+              onClear={() => clearImage("monthlyScheduleImage")}
             />
           )}
         </div>
