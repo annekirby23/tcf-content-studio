@@ -209,30 +209,6 @@ const SECTIONS = [
     ],
   },
   {
-    id: "leadership",
-    icon: "🏛",
-    title: "Leadership Hub (Admin Only)",
-    color: "#6366F1",
-    entries: [
-      {
-        q: "What is Leadership Hub?",
-        a: "Leadership Hub is an admin-only area for managing team-level priorities and monitoring overall team health. It includes the Team Health Report, Working On cards for each admin, and other leadership tools.",
-      },
-      {
-        q: "What is Team Health?",
-        a: "Team Health shows a score and status (Active / At Risk / Inactive) for each team member based on their recent app activity — tasks added, tasks completed, and notes created. It helps admins spot when someone might need support or a check-in.",
-      },
-      {
-        q: "What is Working On?",
-        a: "Each admin has a Working On card where they can post a short bullet list of their current focus areas. This gives leadership a shared view of what everyone is working on at the top level.",
-      },
-      {
-        q: "What are Settings and Team Management?",
-        a: "In the sidebar at the bottom, admins have access to ⚙️ Settings (app configuration) and 👥 Team (add, edit, or remove team members and their roles). These are admin-only tools.",
-      },
-    ],
-  },
-  {
     id: "tips",
     icon: "💡",
     title: "Tips & Tricks",
