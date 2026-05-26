@@ -25,6 +25,7 @@ import MemberJourneyView from "./MemberJourneyView";
 import BulletinBoardView from "./BulletinBoardView";
 import ReportingView from "./ReportingView";
 import BugReportsView from "./BugReportsView";
+import HelpGuideView from "./HelpGuideView";
 import InventoryView from "./InventoryView";
 import ConfRoomsView from "./ConfRoomsView";
 import CirclesView from "./CirclesView";
@@ -1486,6 +1487,7 @@ export default function ContentScheduler() {
     { id: "brandrepo", label: "Brand Repository" },
     { id: "roho", label: "ROHO Social Club" },
     { id: "networking", label: "Networking" },
+    { id: "helpguide", label: "Help & How-To Guide" },
   ];
   const topBarTitle = view === "mydash"
     ? workspaceTitle
@@ -1750,8 +1752,18 @@ export default function ContentScheduler() {
             />
           ))}
 
-          {/* ── Bug Reports (all users) ── */}
+          {/* ── Help Guide + Bug Reports (all users) ── */}
           <div style={{ borderTop: `1px solid ${C.border}`, margin: "10px 0", padding: "10px 0 0" }}>
+            <button
+              onClick={() => navigate("helpguide")}
+              title={!sidebarOpen ? "Help & How-To Guide" : undefined}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "9px 10px", borderRadius: "8px", border: "none", background: view === "helpguide" ? C.accentLight : "transparent", color: view === "helpguide" ? C.accentBright : C.muted, fontSize: "13px", fontWeight: view === "helpguide" ? "600" : "400", cursor: "pointer", transition: "all 0.15s", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}
+              onMouseEnter={(e) => { if (view !== "helpguide") e.currentTarget.style.background = C.hover; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = view === "helpguide" ? C.accentLight : "transparent"; }}
+            >
+              <span style={{ fontSize: "16px", flexShrink: 0 }}>📖</span>
+              {sidebarOpen && "Help Guide"}
+            </button>
             <button
               onClick={() => navigate("bugreports")}
               title={!sidebarOpen ? "Bug Reports" : undefined}
@@ -1972,6 +1984,7 @@ export default function ContentScheduler() {
               {view === "bugreports" && (
                 <BugReportsView token={authToken} currentUser={currentUser} />
               )}
+              {view === "helpguide" && <HelpGuideView />}
               {view === "teamtasks" && <TeamTaskTracker token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
               {view === "training" && <TrainingView token={authToken} currentUser={currentUser} />}
               {view === "events" && <EventsView token={authToken} currentUser={currentUser} teamMembers={teamMembers} />}
