@@ -11,25 +11,31 @@ const IMAGE_KEYS = {
 };
 
 // Upload a base64 data URL to Cloudinary and return the hosted URL.
-async function uploadToCloudinary(base64DataUrl) {
+// Falls back to storing the data URL directly in Redis if Cloudinary is not configured.
+async function uploadImage(base64DataUrl) {
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
   const preset    = process.env.CLOUDINARY_UPLOAD_PRESET;
-  if (!cloudName || !preset) throw new Error("Cloudinary env vars not set");
 
-  const body = new URLSearchParams();
-  body.append("file", base64DataUrl);
-  body.append("upload_preset", preset);
+  // If Cloudinary is configured, use it
+  if (cloudName && preset) {
+    const body = new URLSearchParams();
+    body.append("file", base64DataUrl);
+    body.append("upload_preset", preset);
 
-  const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-    { method: "POST", body }
-  );
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Cloudinary error ${res.status}`);
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+      { method: "POST", body }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Cloudinary error ${res.status}`);
+    }
+    const data = await res.json();
+    return data.secure_url;
   }
-  const data = await res.json();
-  return data.secure_url; // e.g. "https://res.cloudinary.com/..."
+
+  // Fallback: store the base64 data URL directly in Redis
+  return base64DataUrl;
 }
 
 // One-time migration: remove any old image blobs stored in the main bulletin key.
@@ -74,8 +80,8 @@ export async function PUT(req) {
     }
 
     if (value) {
-      // value is a compressed base64 JPEG — upload to Cloudinary, store the URL
-      const url = await uploadToCloudinary(value);
+      // value is a compressed base64 JPEG — upload to Cloudinary if configured, otherwise store directly
+      const url = await uploadImage(value);
       await kvSet(IMAGE_KEYS[field], url);
     } else {
       // Remove image
